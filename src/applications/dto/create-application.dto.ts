@@ -19,4 +19,9 @@ export class CreateApplicationDto {
   @IsArray()
   @IsOptional()
   strTags?: string[];
+
+  @IsString({ each: true})
+  @IsArray()
+  @IsOptional()
+  strImages?: string[];
 }
