@@ -1,4 +1,12 @@
-import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { ApplicationImage } from './application-image.entity';
 
 @Entity()
 export class Application {
@@ -28,28 +36,35 @@ export class Application {
   })
   strSlug: string;
 
-  @Column('text',{
+  @Column('text', {
     array: true,
-    default: []
+    default: [],
   })
   strTags: string[];
 
+  @OneToMany(
+    () => ApplicationImage,
+    (applicationImage) => applicationImage.strApplication,
+    { cascade: true, eager: true },
+  )
+  strImages?: ApplicationImage[];
+
   @BeforeInsert()
-  checkSlugInsert(){
-    if (!this.strSlug){
-      this.strSlug = this.strName
+  checkSlugInsert() {
+    if (!this.strSlug) {
+      this.strSlug = this.strName;
     }
     this.strSlug = this.strSlug
-    .toLowerCase()
-      .replaceAll(' ','_')
-      .replaceAll("'",'')
+      .toLowerCase()
+      .replaceAll(' ', '_')
+      .replaceAll("'", '');
   }
 
   @BeforeUpdate()
-  checkSlugUpdate(){
+  checkSlugUpdate() {
     this.strSlug = this.strSlug
-    .toLowerCase()
-      .replaceAll(' ','_')
-      .replaceAll("'",'')
+      .toLowerCase()
+      .replaceAll(' ', '_')
+      .replaceAll("'", '');
   }
 }
