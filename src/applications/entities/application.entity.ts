@@ -1,4 +1,4 @@
-import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { BeforeInsert, BeforeUpdate, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
 @Entity()
 export class Application {
@@ -28,6 +28,12 @@ export class Application {
   })
   strSlug: string;
 
+  @Column('text',{
+    array: true,
+    default: []
+  })
+  strTags: string[];
+
   @BeforeInsert()
   checkSlugInsert(){
     if (!this.strSlug){
@@ -37,6 +43,13 @@ export class Application {
     .toLowerCase()
       .replaceAll(' ','_')
       .replaceAll("'",'')
-    
+  }
+
+  @BeforeUpdate()
+  checkSlugUpdate(){
+    this.strSlug = this.strSlug
+    .toLowerCase()
+      .replaceAll(' ','_')
+      .replaceAll("'",'')
   }
 }

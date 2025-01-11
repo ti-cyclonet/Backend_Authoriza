@@ -1,4 +1,4 @@
-import { IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class CreateApplicationDto {
   @IsString()
@@ -14,4 +14,9 @@ export class CreateApplicationDto {
   @IsString()
   @IsOptional()
   strSlug?: string;
+
+  @IsString({ each: true})
+  @IsArray()
+  @IsOptional()
+  strTags?: string[];
 }
