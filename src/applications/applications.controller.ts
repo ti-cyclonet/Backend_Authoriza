@@ -20,7 +20,7 @@ export class ApplicationsController {
 
   @Get(':term')
   findOne(@Param('term') term: string) {
-    return this.applicationsService.findOne(term);
+    return this.applicationsService.findOnePlain(term);
   }
 
   @Patch(':id')
