@@ -8,6 +8,12 @@ import { PaginationDto } from 'src/common/dtos/pagination.dto';
 export class ApplicationsController {
   constructor(private readonly applicationsService: ApplicationsService) {}
 
+  @Post('check-name') // Endpoint para verificar el nombre de la aplicación
+  async checkApplicationName(@Body('strName') strName: string): Promise<{ available: boolean }> {
+    const available = await this.applicationsService.checkApplicationName(strName);
+    return { available }; // Devuelve un objeto con la propiedad "available"
+  }  
+
   @Post()
   create(@Body() createApplicationDto: CreateApplicationDto) {
     return this.applicationsService.create(createApplicationDto);

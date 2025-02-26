@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsOptional, IsString, MinLength } from 'class-validator';
+import { CreateMenuoptionDto } from 'src/menuoptions/dto/create-menuoption.dto';
 
 export class CreateRolDto {
   @IsString()
@@ -12,6 +13,7 @@ export class CreateRolDto {
   @IsOptional()
   strDescription2?: string;
 
-  @IsString()
-  strIdApplication: string;
+  @IsArray()
+  menuOptions: CreateMenuoptionDto[];
+  
 }

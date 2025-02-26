@@ -6,7 +6,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { ApplicationImage } from './application-image.entity';
+import { Rol } from 'src/roles/entities/rol.entity';
 
 @Entity()
 export class Application {
@@ -40,14 +40,15 @@ export class Application {
     array: true,
     default: [],
   })
-  strTags: string[];
+  strTags: string[];  
 
+  //Roles
   @OneToMany(
-    () => ApplicationImage,
-    (applicationImage) => applicationImage.strApplication,
+    () => Rol,
+    (rol) => rol.strApplication,
     { cascade: true, eager: true },
   )
-  strImages?: ApplicationImage[];
+  strRoles?: Rol[];
 
   @BeforeInsert()
   checkSlugInsert() {
