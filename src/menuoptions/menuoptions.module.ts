@@ -9,6 +9,7 @@ import { Menuoption } from './entities/menuoption.entity';
   providers: [MenuoptionsService],
   imports: [
     TypeOrmModule.forFeature([Menuoption])
-  ]
+  ],
+  exports: [MenuoptionsService, TypeOrmModule],
 })
 export class MenuoptionsModule {}

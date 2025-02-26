@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsIn,
   IsNumber,
   IsOptional,
@@ -25,14 +26,18 @@ export class CreateMenuoptionDto {
   @IsIn(['main_menu', 'submenu_n1', 'submenu_n2'])
   strType: string;
 
-  @IsString()
-  @IsOptional()
-  strIdMPather: string;
-
   @IsNumber()
   @IsOptional()
   ingOrder: number;
 
-  @IsString()
-  strIdApplication: string;
+  @IsArray()
+  @IsOptional()
+  strSubmenus?: {
+    strName: string;
+    strDescription?: string;
+    strUrl?: string;
+    strIcon?: string;
+    strType?: string;
+    ingOrder?: number;
+  }[];
 }
