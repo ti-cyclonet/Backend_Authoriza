@@ -136,7 +136,7 @@ export class ApplicationsService {
   
   async checkApplicationName(strName: string): Promise<boolean> {
     const application = await this.applicationRepository.findOne({ where: { strName } });
-    return !application;
+    return !application; 
   }
 
   async findAll(paginationDto: PaginationDto) {
