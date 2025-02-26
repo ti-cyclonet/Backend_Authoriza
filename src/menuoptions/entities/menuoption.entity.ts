@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
 
 @Entity()
 export class Menuoption {
@@ -35,11 +36,12 @@ export class Menuoption {
   })
   strType: string;
 
-  @Column({
-    type: 'uuid',
-    nullable: false,
-  })
-  strIdMPather: string;
+  @ManyToOne(
+    () => Menuoption,
+    (menuOption) => menuOption.strSubmenus,
+    { onDelete: 'CASCADE' }
+  )
+  strMPatern: Menuoption;
 
   @Column({
     type: 'numeric',
@@ -47,9 +49,14 @@ export class Menuoption {
   })
   ingOrder: number;
 
-  @Column({
-    type: 'uuid',
-    nullable: false,
-  })
-  strIdApplication: string;
+  @OneToMany(
+    () => Menuoption,
+    (menuOption) => menuOption.strMPatern,
+    { cascade: true, eager: false },
+  )
+  strSubmenus?: Menuoption[];
+
+  @OneToMany(() => RolMenuoption, (rolMenuoption) => rolMenuoption.menuoption, { cascade: true })
+  rolMenuoptions: RolMenuoption[];
+
 }

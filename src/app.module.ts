@@ -5,7 +5,10 @@ import { ApplicationsModule } from './applications/applications.module';
 import { CommonModule } from './common/common.module';
 import { MenuoptionsModule } from './menuoptions/menuoptions.module';
 import { RolesModule } from './roles/roles.module';
-
+import { RolMenuoption } from './roles/entities/rol-menuoption.entity';
+import { Application } from './applications/entities/application.entity';
+import { Menuoption } from './menuoptions/entities/menuoption.entity';
+import { Rol } from './roles/entities/rol.entity';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -17,7 +20,7 @@ import { RolesModule } from './roles/roles.module';
       database: process.env.DB_NAME,
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
-      autoLoadEntities: true,
+      entities: [Application, Menuoption, RolMenuoption, Rol],
       synchronize: true,
     }),
     ApplicationsModule,

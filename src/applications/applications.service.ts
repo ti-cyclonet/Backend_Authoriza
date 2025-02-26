@@ -12,9 +12,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from 'uuid';
-import { ApplicationImage } from './entities';
-import { application } from 'express';
-
+import { Rol } from 'src/roles/entities/rol.entity';
+import { Menuoption } from 'src/menuoptions/entities/menuoption.entity';
+import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
+import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger('ApplicationsService');
@@ -22,99 +23,397 @@ export class ApplicationsService {
     @InjectRepository(Application)
     private readonly applicationRepository: Repository<Application>,
 
-    @InjectRepository(ApplicationImage)
-    private readonly applicationImageRepository: Repository<ApplicationImage>,
+    @InjectRepository(Rol)
+    private readonly RolRepository: Repository<Rol>,
+
+    @InjectRepository(Menuoption)
+    private readonly menuoptionRepository: Repository<Menuoption>,
+
+    @InjectRepository(RolMenuoption)
+    private readonly rolMenuOptionRepository: Repository<RolMenuoption>,
 
     private readonly dataSource: DataSource,
+
+    private readonly cloudinaryService: CloudinaryService
   ) {}
 
-  async create(createApplicationDto: CreateApplicationDto) {
+  async create(createApplicationDto: CreateApplicationDto, file?: Express.Multer.File) {
     try {
-      const { strImages = [], ...applicationDetails } = createApplicationDto;
-
+      const { strRoles = [], ...applicationDetails } = createApplicationDto;
+  
+      // Subir imagen a Cloudinary si se proporcionó un archivo
+      let imageUrl = '';
+      if (file) {
+        const result = await this.cloudinaryService.uploadImage(file, 'logos-applications');
+        imageUrl = result.secure_url;
+      }
+  
+      // Crear la aplicación con la URL de la imagen
       const application = this.applicationRepository.create({
         ...applicationDetails,
-        strImages: strImages.map((image) =>
-          this.applicationImageRepository.create({ strUrl: image }),
-        ),
+        strUrlImage: imageUrl,
       });
+  
+      // Guardar la aplicación en la base de datos
       await this.applicationRepository.save(application);
-      return { ...application, strImages };
+  
+      // Crear roles y sus opciones de menú
+      for (const rolDto of strRoles) {
+        const rol = this.RolRepository.create({
+          strName: rolDto.strName,
+          strDescription1: rolDto.strDescription1,
+          strDescription2: rolDto.strDescription2,
+          strApplication: application,
+        });
+  
+        await this.RolRepository.save(rol);
+  
+        if (Array.isArray(rolDto.strMenuOptions)) {
+          for (const menuOptionDto of rolDto.strMenuOptions) {
+            let menuOption = await this.menuoptionRepository.findOne({
+              where: { strName: menuOptionDto.strName },
+            });
+  
+            if (!menuOption) {
+              menuOption = this.menuoptionRepository.create({
+                strName: menuOptionDto.strName,
+                strDescription: menuOptionDto.strDescription,
+                strUrl: menuOptionDto.strUrl,
+                strIcon: menuOptionDto.strIcon,
+                strType: menuOptionDto.strType,
+                ingOrder: menuOptionDto.ingOrder,
+              });
+  
+              await this.menuoptionRepository.save(menuOption);
+            }
+  
+            const existingRelation = await this.rolMenuOptionRepository.findOne({
+              where: { rol, menuoption: menuOption },
+            });
+  
+            if (!existingRelation) {
+              const rolMenuOption = this.rolMenuOptionRepository.create({
+                rol: rol,
+                menuoption: menuOption,
+              });
+  
+              await this.rolMenuOptionRepository.save(rolMenuOption);
+            }
+  
+            if (Array.isArray(menuOptionDto.strSubmenus)) {
+              for (const submenuDto of menuOptionDto.strSubmenus) {
+                let submenu = await this.menuoptionRepository.findOne({
+                  where: { strName: submenuDto.strName },
+                });
+  
+                if (!submenu) {
+                  submenu = this.menuoptionRepository.create({
+                    strName: submenuDto.strName,
+                    strDescription: submenuDto.strDescription,
+                    strUrl: submenuDto.strUrl,
+                    strIcon: submenuDto.strIcon,
+                    strType: submenuDto.strType,
+                    ingOrder: submenuDto.ingOrder,
+                    strMPatern: menuOption,
+                  });
+  
+                  await this.menuoptionRepository.save(submenu);
+                }
+              }
+            }
+          }
+        }
+      }
+  
+      return {
+        ...application,
+        strRoles,
+      };
     } catch (error) {
       this.handleDBExcelption(error);
     }
   }
+  
+  async checkApplicationName(strName: string): Promise<boolean> {
+    const application = await this.applicationRepository.findOne({ where: { strName } });
+    return !application; 
+  }
 
   async findAll(paginationDto: PaginationDto) {
     const { limit = 10, offset = 0 } = paginationDto;
+
+    // Obtener todas las aplicaciones con imágenes y roles
     const applications = await this.applicationRepository.find({
       take: limit,
       skip: offset,
       relations: {
-        strImages: true,
+        strRoles: true,
       },
     });
 
-    return applications.map((application) => ({
-      ...application,
-      strImages: application.strImages.map((img) => img.strUrl),
-    }));
-  }
+    // Mapear las aplicaciones y agregar las opciones de menú
+    return await Promise.all(
+      applications.map(async (application) => {
+        const rolesWithMenuOptions = await Promise.all(
+          application.strRoles.map(async (rol) => {
+            // Obtener las opciones de menú asociadas al rol a través de RolMenuoption
+            const rolMenuoptions = await this.rolMenuOptionRepository.find({
+              where: {
+                rol: { id: rol.id },
+              },
+              relations: {
+                menuoption: { strSubmenus: true },
+              },
+            });
 
+            // Mapear las opciones de menú para cada rol
+            const menuOptions = rolMenuoptions.map(
+              (rolMenuoption) => rolMenuoption.menuoption,
+            );
+
+            return {
+              id: rol.id,
+              strName: rol.strName,
+              strDescription1: rol.strDescription1,
+              strDescription2: rol.strDescription2,
+              // Modificar el mapeo para asegurar que 'menuOptions' está definido
+              menuOptions: (menuOptions || []).map((menu: Menuoption) => ({
+                id: menu.id,
+                strName: menu.strName || '',
+                strDescription: menu.strDescription || '',
+                strUrl: menu.strUrl || '',
+                strIcon: menu.strIcon || '',
+                strType: menu.strType || '',
+                ingOrder: menu.ingOrder || '',
+                // Asegurarse de que strSubmenus existe y tiene datos
+                strSubmenus:
+                  menu.strSubmenus && menu.strSubmenus.length > 0
+                    ? menu.strSubmenus.map((submenu) => ({
+                        id: submenu.id,
+                        strName: submenu.strName,
+                        strDescription: submenu.strDescription,
+                        strUrl: submenu.strUrl || '',
+                        strIcon: submenu.strIcon || '',
+                        strType: submenu.strType,
+                        ingOrder: submenu.ingOrder,
+                      }))
+                    : [],
+              })),
+            };
+          }),
+        );
+
+        return {
+          ...application,
+          strRoles: rolesWithMenuOptions,
+        };
+      }),
+    );
+  }
   async findOne(term: string) {
     let application: Application;
+
     if (isUUID(term)) {
-      application = await this.applicationRepository.findOneBy({ id: term });
+      application = await this.applicationRepository.findOne({
+        where: { id: term },
+        relations: {
+          strRoles: true,
+        },
+      });
     } else {
-      // application = await this.applicationRepository.findOneBy({strSlug: term});
       const queryBuilder = this.applicationRepository.createQueryBuilder('app');
       application = await queryBuilder
-        .where(`UPPER("strName") = :strName or "strSlug" = :strSlug`, {
+        .where(`UPPER(app.strName) = :strName OR app.strSlug = :strSlug`, {
           strName: term.toUpperCase(),
           strSlug: term.toLowerCase(),
         })
-        .leftJoinAndSelect('app.strImages', 'appImages')
+        .leftJoinAndSelect('app.strRoles', 'appRoles')
         .getOne();
     }
-    if (!application)
-      throw new NotFoundException(`Application with ${term} not found`);
-    return application;
-  }
 
-  async findOnePlain(term: string) {
-    const { strImages = [], ...rest } = await this.findOne(term);
+    if (!application) {
+      throw new NotFoundException(`Application with ${term} not found`);
+    }
+
+    // Obtener las opciones de menú para cada rol
+    const rolesWithMenuOptions = await Promise.all(
+      application.strRoles.map(async (rol) => {
+        const rolMenuoptions = await this.rolMenuOptionRepository.find({
+          where: { rol: { id: rol.id } },
+          relations: { menuoption: { strSubmenus: true } },
+        });
+
+        // Si no hay opciones de menú, retornar un array vacío
+        if (!rolMenuoptions || rolMenuoptions.length === 0) {
+          return {
+            id: rol.id,
+            strName: rol.strName,
+            strDescription1: rol.strDescription1,
+            strDescription2: rol.strDescription2,
+            menuOptions: [],
+          };
+        }
+
+        // Extraer las opciones de menú sin anidación de arrays
+        const menuOptions = rolMenuoptions.map(
+          (rolMenuoption) => rolMenuoption.menuoption,
+        );
+
+        return {
+          id: rol.id,
+          strName: rol.strName,
+          strDescription1: rol.strDescription1,
+          strDescription2: rol.strDescription2,
+          // Modificar el mapeo para asegurar que 'menuOptions' está definido
+          menuOptions: (menuOptions || []).map((menu: Menuoption) => ({
+            id: menu.id,
+            strName: menu.strName || '',
+            strDescription: menu.strDescription || '',
+            strUrl: menu.strUrl || '',
+            strIcon: menu.strIcon || '',
+            strType: menu.strType || '',
+            ingOrder: menu.ingOrder || '',
+            // Asegurarse de que strSubmenus existe y tiene datos
+            strSubmenus:
+              menu.strSubmenus && menu.strSubmenus.length > 0
+                ? menu.strSubmenus.map((submenu) => ({
+                    id: submenu.id,
+                    strName: submenu.strName,
+                    strDescription: submenu.strDescription,
+                    strUrl: submenu.strUrl || '',
+                    strIcon: submenu.strIcon || '',
+                    strType: submenu.strType,
+                    ingOrder: submenu.ingOrder,
+                  }))
+                : [],
+          })),
+        };
+      }),
+    );
+    console.log('ROLES CON MENU', rolesWithMenuOptions);
+
     return {
-      ...rest,
-      strImages: strImages.map((img) => img.strUrl),
+      ...application,
+      strRoles: rolesWithMenuOptions,
     };
   }
 
+  async findOnePlain(term: string) {
+    const application = await this.findOne(term);
+
+    // Asegurar que strRoles es un array de objetos con todas las propiedades necesarias
+    const roles = Array.isArray(application.strRoles)
+      ? application.strRoles.map(
+          (rol: {
+            id: string;
+            strName: string;
+            strDescription1: string;
+            strDescription2: string;
+            menuOptions?: any[]; // Incluir menuOptions
+          }) => ({
+            id: rol.id,
+            strName: rol.strName,
+            strDescription1: rol.strDescription1,
+            strDescription2: rol.strDescription2,
+            menuOptions: rol.menuOptions ?? [], // Asegurar que no sea undefined
+          }),
+        )
+      : [];
+
+    return {
+      ...application,
+      strRoles: roles,
+    };
+  }
   async update(id: string, updateApplicationDto: UpdateApplicationDto) {
-    const { strImages, ...toUpdate } = updateApplicationDto;
+    const { strRoles, ...toUpdate } = updateApplicationDto;
     const application = await this.applicationRepository.preload({
       id,
       ...toUpdate,
     });
+
     if (!application)
       throw new NotFoundException(`Application with id #${id} not found`);
 
-    //create query runner
+    // Crear query runner
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      if (strImages) {
-        await queryRunner.manager.delete(ApplicationImage, {
-          strApplication: { id },
-        });
-        application.strImages = strImages.map((img) =>
-          this.applicationImageRepository.create({ strUrl: img }),
-        );
-      }
-      await queryRunner.manager.save(application);
-      // await this.applicationRepository.save(application);
+      // Recuperar los roles existentes relacionados con la aplicación
+      const existingRoles = await queryRunner.manager.find(Rol, {
+        where: { strApplication: { id } },
+        relations: ['strMenuOptions'],
+      });
 
+      // Manejo de roles si fueron enviados en la petición
+      if (strRoles) {
+        for (const rolObj of strRoles) {
+          const { strName, strMenuOptions } = rolObj;
+          if (!strName) continue;
+
+          // Verificar si el rol ya existe en la tabla 'roles'
+          let rol = await queryRunner.manager.findOne(Rol, {
+            where: { strName },
+            relations: ['strMenuOptions'],
+          });
+
+          if (!rol) {
+            // Si el rol no existe, crearlo con sus datos adicionales si los tiene
+            rol = queryRunner.manager.create(Rol, rolObj);
+            await queryRunner.manager.save(rol);
+          }
+
+          // Verificar si el rol ya está relacionado con la aplicación
+          const isAlreadyAssociated = existingRoles.some(
+            (existingRol) => existingRol.id === rol.id,
+          );
+
+          if (!isAlreadyAssociated) {
+            rol.strApplication = application; // Relacionar el rol con la aplicación
+            await queryRunner.manager.save(rol);
+          }
+
+          // Manejo de strMenuOptions dentro del rol
+          if (strMenuOptions) {
+            for (const menuOption of strMenuOptions) {
+              const { strName } = menuOption;
+              if (!strName) continue;
+
+              let option = await queryRunner.manager.findOne(Menuoption, {
+                where: { strName },
+              });
+
+              if (!option) {
+                option = queryRunner.manager.create(Menuoption, menuOption);
+                await queryRunner.manager.save(option);
+              }
+
+              // Asegurar que ambos IDs sean del mismo tipo
+              const isOptionAlreadyAssociated = rol.rolMenuoptions.some(
+                (existingOption) =>
+                  Number(existingOption.menuoption.id) === Number(option.id),
+              );
+
+              if (!isOptionAlreadyAssociated) {
+                // Crear una instancia de RolMenuoption para la relación
+                const rolMenuOption = queryRunner.manager.create(
+                  RolMenuoption,
+                  {
+                    rol: rol,
+                    menuoption: option,
+                  },
+                );
+
+                await queryRunner.manager.save(rolMenuOption);
+              }
+            }
+          }
+        }
+      }
+
+      await queryRunner.manager.save(application);
       await queryRunner.commitTransaction();
       await queryRunner.release();
 
@@ -129,7 +428,14 @@ export class ApplicationsService {
   }
 
   async remove(id: string) {
-    const application = await this.findOne(id);
+    const application = await this.applicationRepository.findOne({
+      where: { id },
+    });
+
+    if (!application) {
+      throw new NotFoundException(`Application with id ${id} not found`);
+    }
+
     await this.applicationRepository.remove(application);
     return `The application with id #${id} was deleted successfully`;
   }
@@ -140,5 +446,14 @@ export class ApplicationsService {
     throw new InternalServerErrorException(
       `Unexpected error, check server logs`,
     );
+  }
+
+  async deleteAllApplications() {
+    const query = this.applicationRepository.createQueryBuilder('application');
+    try {
+      return await query.delete().where({}).execute();
+    } catch (error) {
+      this.handleDBExcelption(error);
+    }
   }
 }

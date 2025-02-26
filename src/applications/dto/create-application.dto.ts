@@ -19,9 +19,28 @@ export class CreateApplicationDto {
   @IsArray()
   @IsOptional()
   strTags?: string[];
-
-  @IsString({ each: true})
+  
   @IsArray()
   @IsOptional()
-  strImages?: string[];
+  strRoles: { 
+    strName: string; 
+    strDescription1?: string; 
+    strDescription2?: string;
+    strMenuOptions?: {
+      strName: string;
+      strDescription: string;
+      strUrl: string;
+      strIcon: string;
+      strType: string;
+      ingOrder: number;
+      strSubmenus?: {
+        strName: string;
+        strDescription: string;
+        strUrl: string;
+        strIcon: string;
+        strType: string;
+        ingOrder: number;
+      }[];
+    }[];
+  }[];
 }

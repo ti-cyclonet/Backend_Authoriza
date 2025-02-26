@@ -1,4 +1,6 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { Application } from 'src/applications/entities';
+import { Column, Entity, Index, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { RolMenuoption } from './rol-menuoption.entity';
 
 @Entity()
 export class Rol {
@@ -23,9 +25,13 @@ export class Rol {
   })
   strDescription2: string;
 
-  @Column({
-    type: 'uuid',
-    nullable: false,
-  })
-  strIdApplication: string;
+  @ManyToOne(
+    () => Application,
+    (application) => application.strRoles,
+    { onDelete: 'CASCADE' }
+  )
+  strApplication: Application;
+
+  @OneToMany(() => RolMenuoption, (rolMenuoption) => rolMenuoption.rol, { cascade: true })
+  rolMenuoptions: RolMenuoption[];
 }
