@@ -210,6 +210,7 @@ export class ApplicationsService {
       }),
     );
   }
+
   async findOne(term: string) {
     let application: Application;
 
@@ -300,8 +301,7 @@ export class ApplicationsService {
 
   async findOnePlain(term: string) {
     const application = await this.findOne(term);
-
-    // Asegurar que strRoles es un array de objetos con todas las propiedades necesarias
+   
     const roles = Array.isArray(application.strRoles)
       ? application.strRoles.map(
           (rol: {
@@ -309,13 +309,13 @@ export class ApplicationsService {
             strName: string;
             strDescription1: string;
             strDescription2: string;
-            menuOptions?: any[]; // Incluir menuOptions
+            menuOptions?: any[];
           }) => ({
             id: rol.id,
             strName: rol.strName,
             strDescription1: rol.strDescription1,
             strDescription2: rol.strDescription2,
-            menuOptions: rol.menuOptions ?? [], // Asegurar que no sea undefined
+            menuOptions: rol.menuOptions ?? [],
           }),
         )
       : [];
@@ -325,6 +325,7 @@ export class ApplicationsService {
       strRoles: roles,
     };
   }
+
   async update(id: string, updateApplicationDto: UpdateApplicationDto) {
     const { strRoles, ...toUpdate } = updateApplicationDto;
     const application = await this.applicationRepository.preload({
