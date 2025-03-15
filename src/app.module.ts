@@ -9,6 +9,7 @@ import { RolMenuoption } from './roles/entities/rol-menuoption.entity';
 import { Application } from './applications/entities/application.entity';
 import { Menuoption } from './menuoptions/entities/menuoption.entity';
 import { Rol } from './roles/entities/rol.entity';
+import { AuthModule } from './auth/auth.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -26,7 +27,8 @@ import { Rol } from './roles/entities/rol.entity';
     ApplicationsModule,
     MenuoptionsModule,
     RolesModule,
-    CommonModule
+    CommonModule,
+    AuthModule
   ],
 })
 export class AppModule {}
