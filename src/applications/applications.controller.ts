@@ -8,11 +8,11 @@ import { PaginationDto } from 'src/common/dtos/pagination.dto';
 export class ApplicationsController {
   constructor(private readonly applicationsService: ApplicationsService) {}
 
-  @Post('check-name') // Endpoint para verificar el nombre de la aplicación
+  @Post('check-name')
   async checkApplicationName(@Body('strName') strName: string): Promise<{ available: boolean }> {
     const available = await this.applicationsService.checkApplicationName(strName);
-    return { available }; // Devuelve un objeto con la propiedad "available"
-  }  
+    return { available };
+  }
 
   @Post()
   create(@Body() createApplicationDto: CreateApplicationDto) {
@@ -29,10 +29,19 @@ export class ApplicationsController {
     return this.applicationsService.findOnePlain(term);
   }
 
+  @Get(':appName/rol/:rolName')
+  async findByApplicationAndRol(
+    @Param('appName') appName: string,
+    @Param('rolName') rolName: string,
+  ) {
+    return this.applicationsService.findByApplicationAndRol(appName, rolName);
+  }
+
   @Patch(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string, 
-    @Body() updateApplicationDto: UpdateApplicationDto) {
+    @Body() updateApplicationDto: UpdateApplicationDto
+  ) {
     return this.applicationsService.update(id, updateApplicationDto);
   }
 
