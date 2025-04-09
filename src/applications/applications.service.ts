@@ -9,7 +9,7 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { Application } from './entities/application.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, ILike, Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from 'uuid';
 import { Rol } from 'src/roles/entities/rol.entity';
@@ -298,12 +298,14 @@ export class ApplicationsService {
     };
   }
 
-  async findByApplicationAndRol(applicationName: string, rolName: string) {
-    // Buscar la aplicación por nombre
+  async findByApplicationAndRol(applicationName: string, rolName: string) {    
     const application = await this.applicationRepository.findOne({
-        where: { strName: applicationName },
+        where: { strName: ILike(applicationName) },
         relations: { strRoles: true },
     });
+
+    console.log('Application', applicationName);
+    console.log('Rol: ', rolName);
 
     if (!application) {
         throw new NotFoundException(`Application with name ${applicationName} not found`);
