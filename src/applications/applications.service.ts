@@ -9,7 +9,7 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { Application } from './entities/application.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, ILike, Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from 'uuid';
 import { Rol } from 'src/roles/entities/rol.entity';
@@ -290,12 +290,72 @@ export class ApplicationsService {
           })),
         };
       }),
-    );
-    console.log('ROLES CON MENU', rolesWithMenuOptions);
+    );    
 
     return {
       ...application,
       strRoles: rolesWithMenuOptions,
+    };
+  }
+
+  async findByApplicationAndRol(applicationName: string, rolName: string) {    
+    const application = await this.applicationRepository.findOne({
+        where: { strName: ILike(applicationName) },
+        relations: { strRoles: true },
+    });
+
+    console.log('Application', applicationName);
+    console.log('Rol: ', rolName);
+
+    if (!application) {
+        throw new NotFoundException(`Application with name ${applicationName} not found`);
+    }
+
+    // Buscar el rol dentro de la aplicación
+    const rol = application.strRoles.find(rol => rol.strName === rolName);
+    
+    if (!rol) {
+        throw new NotFoundException(`Role ${rolName} not found in application ${applicationName}`);
+    }
+
+    // Obtener las opciones de menú asociadas al rol
+    const rolMenuoptions = await this.rolMenuOptionRepository.find({
+        where: { rol: { id: rol.id } },
+        relations: { menuoption: { strSubmenus: true } },
+    });
+
+    // Mapear las opciones de menú asegurando que la estructura es idéntica a findOne
+    const menuOptions = rolMenuoptions.map(rolMenuoption => ({
+        id: rolMenuoption.menuoption.id,
+        strName: rolMenuoption.menuoption.strName || '',
+        strDescription: rolMenuoption.menuoption.strDescription || '',
+        strUrl: rolMenuoption.menuoption.strUrl || '',
+        strIcon: rolMenuoption.menuoption.strIcon || '',
+        strType: rolMenuoption.menuoption.strType || '',
+        ingOrder: rolMenuoption.menuoption.ingOrder || '',
+        strSubmenus: rolMenuoption.menuoption.strSubmenus?.map(submenu => ({
+            id: submenu.id,
+            strName: submenu.strName,
+            strDescription: submenu.strDescription,
+            strUrl: submenu.strUrl || '',
+            strIcon: submenu.strIcon || '',
+            strType: submenu.strType,
+            ingOrder: submenu.ingOrder,
+        })) || [],
+    }));
+
+    // Estructura idéntica a findOne
+    const rolesWithMenuOptions = [{
+        id: rol.id,
+        strName: rol.strName,
+        strDescription1: rol.strDescription1,
+        strDescription2: rol.strDescription2,
+        menuOptions,
+    }];
+
+    return {
+        ...application,
+        strRoles: rolesWithMenuOptions,
     };
   }
 
