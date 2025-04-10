@@ -1,0 +1,175 @@
+//CREAR APLICACIÓN AUTHORIZA
+{
+   "strName": "Authoriza",
+   "strDescription": "Control Access for Cyclonet Applications",
+   "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1729559448/logos-applications/zfu82lfrmao7v6gponew.png",
+   "strSlug": "authoriza app",
+   "strTags": ["control access", "security", "users"],
+   "strRoles": [
+        {  
+            "strName": "adminAuthoriza",
+            "strDescription1": "Administrador",
+            "strDescription2": "Acceso a todas las opciones de la aplicación",            
+            "strMenuOptions": [
+                {
+                    "strName": "homeAuthoriza",
+                    "strDescription": "Home",
+                    "strUrl": "/home",
+                    "strIcon": "house",
+                    "strType": "main_menu",
+                    "ingOrder": 1,
+                    "strSubmenus": []
+                },
+                {
+                    "strName": "userAuthoriza",
+                    "strDescription": "Users",
+                    "strUrl": "/users",
+                    "strIcon": "people",
+                    "strType": "main_menu",
+                    "ingOrder": 2,
+                    "strSubmenus": []
+                },
+                {
+                    "strName": "applicationsAuthoriza",
+                    "strDescription": "Applications",
+                    "strUrl": "/applications",
+                    "strIcon": "window-stack",
+                    "strType": "main_menu",
+                    "ingOrder": 3,
+                    "strSubmenus": []
+                },
+				{
+                    "strName": "settingsAuthoriza",
+                    "strDescription": "Settings",
+                    "strUrl": "/setup",
+                    "strIcon": "gear",
+                    "strType": "main_menu",
+                    "ingOrder": 4,
+                    "strSubmenus": []
+                }
+            ]
+        }
+    ]
+}
+// CREAR APLICACION AID CASH
+{
+   "strName": "AidCash",
+   "strDescription": "Financial Aid Cash",
+   "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1729559767/logos-applications/ljvrqakrx5f8iicqr7ah.png",
+   "strSlug": "aidcash app",
+   "strTags": ["financial", "cash", "money", "aid"],
+   "strRoles": [
+        {  
+            "strName": "adminAidcash",
+            "strDescription1": "Administrador",
+            "strDescription2": "Acceso a todas las opciones de la aplicación",
+            "strMenuOptions": [
+                {
+                    "strName": "dashboardAidcash",
+                    "strDescription": "Dashboard",
+                    "strUrl": "/dashboard",
+                    "strIcon": "file-bar-graph",
+                    "strType": "main_menu",
+                    "ingOrder": 1,
+                    "strSubmenus": []
+                },
+				{
+                    "strName": "userAidcash",
+                    "strDescription": "Users",
+                    "strUrl": "",
+                    "strIcon": "people",
+                    "strType": "main_menu",
+                    "ingOrder": 2,
+                    "strSubmenus": [
+                        {
+                            "strName": "createUserAidcash",
+                            "strDescription": "Nuevo",
+                            "strUrl": "/createUser",
+                            "strIcon": "person-fill-add",
+                            "strType": "submenu_n1",
+                            "ingOrder": 1
+                        },
+                        {
+                            "strName": "deleteUserAidcash",
+                            "strDescription": "Borrar",
+                            "strUrl": "/deleteUser",
+                            "strIcon": "person-fill-dash",
+                            "strType": "submenu_n1",
+                            "ingOrder": 2
+                        }
+                    ]
+                },
+				{
+                    "strName": "settingsAidcash",
+                    "strDescription": "Settings",
+                    "strUrl": "/setup",
+                    "strIcon": "gear",
+                    "strType": "main_menu",
+                    "ingOrder": 3,
+                    "strSubmenus": []
+                }
+            ]
+        }
+    ]
+}
+
+// CREAR APLICACION INOUT
+{
+   "strName": "Inout",
+   "strDescription": "Inventory Management and Manufacturing",
+   "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1729560292/logos-applications/yhnunl8rbjciuqaksecb.png",
+   "strSlug": "inout app",
+   "strTags": ["inventory", "products", "raw material"],
+   "strRoles": [
+        {  
+            "strName": "adminInout",
+            "strDescription1": "Administrador",
+            "strDescription2": "Acceso a todas las opciones de la aplicación",
+            "strMenuOptions": [                
+				{
+                    "strName": "materialInout",
+                    "strDescription": "Materials",
+                    "strUrl": "/materials",
+                    "strIcon": "boxes",
+                    "strType": "main_menu",
+                    "ingOrder": 1,
+                    "strSubmenus": []
+                },
+				{
+                    "strName": "dashboardInout",
+                    "strDescription": "Dashboard",
+                    "strUrl": "/home",
+                    "strIcon": "file-bar-graph",
+                    "strType": "main_menu",
+                    "ingOrder": 2,
+                    "strSubmenus": []
+                }, 
+				{
+                    "strName": "kardexInout",
+                    "strDescription": "Kardex",
+                    "strUrl": "/kardex",
+                    "strIcon": "file-ppt-fill",
+                    "strType": "main_menu",
+                    "ingOrder": 3,
+                    "strSubmenus": []
+                }
+            ]
+        },
+		{  
+            "strName": "userInout",
+            "strDescription1": "Usuario",
+            "strDescription2": "Acceso limitado a las opciones de la aplicación",
+            "strMenuOptions": [
+				{
+                    "strName": "dashboardInout",
+                    "strDescription": "Dashboard",
+                    "strUrl": "/home",
+                    "strIcon": "file-bar-graph",
+                    "strType": "main_menu",
+                    "ingOrder": 1,
+                    "strSubmenus": []
+                }
+            ]
+        }
+    ]
+}
