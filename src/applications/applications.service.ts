@@ -304,9 +304,6 @@ export class ApplicationsService {
         relations: { strRoles: true },
     });
 
-    console.log('Application', applicationName);
-    console.log('Rol: ', rolName);
-
     if (!application) {
         throw new NotFoundException(`Application with name ${applicationName} not found`);
     }
