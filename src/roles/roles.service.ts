@@ -84,8 +84,7 @@ export class RolesService {
         ),
       }))
     );
-  }
-  
+  }  
 
   async findOne(id: string) {
     const rol = await this.rolRepository.findOne({
@@ -132,6 +131,11 @@ export class RolesService {
       strMenuOptions: menuOptionsWithSubmenus,
     };
   }
+
+  async checkRoleName(strName: string): Promise<boolean> {
+    const rol = await this.rolRepository.findOne({ where: { strName } });
+    return !rol;
+  }
   
 
   async update(id: string, updateRolDto: UpdateRolDto) {
@@ -160,8 +164,7 @@ export class RolesService {
   
     await this.rolRepository.remove(rol);
     return `The rol with id #${id} was deleted successfully`;
-  }
-  
+  }  
 
   private handleDBExcelption(error: any) {
     if (error.code === '23505') throw new BadRequestException(error.detail);
