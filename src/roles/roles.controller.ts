@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, Query, BadRequestException } from '@nestjs/common';
 import { RolesService } from './roles.service';
 import { CreateRolDto } from './dto/create-rol.dto';
 import { UpdateRolDto } from './dto/update-rol.dto';
@@ -16,6 +16,15 @@ export class RolesController {
   @Get()
   findAll(@Query() paginationDto: PaginationDto) {
     return this.rolesService.findAll(paginationDto);
+  }
+
+  @Get('check-name')
+  async checkRoleName(@Query('strName') strName: string) {
+    if (!strName) {
+      throw new BadRequestException('The query parameter "strName" is required');
+    }
+    const isAvailable = await this.rolesService.checkRoleName(strName);
+    return { available: isAvailable };
   }
 
   @Get(':id')
