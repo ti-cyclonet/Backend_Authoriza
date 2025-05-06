@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class CreateApplicationDto {
@@ -43,4 +44,13 @@ export class CreateApplicationDto {
       }[];
     }[];
   }[];
+
+  @Exclude() // opcional, si no deseas que se valide o serialice
+  id?: any;
+
+  @Exclude()
+  strState?: any;
+
+  @Exclude()
+  file?: any;
 }
