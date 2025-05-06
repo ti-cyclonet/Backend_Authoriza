@@ -1,22 +1,44 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  ParseUUIDPipe,
+  Query,
+  UseInterceptors,
+  UploadedFile,
+} from '@nestjs/common';
 import { ApplicationsService } from './applications.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('applications')
 export class ApplicationsController {
   constructor(private readonly applicationsService: ApplicationsService) {}
 
   @Post('check-name')
-  async checkApplicationName(@Body('strName') strName: string): Promise<{ available: boolean }> {
-    const available = await this.applicationsService.checkApplicationName(strName);
+  async checkApplicationName(
+    @Body('strName') strName: string,
+  ): Promise<{ available: boolean }> {
+    const available = await this.applicationsService.checkApplicationName(
+      strName,
+    );
     return { available };
   }
 
   @Post()
-  create(@Body() createApplicationDto: CreateApplicationDto) {
-    return this.applicationsService.create(createApplicationDto);
+  @UseInterceptors(FileInterceptor('file'))
+  async createApplication(
+    @Body() createApplicationDto: CreateApplicationDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    console.log('🎯 DTO recibido en el controlador:', createApplicationDto);
+    return this.applicationsService.create(createApplicationDto, file);
   }
 
   @Get()
@@ -39,8 +61,8 @@ export class ApplicationsController {
 
   @Patch(':id')
   update(
-    @Param('id', ParseUUIDPipe) id: string, 
-    @Body() updateApplicationDto: UpdateApplicationDto
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateApplicationDto: UpdateApplicationDto,
   ) {
     return this.applicationsService.update(id, updateApplicationDto);
   }

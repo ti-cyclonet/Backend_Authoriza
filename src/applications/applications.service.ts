@@ -39,6 +39,10 @@ export class ApplicationsService {
 
   async create(createApplicationDto: CreateApplicationDto, file?: Express.Multer.File) {
     try {
+      // 🔍 Imprimir el DTO completo recibido del frontend
+      console.log('📦 DTO recibido del frontend:');
+      console.log(JSON.stringify(createApplicationDto, null, 2)); // Formato legible
+  
       const { strRoles = [], ...applicationDetails } = createApplicationDto;
   
       // Subir imagen a Cloudinary si se proporcionó un archivo
@@ -54,7 +58,6 @@ export class ApplicationsService {
         strUrlImage: imageUrl,
       });
   
-      // Guardar la aplicación en la base de datos
       await this.applicationRepository.save(application);
   
       // Crear roles y sus opciones de menú
@@ -133,6 +136,7 @@ export class ApplicationsService {
       this.handleDBExcelption(error);
     }
   }
+  
   
   async checkApplicationName(strName: string): Promise<boolean> {
     const application = await this.applicationRepository.findOne({ where: { strName } });
