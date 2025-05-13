@@ -42,6 +42,8 @@ export class ApplicationsService {
       // 🔍 Imprimir el DTO completo recibido del frontend
       console.log('📦 DTO recibido del frontend:');
       console.log(JSON.stringify(createApplicationDto, null, 2)); // Formato legible
+      console.log('📥 Archivo recibido:', file?.originalname, file?.mimetype);
+
   
       const { strRoles = [], ...applicationDetails } = createApplicationDto;
   
@@ -71,8 +73,8 @@ export class ApplicationsService {
   
         await this.RolRepository.save(rol);
   
-        if (Array.isArray(rolDto.strMenuOptions)) {
-          for (const menuOptionDto of rolDto.strMenuOptions) {
+        if (Array.isArray(rolDto.menuOptions)) {
+          for (const menuOptionDto of rolDto.menuOptions) {
             let menuOption = await this.menuoptionRepository.findOne({
               where: { strName: menuOptionDto.strName },
             });
@@ -412,7 +414,7 @@ export class ApplicationsService {
       // Manejo de roles si fueron enviados en la petición
       if (strRoles) {
         for (const rolObj of strRoles) {
-          const { strName, strMenuOptions } = rolObj;
+          const { strName, menuOptions } = rolObj;
           if (!strName) continue;
 
           // Verificar si el rol ya existe en la tabla 'roles'
@@ -438,8 +440,8 @@ export class ApplicationsService {
           }
 
           // Manejo de strMenuOptions dentro del rol
-          if (strMenuOptions) {
-            for (const menuOption of strMenuOptions) {
+          if (menuOptions) {
+            for (const menuOption of menuOptions) {
               const { strName } = menuOption;
               if (!strName) continue;
 

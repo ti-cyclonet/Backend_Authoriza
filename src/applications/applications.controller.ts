@@ -12,10 +12,11 @@ import {
   UploadedFile,
 } from '@nestjs/common';
 import { ApplicationsService } from './applications.service';
-import { CreateApplicationDto } from './dto/create-application.dto';
+
 import { UpdateApplicationDto } from './dto/update-application.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { CreateApplicationDto } from './dto/create-application.dto';
 
 @Controller('applications')
 export class ApplicationsController {
@@ -38,6 +39,7 @@ export class ApplicationsController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     console.log('🎯 DTO recibido en el controlador:', createApplicationDto);
+    console.log('🎯 Archivo recibido en el controlador:', file);
     return this.applicationsService.create(createApplicationDto, file);
   }
 

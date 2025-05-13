@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Exclude, Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsOptional,
@@ -13,6 +13,7 @@ export class CreateRolDto {
   @MinLength(1)
   strName: string;
 
+  @IsOptional()
   @IsString()
   strDescription1: string;
 
@@ -20,8 +21,26 @@ export class CreateRolDto {
   @IsOptional()
   strDescription2?: string;
 
+  @Transform(({ value }) => {
+    try {
+      return typeof value === 'string' ? JSON.parse(value) : value;
+    } catch {
+      return [];
+    }
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateMenuoptionDto)
-  menuOptions: CreateMenuoptionDto[];
+  menuOptions?: CreateMenuoptionDto[];
+
+  @Exclude()
+  id?: any;
+
+  @Exclude()
+  strState?: any;
+
+  @Exclude()
+  isTemporary?: any;
 }
+console.log('✅ CreateRolDto usado en validación');
+

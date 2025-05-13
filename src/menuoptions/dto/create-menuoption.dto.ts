@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsIn,
@@ -5,7 +6,9 @@ import {
   IsOptional,
   IsString,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { CreateSubmenuDto } from './create-submenu.dto';
 
 export class CreateMenuoptionDto {
   @IsString()
@@ -30,14 +33,10 @@ export class CreateMenuoptionDto {
   @IsOptional()
   ingOrder: number;
 
-  @IsArray()
   @IsOptional()
-  strSubmenus?: {
-    strName: string;
-    strDescription?: string;
-    strUrl?: string;
-    strIcon?: string;
-    strType?: string;
-    ingOrder?: number;
-  }[];
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateSubmenuDto)
+  strSubmenus?: CreateSubmenuDto[];
 }
+console.log('✅ CreateMenuoptionDto usado en validación');

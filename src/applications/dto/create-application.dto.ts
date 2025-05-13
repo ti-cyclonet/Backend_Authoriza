@@ -1,5 +1,6 @@
-import { Exclude } from 'class-transformer';
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { Exclude, plainToInstance, Transform, Type } from 'class-transformer';
+import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { CreateRolDto } from 'src/roles/dto/create-rol.dto';
 
 export class CreateApplicationDto {
   @IsString()
@@ -8,44 +9,49 @@ export class CreateApplicationDto {
   @IsString()
   strDescription: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   strUrlImage?: string;
 
-  @IsString()
   @IsOptional()
+  @IsString()
   strSlug?: string;
 
-  @IsString({ each: true})
-  @IsArray()
   @IsOptional()
-  strTags?: string[];
-  
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @IsString({ each: true })
   @IsArray()
-  @IsOptional()
-  strRoles: { 
-    strName: string; 
-    strDescription1?: string; 
-    strDescription2?: string;
-    strMenuOptions?: {
-      strName: string;
-      strDescription: string;
-      strUrl: string;
-      strIcon: string;
-      strType: string;
-      ingOrder: number;
-      strSubmenus?: {
-        strName: string;
-        strDescription: string;
-        strUrl: string;
-        strIcon: string;
-        strType: string;
-        ingOrder: number;
-      }[];
-    }[];
-  }[];
+  strTags?: string[];  
 
-  @Exclude() // opcional, si no deseas que se valide o serialice
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed)
+          ? plainToInstance(CreateRolDto, parsed)
+          : [];
+      } catch {
+        return [];
+      }
+    }
+    return value;
+  })
+  @Type(() => CreateRolDto)
+  @ValidateNested({ each: true })
+  @IsArray()
+  strRoles: CreateRolDto[];
+
+  @Exclude()
   id?: any;
 
   @Exclude()
