@@ -10,7 +10,7 @@
             "strName": "adminAuthoriza",
             "strDescription1": "Administrador",
             "strDescription2": "Acceso a todas las opciones de la aplicación",            
-            "strMenuOptions": [
+            "menuOptions": [
                 {
                     "strName": "homeAuthoriza",
                     "strDescription": "Home",
@@ -63,7 +63,7 @@
             "strName": "adminAidcash",
             "strDescription1": "Administrador",
             "strDescription2": "Acceso a todas las opciones de la aplicación",
-            "strMenuOptions": [
+            "menuOptions": [
                 {
                     "strName": "dashboardAidcash",
                     "strDescription": "Dashboard",
@@ -125,7 +125,7 @@
             "strName": "adminInout",
             "strDescription1": "Administrador",
             "strDescription2": "Acceso a todas las opciones de la aplicación",
-            "strMenuOptions": [                
+            "menuOptions": [                
 				{
                     "strName": "materialInout",
                     "strDescription": "Materials",
@@ -159,7 +159,7 @@
             "strName": "userInout",
             "strDescription1": "Usuario",
             "strDescription2": "Acceso limitado a las opciones de la aplicación",
-            "strMenuOptions": [
+            "menuOptions": [
 				{
                     "strName": "dashboardInout",
                     "strDescription": "Dashboard",
