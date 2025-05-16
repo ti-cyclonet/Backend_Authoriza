@@ -39,4 +39,3 @@ export class CreateMenuoptionDto {
   @Type(() => CreateSubmenuDto)
   strSubmenus?: CreateSubmenuDto[];
 }
-console.log('✅ CreateMenuoptionDto usado en validación');
