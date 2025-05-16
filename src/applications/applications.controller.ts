@@ -38,8 +38,8 @@ export class ApplicationsController {
     @Body() createApplicationDto: CreateApplicationDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    console.log('🎯 DTO recibido en el controlador:', createApplicationDto);
-    console.log('🎯 Archivo recibido en el controlador:', file);
+    // console.log('🎯 DTO recibido en el controlador:', createApplicationDto);
+    // console.log('🎯 Archivo recibido en el controlador:', file);
     return this.applicationsService.create(createApplicationDto, file);
   }
 
