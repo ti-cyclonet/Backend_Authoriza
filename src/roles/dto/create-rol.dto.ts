@@ -42,5 +42,4 @@ export class CreateRolDto {
   @Exclude()
   isTemporary?: any;
 }
-console.log('✅ CreateRolDto usado en validación');
 
