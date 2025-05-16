@@ -24,4 +24,3 @@ export class CreateSubmenuDto {
   @IsNumber()
   ingOrder?: number;
 }
-console.log('✅ CreateSubmenuDto usado en validación');
