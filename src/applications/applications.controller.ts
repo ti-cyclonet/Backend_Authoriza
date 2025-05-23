@@ -38,8 +38,6 @@ export class ApplicationsController {
     @Body() createApplicationDto: CreateApplicationDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // console.log('🎯 DTO recibido en el controlador:', createApplicationDto);
-    // console.log('🎯 Archivo recibido en el controlador:', file);
     return this.applicationsService.create(createApplicationDto, file);
   }
 
@@ -62,11 +60,13 @@ export class ApplicationsController {
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() updateApplicationDto: UpdateApplicationDto,
+  @UseInterceptors(FileInterceptor('file'))
+  async updateApp(
+    @Param('id') id: string,
+    @Body() body: any,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.applicationsService.update(id, updateApplicationDto);
+    return this.applicationsService.updateApplication(id, body, file);
   }
 
   @Delete(':id')

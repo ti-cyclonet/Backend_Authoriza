@@ -34,34 +34,39 @@ export class ApplicationsService {
 
     private readonly dataSource: DataSource,
 
-    private readonly cloudinaryService: CloudinaryService
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
-  async create(createApplicationDto: CreateApplicationDto, file?: Express.Multer.File) {
+  async create(
+    createApplicationDto: CreateApplicationDto,
+    file?: Express.Multer.File,
+  ) {
     try {
       // 🔍 Imprimir el DTO completo recibido del frontend
       // console.log('📦 DTO recibido del frontend:');
       // console.log(JSON.stringify(createApplicationDto, null, 2)); // Formato legible
       // console.log('📥 Archivo recibido:', file?.originalname, file?.mimetype);
 
-  
       const { strRoles = [], ...applicationDetails } = createApplicationDto;
-  
+
       // Subir imagen a Cloudinary si se proporcionó un archivo
       let imageUrl = '';
       if (file) {
-        const result = await this.cloudinaryService.uploadImage(file, 'logos-applications');
+        const result = await this.cloudinaryService.uploadImage(
+          file,
+          'logos-applications',
+        );
         imageUrl = result.secure_url;
       }
-  
+
       // Crear la aplicación con la URL de la imagen
       const application = this.applicationRepository.create({
         ...applicationDetails,
         strUrlImage: imageUrl,
       });
-  
+
       await this.applicationRepository.save(application);
-  
+
       // Crear roles y sus opciones de menú
       for (const rolDto of strRoles) {
         const rol = this.RolRepository.create({
@@ -70,15 +75,15 @@ export class ApplicationsService {
           strDescription2: rolDto.strDescription2,
           strApplication: application,
         });
-  
+
         await this.RolRepository.save(rol);
-  
+
         if (Array.isArray(rolDto.menuOptions)) {
           for (const menuOptionDto of rolDto.menuOptions) {
             let menuOption = await this.menuoptionRepository.findOne({
               where: { strName: menuOptionDto.strName },
             });
-  
+
             if (!menuOption) {
               menuOption = this.menuoptionRepository.create({
                 strName: menuOptionDto.strName,
@@ -88,29 +93,31 @@ export class ApplicationsService {
                 strType: menuOptionDto.strType,
                 ingOrder: menuOptionDto.ingOrder,
               });
-  
+
               await this.menuoptionRepository.save(menuOption);
             }
-  
-            const existingRelation = await this.rolMenuOptionRepository.findOne({
-              where: { rol, menuoption: menuOption },
-            });
-  
+
+            const existingRelation = await this.rolMenuOptionRepository.findOne(
+              {
+                where: { rol, menuoption: menuOption },
+              },
+            );
+
             if (!existingRelation) {
               const rolMenuOption = this.rolMenuOptionRepository.create({
                 rol: rol,
                 menuoption: menuOption,
               });
-  
+
               await this.rolMenuOptionRepository.save(rolMenuOption);
             }
-  
+
             if (Array.isArray(menuOptionDto.strSubmenus)) {
               for (const submenuDto of menuOptionDto.strSubmenus) {
                 let submenu = await this.menuoptionRepository.findOne({
                   where: { strName: submenuDto.strName },
                 });
-  
+
                 if (!submenu) {
                   submenu = this.menuoptionRepository.create({
                     strName: submenuDto.strName,
@@ -121,7 +128,7 @@ export class ApplicationsService {
                     ingOrder: submenuDto.ingOrder,
                     strMPatern: menuOption,
                   });
-  
+
                   await this.menuoptionRepository.save(submenu);
                 }
               }
@@ -129,7 +136,7 @@ export class ApplicationsService {
           }
         }
       }
-  
+
       return {
         ...application,
         strRoles,
@@ -138,11 +145,12 @@ export class ApplicationsService {
       this.handleDBExcelption(error);
     }
   }
-  
-  
+
   async checkApplicationName(strName: string): Promise<boolean> {
-    const application = await this.applicationRepository.findOne({ where: { strName } });
-    return !application; 
+    const application = await this.applicationRepository.findOne({
+      where: { strName },
+    });
+    return !application;
   }
 
   async findAll(paginationDto: PaginationDto) {
@@ -296,7 +304,7 @@ export class ApplicationsService {
           })),
         };
       }),
-    );    
+    );
 
     return {
       ...application,
@@ -304,67 +312,74 @@ export class ApplicationsService {
     };
   }
 
-  async findByApplicationAndRol(applicationName: string, rolName: string) {    
+  async findByApplicationAndRol(applicationName: string, rolName: string) {
     const application = await this.applicationRepository.findOne({
-        where: { strName: ILike(applicationName) },
-        relations: { strRoles: true },
+      where: { strName: ILike(applicationName) },
+      relations: { strRoles: true },
     });
 
     if (!application) {
-        throw new NotFoundException(`Application with name ${applicationName} not found`);
+      throw new NotFoundException(
+        `Application with name ${applicationName} not found`,
+      );
     }
 
     // Buscar el rol dentro de la aplicación
-    const rol = application.strRoles.find(rol => rol.strName === rolName);
-    
+    const rol = application.strRoles.find((rol) => rol.strName === rolName);
+
     if (!rol) {
-        throw new NotFoundException(`Role ${rolName} not found in application ${applicationName}`);
+      throw new NotFoundException(
+        `Role ${rolName} not found in application ${applicationName}`,
+      );
     }
 
     // Obtener las opciones de menú asociadas al rol
     const rolMenuoptions = await this.rolMenuOptionRepository.find({
-        where: { rol: { id: rol.id } },
-        relations: { menuoption: { strSubmenus: true } },
+      where: { rol: { id: rol.id } },
+      relations: { menuoption: { strSubmenus: true } },
     });
 
     // Mapear las opciones de menú asegurando que la estructura es idéntica a findOne
-    const menuOptions = rolMenuoptions.map(rolMenuoption => ({
-        id: rolMenuoption.menuoption.id,
-        strName: rolMenuoption.menuoption.strName || '',
-        strDescription: rolMenuoption.menuoption.strDescription || '',
-        strUrl: rolMenuoption.menuoption.strUrl || '',
-        strIcon: rolMenuoption.menuoption.strIcon || '',
-        strType: rolMenuoption.menuoption.strType || '',
-        ingOrder: rolMenuoption.menuoption.ingOrder || '',
-        strSubmenus: rolMenuoption.menuoption.strSubmenus?.map(submenu => ({
-            id: submenu.id,
-            strName: submenu.strName,
-            strDescription: submenu.strDescription,
-            strUrl: submenu.strUrl || '',
-            strIcon: submenu.strIcon || '',
-            strType: submenu.strType,
-            ingOrder: submenu.ingOrder,
+    const menuOptions = rolMenuoptions.map((rolMenuoption) => ({
+      id: rolMenuoption.menuoption.id,
+      strName: rolMenuoption.menuoption.strName || '',
+      strDescription: rolMenuoption.menuoption.strDescription || '',
+      strUrl: rolMenuoption.menuoption.strUrl || '',
+      strIcon: rolMenuoption.menuoption.strIcon || '',
+      strType: rolMenuoption.menuoption.strType || '',
+      ingOrder: rolMenuoption.menuoption.ingOrder || '',
+      strSubmenus:
+        rolMenuoption.menuoption.strSubmenus?.map((submenu) => ({
+          id: submenu.id,
+          strName: submenu.strName,
+          strDescription: submenu.strDescription,
+          strUrl: submenu.strUrl || '',
+          strIcon: submenu.strIcon || '',
+          strType: submenu.strType,
+          ingOrder: submenu.ingOrder,
         })) || [],
     }));
 
     // Estructura idéntica a findOne
-    const rolesWithMenuOptions = [{
+    const rolesWithMenuOptions = [
+      {
         id: rol.id,
         strName: rol.strName,
         strDescription1: rol.strDescription1,
         strDescription2: rol.strDescription2,
         menuOptions,
-    }];
+      },
+    ];
 
     return {
-        ...application,
-        strRoles: rolesWithMenuOptions,
+      ...application,
+      strRoles: rolesWithMenuOptions,
     };
   }
 
   async findOnePlain(term: string) {
     const application = await this.findOne(term);
-   
+
     const roles = Array.isArray(application.strRoles)
       ? application.strRoles.map(
           (rol: {
@@ -389,106 +404,175 @@ export class ApplicationsService {
     };
   }
 
-  async update(id: string, updateApplicationDto: UpdateApplicationDto) {
-    const { strRoles, ...toUpdate } = updateApplicationDto;
-    const application = await this.applicationRepository.preload({
-      id,
-      ...toUpdate,
+  async updateApplication(
+    id: string,
+    data: any,
+    file?: Express.Multer.File,
+  ): Promise<Application> {
+    // 🧩 Parsear strTags si viene como string JSON
+    if (typeof data.strTags === 'string') {
+      try {
+        data.strTags = JSON.parse(data.strTags);
+      } catch (e) {
+        throw new BadRequestException('Invalid format for strTags');
+      }
+    }
+
+    // 🧩 Parsear strRoles si viene como string JSON
+    if (typeof data.strRoles === 'string') {
+      try {
+        data.strRoles = JSON.parse(data.strRoles);
+      } catch (e) {
+        throw new BadRequestException('Invalid format for strRoles');
+      }
+    }
+
+    // 🔎 Buscar la aplicación
+    const app = await this.applicationRepository.findOne({
+      where: { id },
+      relations: ['strRoles', 'strRoles.rolMenuoptions'],
     });
 
-    if (!application)
-      throw new NotFoundException(`Application with id #${id} not found`);
+    if (!app) {
+      throw new NotFoundException('Application not found');
+    }
 
-    // Crear query runner
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
+    // 📸 Manejo de imagen con Cloudinary
+    if (file) {
+      const uploaded = await this.cloudinaryService.uploadImage(file);
+      if (data.strUrlImage) {
+        await this.cloudinaryService.deleteImageByUrl(data.strUrlImage);
+      }
+      data.strUrlImage = uploaded.secure_url;
+    }
 
-    try {
-      // Recuperar los roles existentes relacionados con la aplicación
-      const existingRoles = await queryRunner.manager.find(Rol, {
-        where: { strApplication: { id } },
-        relations: ['strMenuOptions'],
-      });
+    // 🚫 Guardar copia de los roles entrantes antes de eliminarlos de data
+    const incomingRolesDto = data.strRoles || [];
+    delete data.strRoles;
+    delete data.id; // No permitir cambio de ID
 
-      // Manejo de roles si fueron enviados en la petición
-      if (strRoles) {
-        for (const rolObj of strRoles) {
-          const { strName, menuOptions } = rolObj;
-          if (!strName) continue;
+    // 🧬 Asignar datos restantes
+    Object.assign(app, data);
+    await this.applicationRepository.save(app);
 
-          // Verificar si el rol ya existe en la tabla 'roles'
-          let rol = await queryRunner.manager.findOne(Rol, {
-            where: { strName },
-            relations: ['strMenuOptions'],
+    // 🔄 Obtener roles actuales de la DB
+    const existingRoles = await this.RolRepository.find({
+      where: { strApplication: { id } },
+      relations: ['rolMenuoptions'],
+    });
+
+    const existingRolesMap = new Map(existingRoles.map((r) => [r.strName, r]));
+    const incomingRoles: Rol[] = [];
+
+    // 🔁 Procesar roles entrantes
+    for (const rolDto of incomingRolesDto) {
+      if (!rolDto.strName || typeof rolDto.strName !== 'string') {
+        throw new BadRequestException('Each role must have a valid strName');
+      }
+
+      let rol = existingRolesMap.get(rolDto.strName);
+
+      if (rol) {
+        rol.strDescription1 = rolDto.strDescription1;
+        rol.strDescription2 = rolDto.strDescription2;
+      } else {
+        rol = this.RolRepository.create({
+          strName: rolDto.strName,
+          strDescription1: rolDto.strDescription1 ?? null,
+          strDescription2: rolDto.strDescription2 ?? null,
+          strApplication: app,
+        });
+      }
+
+      await this.RolRepository.save(rol);
+      incomingRoles.push(rol);
+
+      // 📌 Procesar MenuOptions
+      const processedMenuOptions = new Set<string>();
+
+      for (const menuOptionDto of rolDto.menuOptions || []) {
+        if (!menuOptionDto.strName) continue;
+
+        processedMenuOptions.add(menuOptionDto.strName);
+
+        let menuOption = await this.menuoptionRepository.findOne({
+          where: { strName: menuOptionDto.strName },
+        });
+
+        if (!menuOption) {
+          menuOption = this.menuoptionRepository.create({
+            strName: menuOptionDto.strName,
+            strDescription: menuOptionDto.strDescription ?? null,
+            strUrl: menuOptionDto.strUrl ?? null,
+            strIcon: menuOptionDto.strIcon ?? null,
+            strType: menuOptionDto.strType ?? null,
+            ingOrder: menuOptionDto.ingOrder ?? 0,
+          });
+          await this.menuoptionRepository.save(menuOption);
+        }
+
+        const relationExists = await this.rolMenuOptionRepository.findOne({
+          where: { rol, menuoption: menuOption },
+        });
+
+        if (!relationExists) {
+          const rolMenuOption = this.rolMenuOptionRepository.create({
+            rol,
+            menuoption: menuOption,
+          });
+          await this.rolMenuOptionRepository.save(rolMenuOption);
+        }
+
+        // 📂 Submenús
+        for (const submenuDto of menuOptionDto.strSubmenus || []) {
+          if (!submenuDto.strName) continue;
+
+          let submenu = await this.menuoptionRepository.findOne({
+            where: { strName: submenuDto.strName },
           });
 
-          if (!rol) {
-            // Si el rol no existe, crearlo con sus datos adicionales si los tiene
-            rol = queryRunner.manager.create(Rol, rolObj);
-            await queryRunner.manager.save(rol);
-          }
-
-          // Verificar si el rol ya está relacionado con la aplicación
-          const isAlreadyAssociated = existingRoles.some(
-            (existingRol) => existingRol.id === rol.id,
-          );
-
-          if (!isAlreadyAssociated) {
-            rol.strApplication = application; // Relacionar el rol con la aplicación
-            await queryRunner.manager.save(rol);
-          }
-
-          // Manejo de strMenuOptions dentro del rol
-          if (menuOptions) {
-            for (const menuOption of menuOptions) {
-              const { strName } = menuOption;
-              if (!strName) continue;
-
-              let option = await queryRunner.manager.findOne(Menuoption, {
-                where: { strName },
-              });
-
-              if (!option) {
-                option = queryRunner.manager.create(Menuoption, menuOption);
-                await queryRunner.manager.save(option);
-              }
-
-              // Asegurar que ambos IDs sean del mismo tipo
-              const isOptionAlreadyAssociated = rol.rolMenuoptions.some(
-                (existingOption) =>
-                  Number(existingOption.menuoption.id) === Number(option.id),
-              );
-
-              if (!isOptionAlreadyAssociated) {
-                // Crear una instancia de RolMenuoption para la relación
-                const rolMenuOption = queryRunner.manager.create(
-                  RolMenuoption,
-                  {
-                    rol: rol,
-                    menuoption: option,
-                  },
-                );
-
-                await queryRunner.manager.save(rolMenuOption);
-              }
-            }
+          if (!submenu) {
+            submenu = this.menuoptionRepository.create({
+              strName: submenuDto.strName,
+              strDescription: submenuDto.strDescription ?? null,
+              strUrl: submenuDto.strUrl ?? null,
+              strIcon: submenuDto.strIcon ?? null,
+              strType: submenuDto.strType ?? null,
+              ingOrder: submenuDto.ingOrder ?? 0,
+              strMPatern: menuOption,
+            });
+            await this.menuoptionRepository.save(submenu);
           }
         }
       }
 
-      await queryRunner.manager.save(application);
-      await queryRunner.commitTransaction();
-      await queryRunner.release();
+      // 🧹 Eliminar relaciones menú que ya no están
+      const currentRelations = await this.rolMenuOptionRepository.find({
+        where: { rol },
+        relations: ['menuoption'],
+      });
 
-      return this.findOnePlain(id);
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      await queryRunner.release();
-      this.handleDBExcelption(error);
+      for (const rel of currentRelations) {
+        if (!processedMenuOptions.has(rel.menuoption.strName)) {
+          await this.rolMenuOptionRepository.remove(rel);
+        }
+      }
     }
 
-    return application;
+    // 🗑️ Eliminar roles que ya no existen en el DTO
+    for (const existingRol of existingRoles) {
+      const stillExists = incomingRolesDto.some(
+        (r) => r.strName === existingRol.strName,
+      );
+      if (!stillExists) {
+        await this.RolRepository.remove(existingRol);
+      }
+    }
+
+    return {
+      ...app,
+      strRoles: incomingRoles,
+    } as Application;
   }
 
   async remove(id: string) {
