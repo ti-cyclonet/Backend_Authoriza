@@ -1,26 +1,42 @@
 import { Injectable } from '@nestjs/common';
-import { v2 as cloudinary } from 'cloudinary';
-import * as fs from 'fs';
-import { UploadApiResponse } from 'cloudinary';
-import { ConfigService } from '@nestjs/config';
+import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { Readable } from 'stream';
 
 @Injectable()
 export class CloudinaryService {
-    constructor(private configService: ConfigService) {
-      }
-      async uploadImage(file: Express.Multer.File, folder: string): Promise<any> {
-        return new Promise((resolve, reject) => {
-          const stream = cloudinary.uploader.upload_stream(
-            { folder },
-            (error, result) => {
-              if (error) return reject(error);
-              resolve(result);
-            },
-          );
-      
-          // Convertir el buffer a un stream legible
-          Readable.from(file.buffer).pipe(stream);
-        });
-      }
+  async uploadImage(
+    file: Express.Multer.File,
+    folder: string = '',
+  ): Promise<UploadApiResponse> {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        },
+      );
+
+      // Convertir el buffer del archivo en un stream legible
+      const readable = new Readable();
+      readable.push(file.buffer);
+      readable.push(null);
+      readable.pipe(uploadStream);
+    });
+
+    return result;
+  }
+
+  async deleteImageByUrl(url: string): Promise<void> {
+    const publicId = this.extractPublicId(url);
+    if (!publicId) return;
+    await cloudinary.uploader.destroy(publicId);
+  }
+
+  private extractPublicId(url: string): string | null {
+    const match = url.match(
+      /\/applications\/([^/.]+)\.(jpg|png|jpeg|gif|webp)/,
+    );
+    return match ? `applications/${match[1]}` : null;
+  }
 }
