@@ -136,7 +136,6 @@ export class RolesService {
     const rol = await this.rolRepository.findOne({ where: { strName } });
     return !rol;
   }
-  
 
   async update(id: string, updateRolDto: UpdateRolDto) {
     const rol = await this.rolRepository.preload({

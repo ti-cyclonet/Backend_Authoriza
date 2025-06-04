@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { ApplicationsModule } from 'src/applications/applications.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       secret: 'SECRET_KEY',
       signOptions: { expiresIn: '1h' },
     }),
+    ApplicationsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
