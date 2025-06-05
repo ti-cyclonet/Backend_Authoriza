@@ -377,6 +377,19 @@ export class ApplicationsService {
     };
   }
 
+  async findRolesByApplicationName(applicationName: string): Promise<string[]> {
+    const application = await this.applicationRepository.findOne({
+      where: { strName: ILike(applicationName) },
+      relations: { strRoles: true },
+    });
+
+    if (!application) {
+      throw new NotFoundException(`Application '${applicationName}' not found`);
+    }
+
+    return application.strRoles.map((rol) => rol.strName);
+  }
+
   async findOnePlain(term: string) {
     const application = await this.findOne(term);
 
