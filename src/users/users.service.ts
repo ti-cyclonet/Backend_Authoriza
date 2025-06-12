@@ -6,6 +6,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Rol } from 'src/roles/entities/rol.entity';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Injectable()
 export class UsersService {
@@ -19,18 +20,27 @@ export class UsersService {
     const user = this.userRepository.create({
       strUserName: dto.strUserName,
       strPassword: hashedPassword,
+      strStatus: 'ACTIVE',
+      dtmCreateDate: new Date(),
+      dtmLatestUpdateDate: new Date(),
     });
     return this.userRepository.save(user);
   }
 
-  async findAll() {
-    return this.userRepository.find({ relations: ['rol'] });
+  async findAll(paginationDto: PaginationDto) {
+    const { limit = 10, offset = 0 } = paginationDto;
+    return this.userRepository.find({
+      take: limit,
+      skip: offset,
+      relations: ['rol', 'basicData'],
+      select: ['id', 'strUserName', 'strStatus', 'dtmLatestUpdateDate'],
+    });
   }
 
   async findOne(id: string) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['rol'],
+      relations: ['rol', 'basicData'],
     });
     if (!user) throw new NotFoundException('User not found');
     return user;
@@ -41,13 +51,14 @@ export class UsersService {
     const role = await this.rolRepository.findOne({ where: { id: roleId } });
     if (!role) throw new NotFoundException('Role not found');
     user.rol = role;
+    user.dtmLatestUpdateDate = new Date();
     return this.userRepository.save(user);
   }
 
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { strUserName: email },
-      relations: ['rol'],
+      relations: ['rol', 'basicData'],
     });
   }
 
@@ -67,9 +78,9 @@ export class UsersService {
     }
 
     user.strPassword = await bcrypt.hash(newPassword, 10);
+    user.dtmLatestUpdateDate = new Date();
     await this.userRepository.save(user);
 
-    // ✅ respuesta estructurada como objeto JSON
     return { message: 'Password updated successfully!' };
   }
 }
