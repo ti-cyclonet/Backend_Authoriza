@@ -12,6 +12,8 @@ import { Rol } from './roles/entities/rol.entity';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { User } from './users/entities/user.entity';
+import { BasicDataModule } from './basic-data/basic-data.module';
+import { BasicData } from './basic-data/entities/basic-data.entity';
 @Module({
   imports: [
     ConfigModule.forRoot(),
@@ -23,13 +25,14 @@ import { User } from './users/entities/user.entity';
       database: process.env.DB_NAME,
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
-      entities: [Application, Menuoption, RolMenuoption, Rol, User],
+      entities: [Application, Menuoption, RolMenuoption, Rol, User, BasicData],
       synchronize: true,
     }),
     ApplicationsModule,
     MenuoptionsModule,
     RolesModule,
     UsersModule,
+    BasicDataModule,
     CommonModule,
     AuthModule
   ],
