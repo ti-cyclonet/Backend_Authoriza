@@ -1,7 +1,10 @@
-import { Controller, Post, Get, Param, Body } from '@nestjs/common';
+import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+import { plainToInstance } from 'class-transformer';
+import { PaginationDto } from './dto/pagination.dto';
 
 @Controller('users')
 export class UsersController {
@@ -14,13 +17,29 @@ export class UsersController {
   }
 
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  async findAll(
+    @Query() paginationDto: PaginationDto,
+  ): Promise<UserResponseDto[]> {
+    const users = await this.usersService.findAll(paginationDto);
+    return plainToInstance(UserResponseDto, users, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+    const user = await this.usersService.findOne(id);
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  @Get('email/:email')
+  async findByEmail(@Param('email') email: string): Promise<UserResponseDto> {
+    const user = await this.usersService.findByEmail(email);
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Post(':id/assign-role')
