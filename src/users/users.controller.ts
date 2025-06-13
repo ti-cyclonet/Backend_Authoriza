@@ -5,17 +5,22 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
+import { ApiTags, ApiOperation} from '@nestjs/swagger';
 
+
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @ApiOperation({ summary: 'Create an user' })
   @Post()
   create(@Body() dto: CreateUserDto) {
     console.log('CREANDO USUARIO...');
     return this.usersService.create(dto);
   }
 
+  @ApiOperation({ summary: 'Get all users' })
   @Get()
   async findAll(
     @Query() paginationDto: PaginationDto,
@@ -26,6 +31,7 @@ export class UsersController {
     });
   }
 
+  @ApiOperation({ summary: 'Get user by id' })
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<UserResponseDto> {
     const user = await this.usersService.findOne(id);
@@ -34,6 +40,7 @@ export class UsersController {
     });
   }
 
+  @ApiOperation({ summary: 'Get user by email' })
   @Get('email/:email')
   async findByEmail(@Param('email') email: string): Promise<UserResponseDto> {
     const user = await this.usersService.findByEmail(email);
@@ -42,11 +49,13 @@ export class UsersController {
     });
   }
 
+  @ApiOperation({ summary: 'Create a rol' })
   @Post(':id/assign-role')
   assignRole(@Param('id') id: string, @Body() body: { roleId: string }) {
     return this.usersService.assignRole(id, body.roleId);
   }
 
+  @ApiOperation({ summary: 'Change password' })
   @Post(':id/change-password')
   async changePassword(
     @Param('id') id: string,
