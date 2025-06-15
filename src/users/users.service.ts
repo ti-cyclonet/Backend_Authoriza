@@ -7,6 +7,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { PaginationDto } from './dto/pagination.dto';
+import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 
 @Injectable()
 export class UsersService {
@@ -62,6 +63,38 @@ export class UsersService {
     });
   }
 
+  async update(id: string, dto: UpdateUserDto): Promise<User> {
+  const user = await this.findOne(id);
+
+  if (dto.strUserName) user.strUserName = dto.strUserName;
+  if (dto.strStatus) user.strStatus = dto.strStatus;
+
+  if (dto.rolId) {
+    const rol = await this.rolRepository.findOne({
+      where: { id: dto.rolId },
+    });
+    if (!rol) throw new NotFoundException('Role not found');
+    user.rol = rol;
+  }
+
+  if (dto.basicDataId) {
+    const basicData = await this.userRepository.manager.findOne(BasicData, {
+      where: { id: dto.basicDataId },
+    });
+    if (!basicData) throw new NotFoundException('BasicData not found');
+    user.basicData = basicData;
+  }
+
+  if (dto.dependentOnId) {
+    const dependentUser = await this.findOne(dto.dependentOnId);
+    user.dependentOn = dependentUser;
+  }
+
+  user.dtmLatestUpdateDate = new Date();
+
+  return await this.userRepository.save(user);
+}
+
   async changePassword(
     userId: string,
     oldPassword: string,
@@ -82,5 +115,11 @@ export class UsersService {
     await this.userRepository.save(user);
 
     return { message: 'Password updated successfully!' };
+  }
+
+  async toggleStatus(userId: string): Promise<User> {
+    const user = await this.findOne(userId);
+    user.strStatus = user.strStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    return this.userRepository.save(user);
   }
 }

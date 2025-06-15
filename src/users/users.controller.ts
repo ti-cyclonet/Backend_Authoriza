@@ -1,10 +1,20 @@
-import { Controller, Post, Get, Param, Body, Query } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Param,
+  Body,
+  Query,
+  Patch,
+  Put,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @Controller('users')
 export class UsersController {
@@ -12,7 +22,6 @@ export class UsersController {
 
   @Post()
   create(@Body() dto: CreateUserDto) {
-    console.log('CREANDO USUARIO...');
     return this.usersService.create(dto);
   }
 
@@ -57,5 +66,15 @@ export class UsersController {
       dto.oldPassword,
       dto.newPassword,
     );
+  }
+
+  @Put(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(id, dto);
+  }
+
+  @Patch(':id/toggle-status')
+  toggleStatus(@Param('id') id: string) {
+    return this.usersService.toggleStatus(id);
   }
 }
