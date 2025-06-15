@@ -5,7 +5,7 @@ import { LoginDto } from './dto/login.dto';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { UsersService } from 'src/users/users.service';
 export interface AuthenticatedUser {
-  id: string
+  id: string;
   email: string;
   image: string;
   name: string;
@@ -18,7 +18,7 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly applicationsService: ApplicationsService,
-    private readonly usersService: UsersService
+    private readonly usersService: UsersService,
   ) {}
 
   async validateUser(
@@ -44,16 +44,21 @@ export class AuthService {
       throw new UnauthorizedException('Incorrect credentials');
     }
 
-    // 4. Validar si su rol está dentro de los roles válidos
+    // 4. validar si el usuario está activo
+    if (user.strStatus?.toUpperCase() !== 'ACTIVE') {
+      throw new UnauthorizedException('Inactive user. Access denied.');
+    }
+
+    // 5. Validar si su rol está dentro de los roles válidos
     if (!validRoles.includes(user.rol?.strName)) {
       throw new UnauthorizedException('UNAUTHORIZED');
     }
 
-    // 5. Generar token JWT
+    // 6. Generar token JWT
     const payload = { sub: user.id, email: user.strUserName };
     const token = this.jwtService.sign(payload);
 
-    // 6. Retornar usuario sin datos sensibles
+    // 7. Retornar usuario sin datos sensibles
     const userWithoutSensitiveData: AuthenticatedUser = {
       id: user.id,
       email: user.strUserName,
