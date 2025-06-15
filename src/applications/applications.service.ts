@@ -42,10 +42,6 @@ export class ApplicationsService {
     file?: Express.Multer.File,
   ) {
     try {
-      // 🔍 Imprimir el DTO completo recibido del frontend
-      // console.log('📦 DTO recibido del frontend:');
-      // console.log(JSON.stringify(createApplicationDto, null, 2)); // Formato legible
-      // console.log('📥 Archivo recibido:', file?.originalname, file?.mimetype);
 
       const { strRoles = [], ...applicationDetails } = createApplicationDto;
 
