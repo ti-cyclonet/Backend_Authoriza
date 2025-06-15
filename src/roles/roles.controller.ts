@@ -3,7 +3,7 @@ import { RolesService } from './roles.service';
 import { CreateRolDto } from './dto/create-rol.dto';
 import { UpdateRolDto } from './dto/update-rol.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
-import { ApiTags, ApiOperation} from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Roles')
 @Controller('roles')
