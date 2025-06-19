@@ -5,27 +5,27 @@ WORKDIR /app
 # Copiar definiciones e instalar dependencias
 COPY package*.json ./
 COPY nest-cli.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
-# Copiar código fuente
+# Copiar todo el código fuente
 COPY . .
 
-# ⚠️ Usar npx directamente para evitar el error "nest not found"
+# Compilar el proyecto Nest.js
 RUN npx nest build
 
-# Etapa 2: Producción
+# Etapa 2: Imagen final
 FROM node:18-alpine
 WORKDIR /app
 
-# Copiar build y node_modules
+# Copiar el resultado del build y dependencias necesarias
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY package*.json ./
+COPY --from=builder /app/package*.json ./
 
-# Variables de entorno
+# Variables de entorno y puerto expuesto
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
-# Ejecutar aplicación
+# Comando para ejecutar la app
 CMD ["node", "dist/main"]
