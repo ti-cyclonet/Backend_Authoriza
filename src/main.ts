@@ -1,4 +1,4 @@
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -36,7 +36,8 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   // 🔹 Aplica el guard global DESPUÉS de Swagger
-  app.useGlobalGuards(app.get(JwtAuthGuard));
+  // const reflector = app.get(Reflector);
+  // app.useGlobalGuards(new JwtAuthGuard(reflector));  
 
   await app.listen(process.env.PORT ?? 3000);
 }

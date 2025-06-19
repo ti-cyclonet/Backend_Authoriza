@@ -16,7 +16,10 @@ import { BasicDataModule } from './basic-data/basic-data.module';
 import { BasicData } from './basic-data/entities/basic-data.entity';
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
 
     TypeOrmModule.forRoot({
       type: 'postgres',
@@ -34,7 +37,7 @@ import { BasicData } from './basic-data/entities/basic-data.entity';
     UsersModule,
     BasicDataModule,
     CommonModule,
-    AuthModule
+    AuthModule,
   ],
 })
 export class AppModule {}
