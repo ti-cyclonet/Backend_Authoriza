@@ -28,12 +28,19 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async findAll(paginationDto: PaginationDto) {
+  async findAll(paginationDto: PaginationDto, dependentOnId?: string) {
     const { limit = 10, offset = 0 } = paginationDto;
+
+    const where: any = {};
+    if (dependentOnId) {
+      where.dependentOn = { id: dependentOnId };
+    }
+
     return this.userRepository.find({
+      where,
       take: limit,
       skip: offset,
-      relations: ['rol', 'basicData'],
+      relations: ['rol', 'basicData', 'dependentOn'],
       select: ['id', 'strUserName', 'strStatus', 'dtmLatestUpdateDate'],
     });
   }
@@ -64,36 +71,36 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
-  const user = await this.findOne(id);
+    const user = await this.findOne(id);
 
-  if (dto.strUserName) user.strUserName = dto.strUserName;
-  if (dto.strStatus) user.strStatus = dto.strStatus;
+    if (dto.strUserName) user.strUserName = dto.strUserName;
+    if (dto.strStatus) user.strStatus = dto.strStatus;
 
-  if (dto.rolId) {
-    const rol = await this.rolRepository.findOne({
-      where: { id: dto.rolId },
-    });
-    if (!rol) throw new NotFoundException('Role not found');
-    user.rol = rol;
+    if (dto.rolId) {
+      const rol = await this.rolRepository.findOne({
+        where: { id: dto.rolId },
+      });
+      if (!rol) throw new NotFoundException('Role not found');
+      user.rol = rol;
+    }
+
+    if (dto.basicDataId) {
+      const basicData = await this.userRepository.manager.findOne(BasicData, {
+        where: { id: dto.basicDataId },
+      });
+      if (!basicData) throw new NotFoundException('BasicData not found');
+      user.basicData = basicData;
+    }
+
+    if (dto.dependentOnId) {
+      const dependentUser = await this.findOne(dto.dependentOnId);
+      user.dependentOn = dependentUser;
+    }
+
+    user.dtmLatestUpdateDate = new Date();
+
+    return await this.userRepository.save(user);
   }
-
-  if (dto.basicDataId) {
-    const basicData = await this.userRepository.manager.findOne(BasicData, {
-      where: { id: dto.basicDataId },
-    });
-    if (!basicData) throw new NotFoundException('BasicData not found');
-    user.basicData = basicData;
-  }
-
-  if (dto.dependentOnId) {
-    const dependentUser = await this.findOne(dto.dependentOnId);
-    user.dependentOn = dependentUser;
-  }
-
-  user.dtmLatestUpdateDate = new Date();
-
-  return await this.userRepository.save(user);
-}
 
   async changePassword(
     userId: string,
