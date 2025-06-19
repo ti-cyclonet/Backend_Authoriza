@@ -2,27 +2,30 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
-# Instalar dependencias
+# Copiar archivos de definición e instalar dependencias
 COPY package*.json ./
+COPY nest-cli.json ./
 RUN npm install
 
-# Copiar el código y compilar
+# Copiar el resto del código fuente
 COPY . .
-RUN npm run build
+
+# Ejecutar la compilación
+RUN npx nest build
 
 # Etapa 2: Imagen final de producción
 FROM node:18-alpine
 WORKDIR /app
 
-# Copiar sólo lo necesario
+# Copiar solo lo necesario
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY package*.json ./
 
-# Variables de entorno y puerto
+# Variables de entorno
 ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
-# Iniciar app
+# Ejecutar la app
 CMD ["node", "dist/main"]
