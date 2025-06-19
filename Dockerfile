@@ -11,7 +11,7 @@ RUN npm install --legacy-peer-deps
 COPY . .
 
 # Compilar el proyecto Nest.js
-RUN npx nest build
+RUN ./node_modules/.bin/nest build
 
 # Etapa 2: Imagen final
 FROM node:18-alpine
