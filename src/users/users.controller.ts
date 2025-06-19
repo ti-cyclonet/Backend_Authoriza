@@ -14,9 +14,9 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
-import { ApiTags, ApiOperation} from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
-
+import { FindUsersDto } from './dto/find-users.dto';
 
 @ApiTags('Users')
 @Controller('users')
@@ -32,9 +32,10 @@ export class UsersController {
   @ApiOperation({ summary: 'Get all users' })
   @Get()
   async findAll(
-    @Query() paginationDto: PaginationDto,
+    @Query() findUsersDto: FindUsersDto,
   ): Promise<UserResponseDto[]> {
-    const users = await this.usersService.findAll(paginationDto);
+    const { dependentOnId, ...pagination } = findUsersDto;
+    const users = await this.usersService.findAll(pagination, dependentOnId);
     return plainToInstance(UserResponseDto, users, {
       excludeExtraneousValues: true,
     });
