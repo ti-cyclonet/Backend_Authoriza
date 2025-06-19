@@ -7,3 +7,12 @@ DB_PASSWORD=Cycl0n3t@*+*
 CLOUDINARY_CLOUD_NAME=dn8ki4idz
 CLOUDINARY_API_KEY=411461764687417
 CLOUDINARY_API_SECRET=GHJhWnvSFSwogFTQmrF6qmbWZiw
+
+NODE_ENV=development
+PORT=3000
+
+# Render PostgreSQL (ajusta con los valores reales de tu servicio Render)
+DATABASE_URL=postgres://user:pass@your-db-host.render.com:5432/authoriza
+
+# JWT
+JWT_SECRET=una_clave_segura_aqui

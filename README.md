@@ -10,7 +10,7 @@
 
 ## Descripción
 
-Authoriza es un backend API que proporciona servicios de autenticación, autorización y gestión de usuarios para la plataforma Ciclonets. El sistema está diseñado para manejar roles y permisos, además de conectarse con diferentes aplicaciones cliente.
+Authoriza es un backend API que proporciona servicios de autenticación, autorización y gestión de usuarios para la plataforma C-Verse. El sistema está diseñado para manejar roles y permisos, además de conectarse con diferentes aplicaciones cliente.
 
 ## Características principales
 
