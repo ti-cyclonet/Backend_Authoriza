@@ -7,7 +7,7 @@ import {
   Query,
   Patch,
   Put,
-} from '@nestjs/common';
+  Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -57,6 +57,13 @@ export class UsersController {
     return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });
+  }
+
+  @ApiOperation({ summary: 'Get users without dependency' })
+  @Get('without-dependency')
+  getUsers(@Request() req: any) {
+    const userId = req.user.id;
+    return this.usersService.findAllExcludingDependency(userId);
   }
 
   @ApiOperation({ summary: 'Create a rol' })

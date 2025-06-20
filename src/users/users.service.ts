@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -42,6 +42,20 @@ export class UsersService {
       skip: offset,
       relations: ['rol', 'basicData', 'dependentOn'],
       select: ['id', 'strUserName', 'strStatus', 'dtmLatestUpdateDate'],
+    });
+  }
+
+  async findAllExcludingDependency(currentUserId: string): Promise<User[]> {
+    const currentUser = await this.userRepository.findOne({
+      where: { id: currentUserId },
+      relations: ['dependentOn'],
+    });
+
+    const excludedId = currentUser?.dependentOn?.id;
+
+    return this.userRepository.find({
+      where: excludedId ? { id: Not(excludedId) } : {},
+      relations: ['rol', 'basicData'],
     });
   }
 
