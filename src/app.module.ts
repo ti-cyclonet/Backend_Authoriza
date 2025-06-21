@@ -31,12 +31,12 @@ import { BasicData } from './basic-data/entities/basic-data.entity';
       entities: [Application, Menuoption, RolMenuoption, Rol, User, BasicData],
       synchronize: true,
 
-      ssl: true,
-      extra: {
-        ssl: {
-          rejectUnauthorized: false,
-        },
-      },
+      // ssl: true,
+      // extra: {
+      //   ssl: {
+      //     rejectUnauthorized: false,
+      //   },
+      // },
     }),
     ApplicationsModule,
     MenuoptionsModule,
