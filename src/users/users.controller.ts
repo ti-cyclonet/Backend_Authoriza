@@ -7,6 +7,8 @@ import {
   Query,
   Patch,
   Put,
+  Request,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -14,7 +16,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 
@@ -57,6 +59,20 @@ export class UsersController {
     return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });
+  }
+
+  @Get('without-dependency/:id')
+  @ApiOperation({
+    summary: 'List all users excluding the user that the given user depends on',
+  })
+  @ApiParam({
+    name: 'id',
+    type: 'string',
+    format: 'uuid',
+    description: 'UUID of the user to evaluate',
+  })
+  getUsers(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findAllExcludingUserThatThisUserDependsOn(id);
   }
 
   @ApiOperation({ summary: 'Create a rol' })
