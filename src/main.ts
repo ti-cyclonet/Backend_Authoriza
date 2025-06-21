@@ -36,8 +36,8 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   // 🔹 Aplica el guard global DESPUÉS de Swagger
-  // const reflector = app.get(Reflector);
-  // app.useGlobalGuards(new JwtAuthGuard(reflector));  
+  const reflector = app.get(Reflector);
+  app.useGlobalGuards(new JwtAuthGuard(reflector));  
 
   await app.listen(process.env.PORT ?? 3000);
 }
