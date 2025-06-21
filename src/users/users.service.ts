@@ -45,18 +45,27 @@ export class UsersService {
     });
   }
 
-  async findAllExcludingDependency(currentUserId: string): Promise<User[]> {
-    const currentUser = await this.userRepository.findOne({
-      where: { id: currentUserId },
+  async findAllExcludingUserThatThisUserDependsOn(
+    userId: string,
+  ): Promise<User[]> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
       relations: ['dependentOn'],
     });
 
-    const excludedId = currentUser?.dependentOn?.id;
+    if (!user) {
+      throw new NotFoundException(`User with id ${userId} not found`);
+    }
 
-    return this.userRepository.find({
-      where: excludedId ? { id: Not(excludedId) } : {},
-      relations: ['rol', 'basicData'],
-    });
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.basicData', 'basicData');
+
+    if (user.dependentOn) {
+      qb.where('user.id != :excludedId', { excludedId: user.dependentOn.id });
+    }
+
+    return qb.getMany();
   }
 
   async findOne(id: string) {
