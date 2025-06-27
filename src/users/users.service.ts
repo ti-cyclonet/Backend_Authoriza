@@ -101,7 +101,12 @@ export class UsersService {
   async findByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { strUserName: email },
-      relations: ['rol', 'basicData'],
+      relations: [
+        'rol',
+        'basicData',
+        'basicData.naturalPersonData',
+        'basicData.legalEntityData',
+      ],
     });
   }
 

@@ -11,6 +11,9 @@ export interface AuthenticatedUser {
   name: string;
   rol: string;
   rolDescription: string;
+  firstName?: string;
+  secondName?: string;
+  businessName?: string;
 }
 
 @Injectable()
@@ -59,7 +62,11 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     // 7. Retornar usuario sin datos sensibles
-    const userWithoutSensitiveData: AuthenticatedUser = {
+    const userWithoutSensitiveData: AuthenticatedUser & {
+      firstName?: string;
+      secondName?: string;
+      businessName?: string;
+    } = {
       id: user.id,
       email: user.strUserName,
       image:
@@ -70,6 +77,19 @@ export class AuthService {
       rolDescription: user.rol.strDescription1 || '',
     };
 
+    // Si es persona natural
+    if (user.basicData?.strPersonType === 'N') {
+      userWithoutSensitiveData.firstName =
+        user.basicData?.naturalPersonData?.firstName || '';
+      userWithoutSensitiveData.secondName =
+        user.basicData?.naturalPersonData?.secondName || '';
+    }
+
+    // Si es persona jurídica
+    if (user.basicData?.strPersonType === 'J') {
+      userWithoutSensitiveData.businessName =
+        user.basicData?.legalEntityData?.businessName || '';
+    }
     return {
       access_token: token,
       user: userWithoutSensitiveData,
