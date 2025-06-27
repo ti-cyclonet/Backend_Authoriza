@@ -33,19 +33,18 @@ export class UsersService {
   async findAll(paginationDto: PaginationDto, dependentOnId?: string) {
     const { limit = 10, offset = 0 } = paginationDto;
 
-    const where: any = {};
-    if (dependentOnId) {
-      where.dependentOn = { id: dependentOnId };
-    }
-    return this.userRepository
+    const qb = this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
-      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .take(limit)
-      .skip(offset)
-      .getMany();
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData');
+
+    if (dependentOnId) {
+      qb.where('user.dependentOnId = :dependentOnId', { dependentOnId });
+    }
+
+    return qb.take(limit).skip(offset).getMany();
   }
 
   async findAllExcludingUserThatThisUserDependsOn(
