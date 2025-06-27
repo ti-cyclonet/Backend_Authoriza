@@ -14,6 +14,10 @@ import { UsersModule } from './users/users.module';
 import { User } from './users/entities/user.entity';
 import { BasicDataModule } from './basic-data/basic-data.module';
 import { BasicData } from './basic-data/entities/basic-data.entity';
+import { NaturalPersonDataModule } from './natural-person-data/natural-person-data.module';
+import { LegalEntityDataModule } from './legal-entity-data/legal-entity-data.module';
+import { NaturalPersonData } from './natural-person-data/entities/natural-person-data.entity';
+import { LegalEntityData } from './legal-entity-data/entities/legal-entity-data.entity';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -28,7 +32,7 @@ import { BasicData } from './basic-data/entities/basic-data.entity';
       database: process.env.DB_NAME,
       username: process.env.DB_USERNAME,
       password: process.env.DB_PASSWORD,
-      entities: [Application, Menuoption, RolMenuoption, Rol, User, BasicData],
+      entities: [Application, Menuoption, RolMenuoption, Rol, User, BasicData, NaturalPersonData, LegalEntityData],
       synchronize: true,
 
       ssl: true,
@@ -37,12 +41,15 @@ import { BasicData } from './basic-data/entities/basic-data.entity';
           rejectUnauthorized: false,
         },
       },
+      
     }),
     ApplicationsModule,
     MenuoptionsModule,
     RolesModule,
     UsersModule,
     BasicDataModule,
+    NaturalPersonDataModule,
+    LegalEntityDataModule,
     CommonModule,
     AuthModule,
   ],
