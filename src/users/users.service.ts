@@ -8,6 +8,8 @@ import * as bcrypt from 'bcrypt';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
+import { NaturalPersonData } from 'src/natural-person-data/entities/natural-person-data.entity';
+import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
 
 @Injectable()
 export class UsersService {
@@ -35,14 +37,15 @@ export class UsersService {
     if (dependentOnId) {
       where.dependentOn = { id: dependentOnId };
     }
-
-    return this.userRepository.find({
-      where,
-      take: limit,
-      skip: offset,
-      relations: ['rol', 'basicData', 'dependentOn'],
-      select: ['id', 'strUserName', 'strStatus', 'dtmLatestUpdateDate'],
-    });
+    return this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.rol', 'rol')
+      .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .take(limit)
+      .skip(offset)
+      .getMany();
   }
 
   async findAllExcludingUserThatThisUserDependsOn(
@@ -59,13 +62,23 @@ export class UsersService {
 
     const qb = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.basicData', 'basicData');
+      .leftJoinAndSelect('user.rol', 'rol')
+      .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData');
 
     if (user.dependentOn) {
       qb.where('user.id != :excludedId', { excludedId: user.dependentOn.id });
     }
 
     return qb.getMany();
+  }
+
+  async isUserNameTaken(userName: string): Promise<boolean> {
+    const user = await this.userRepository.findOne({
+      where: { strUserName: userName },
+    });
+    return !!user;
   }
 
   async findOne(id: string) {
