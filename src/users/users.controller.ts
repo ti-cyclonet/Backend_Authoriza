@@ -9,6 +9,8 @@ import {
   Put,
   Request,
   ParseUUIDPipe,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -19,16 +21,53 @@ import { PaginationDto } from './dto/pagination.dto';
 import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
+import { CreateFullUserDto } from './dto/CreateFullUserDto';
+import { BasicDataService } from 'src/basic-data/basic-data.service';
+import { NaturalPersonDataService } from 'src/natural-person-data/natural-person-data.service';
+import { LegalEntityDataService } from 'src/legal-entity-data/legal-entity-data.service';
 
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly basicDataService: BasicDataService,
+    private readonly naturalPersonService: NaturalPersonDataService,
+    private readonly legalEntityService: LegalEntityDataService,
+  ) {}
 
   @ApiOperation({ summary: 'Create an user' })
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
+  }
+
+  @Post('full')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  async createFullUser(@Body() dto: CreateFullUserDto) {
+    // console.log('Creating full user with data:', dto);
+    const user = await this.usersService.create(dto.user);
+
+    const basicData = await this.basicDataService.create(
+      user.id,
+      dto.basicData,
+    );
+
+    if (dto.basicData.strPersonType === 'N' && dto.naturalPersonData) {
+      await this.naturalPersonService.create({
+        ...dto.naturalPersonData,
+        basicDataId: basicData.id,
+      });
+    }
+
+    if (dto.basicData.strPersonType === 'J' && dto.legalEntityData) {
+      await this.legalEntityService.create({
+        ...dto.legalEntityData,
+        basicDataId: basicData.id,
+      });
+    }
+
+    return { message: 'User created successfully' };
   }
 
   @ApiOperation({ summary: 'Get all users' })
@@ -41,6 +80,12 @@ export class UsersController {
     return plainToInstance(UserResponseDto, users, {
       excludeExtraneousValues: true,
     });
+  }
+
+  @Get('check-username/:userName')
+  async checkUsername(@Param('userName') userName: string) {
+    const isTaken = await this.usersService.isUserNameTaken(userName);
+    return { available: !isTaken };
   }
 
   @ApiOperation({ summary: 'Get user by id' })

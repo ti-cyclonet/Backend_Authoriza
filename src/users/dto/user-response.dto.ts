@@ -1,6 +1,6 @@
 import { Expose, Type } from 'class-transformer';
-import { Rol } from '../../roles/entities/rol.entity';
-import { BasicData } from '../../basic-data/entities/basic-data.entity';
+import { RolResponseDto } from '../../roles/dto/rol-response.dto';
+import { BasicDataResponseDto } from 'src/basic-data/dto/basic-data-responde.dto';
 
 export class UserResponseDto {
   @Expose()
@@ -16,10 +16,10 @@ export class UserResponseDto {
   dtmLatestUpdateDate: Date;
 
   @Expose()
-  @Type(() => Rol)
-  rol: Rol;
+  @Type(() => RolResponseDto)
+  rol: RolResponseDto;
 
   @Expose()
-  @Type(() => BasicData)
-  basicData: BasicData;
+  @Type(() => BasicDataResponseDto)
+  basicData: BasicDataResponseDto;
 }
