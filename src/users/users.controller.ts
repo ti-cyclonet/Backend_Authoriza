@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   UsePipes,
   ValidationPipe,
+  Delete,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -18,7 +19,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
-import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiBody } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CreateFullUserDto } from './dto/CreateFullUserDto';
@@ -67,7 +68,10 @@ export class UsersController {
       });
     }
 
-    return { message: 'User created successfully' };
+    return {
+      id: user.id,
+      message: 'User created successfully',
+    };
   }
 
   @ApiOperation({ summary: 'Get all users' })
@@ -120,7 +124,8 @@ export class UsersController {
     return this.usersService.findAllExcludingUserThatThisUserDependsOn(id);
   }
 
-  @ApiOperation({ summary: 'Create a rol' })
+  @ApiOperation({ summary: 'Assign a role to user' })
+  @ApiBody({ schema: { example: { roleId: 'uuid-of-role' } } })
   @Post(':id/assign-role')
   assignRole(@Param('id') id: string, @Body() body: { roleId: string }) {
     return this.usersService.assignRole(id, body.roleId);
@@ -147,5 +152,11 @@ export class UsersController {
   @Patch(':id/toggle-status')
   toggleStatus(@Param('id') id: string) {
     return this.usersService.toggleStatus(id);
+  }
+
+  @Delete(':userId/roles')
+  async removeUserRole(@Param('userId') userId: string) {
+    const updatedUser = await this.usersService.removeRole(userId);
+    return { message: 'Role removed successfully', user: updatedUser };
   }
 }

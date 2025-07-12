@@ -169,4 +169,11 @@ export class UsersService {
     user.strStatus = user.strStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     return this.userRepository.save(user);
   }
+
+  async removeRole(userId: string): Promise<User> {
+    const user = await this.findOne(userId);
+    user.rol = null;
+    user.dtmLatestUpdateDate = new Date();
+    return this.userRepository.save(user);
+  }
 }
