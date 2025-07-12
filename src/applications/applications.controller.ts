@@ -17,10 +17,9 @@ import { UpdateApplicationDto } from './dto/update-application.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateApplicationDto } from './dto/create-application.dto';
-import { ApiTags, ApiOperation  } from '@nestjs/swagger';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UseGuards } from '@nestjs/common';
-
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -54,7 +53,7 @@ export class ApplicationsController {
     return this.applicationsService.findAll(paginationDto);
   }
 
-  @ApiOperation({ summary: 'Get application by ID' })  
+  @ApiOperation({ summary: 'Get application by ID' })
   @Get(':term')
   findOne(@Param('term') term: string) {
     return this.applicationsService.findOnePlain(term);
@@ -66,7 +65,10 @@ export class ApplicationsController {
     @Param('appName') appName: string,
     @Param('rolName') rolName: string,
   ) {
-    return this.applicationsService.findByApplicationAndRol(appName, rolName);
+    if (rolName) {
+      return this.applicationsService.findByApplicationAndRol(appName, rolName);
+    }
+    return this.applicationsService.findRolesByApplicationName(appName);
   }
 
   @ApiOperation({ summary: 'Update an application by ID' })
