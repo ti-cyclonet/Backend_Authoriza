@@ -22,4 +22,8 @@ export class UserResponseDto {
   @Expose()
   @Type(() => BasicDataResponseDto)
   basicData: BasicDataResponseDto;
+
+  @Expose()
+  @Type(() => UserResponseDto)
+  dependentOn?: UserResponseDto;
 }
