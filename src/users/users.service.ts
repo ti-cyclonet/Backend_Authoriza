@@ -10,6 +10,8 @@ import { PaginationDto } from './dto/pagination.dto';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { NaturalPersonData } from 'src/natural-person-data/entities/natural-person-data.entity';
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
+import { UserResponseDto } from './dto/user-response.dto';
+import { plainToInstance } from 'class-transformer';
 
 @Injectable()
 export class UsersService {
@@ -38,39 +40,49 @@ export class UsersService {
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
-      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData');
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
+      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
+      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData');
 
     if (dependentOnId) {
       qb.where('user.dependentOnId = :dependentOnId', { dependentOnId });
     }
 
-    return qb.take(limit).skip(offset).getMany();
+    const users = await qb.take(limit).skip(offset).getMany();
+    return plainToInstance(UserResponseDto, users, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async findAllExcludingUserThatThisUserDependsOn(
     userId: string,
-  ): Promise<User[]> {
+  ): Promise<UserResponseDto[]> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['dependentOn'],
     });
 
-    if (!user) {
-      throw new NotFoundException(`User with id ${userId} not found`);
-    }
+    if (!user) throw new NotFoundException(`User with id ${userId} not found`);
 
     const qb = this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
-      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData');
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
+      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
+      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData');
 
     if (user.dependentOn) {
       qb.where('user.id != :excludedId', { excludedId: user.dependentOn.id });
     }
 
-    return qb.getMany();
+    const users = await qb.getMany();
+    return plainToInstance(UserResponseDto, users, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async isUserNameTaken(userName: string): Promise<boolean> {
@@ -83,10 +95,20 @@ export class UsersService {
   async findOne(id: string) {
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['rol', 'basicData'],
+      relations: [
+        'rol',
+        'basicData',
+        'basicData.naturalPersonData',
+        'basicData.legalEntityData',
+        'dependentOn',
+        'dependentOn.rol',
+        'dependentOn.basicData',
+      ],
     });
     if (!user) throw new NotFoundException('User not found');
-    return user;
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   async assignRole(userId: string, roleId: string) {
@@ -98,7 +120,26 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async findByEmail(email: string): Promise<User | null> {
+  async findByEmail(email: string): Promise<UserResponseDto | null> {
+    const user = await this.userRepository.findOne({
+      where: { strUserName: email },
+      relations: [
+        'rol',
+        'basicData',
+        'basicData.naturalPersonData',
+        'basicData.legalEntityData',
+        'dependentOn',
+        'dependentOn.rol',
+        'dependentOn.basicData',
+      ],
+    });
+    if (!user) return null;
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
+  }
+
+  async findEntityByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { strUserName: email },
       relations: [
@@ -106,6 +147,9 @@ export class UsersService {
         'basicData',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
+        'dependentOn',
+        'dependentOn.rol',
+        'dependentOn.basicData',
       ],
     });
   }
@@ -147,7 +191,13 @@ export class UsersService {
     oldPassword: string,
     newPassword: string,
   ): Promise<{ message: string }> {
-    const user = await this.findOne(userId);
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
 
     const isOldPasswordValid = await bcrypt.compare(
       oldPassword,

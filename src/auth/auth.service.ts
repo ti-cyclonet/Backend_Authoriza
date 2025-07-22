@@ -36,7 +36,7 @@ export class AuthService {
       );
 
     // 2. Buscar el usuario por email
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.usersService.findEntityByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Incorrect credentials');
     }

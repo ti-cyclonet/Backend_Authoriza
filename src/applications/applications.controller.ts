@@ -71,6 +71,12 @@ export class ApplicationsController {
     return this.applicationsService.findRolesByApplicationName(appName);
   }
 
+  @ApiOperation({ summary: 'Get all roles of an application' })
+  @Get(':appName/rol')
+  async getRolesByApplicationName(@Param('appName') appName: string) {
+    return this.applicationsService.findRolesByApplicationName(appName);
+  }
+
   @ApiOperation({ summary: 'Update an application by ID' })
   @Patch(':id')
   @UseInterceptors(FileInterceptor('file'))
