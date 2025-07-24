@@ -19,7 +19,7 @@ class UserDto {
   strPassword: string;
 
   @IsString()
-  @IsIn(['ACTIVE', 'INACTIVE'])
+  @IsIn(['ACTIVE', 'INACTIVE', 'UNCONFIRMED', 'EXPINING', 'SUSPENDED', 'DELINQUENT' ])
   strStatus: string;
 }
 
@@ -29,7 +29,7 @@ class BasicDataDto {
   strPersonType: string;
 
   @IsString()
-  @IsIn(['ACTIVE', 'INACTIVE'])
+  @IsIn(['ACTIVE', 'INACTIVE' ])
   strStatus: string;
 }
 
@@ -65,6 +65,9 @@ class LegalEntityDto {
   @IsOptional()
   @IsString()
   webSite?: string;
+
+  @IsString()
+  contactName: string;
 
   @IsEmail()
   contactEmail: string;

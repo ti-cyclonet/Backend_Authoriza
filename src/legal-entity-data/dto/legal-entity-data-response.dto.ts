@@ -11,6 +11,9 @@ export class LegalEntityDataResponseDto {
   webSite?: string;
 
   @Expose()
+  contactName: string;
+
+  @Expose()
   contactEmail: string;
 
   @Expose()
