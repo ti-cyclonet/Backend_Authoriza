@@ -19,7 +19,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
-import { ApiTags, ApiOperation, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CreateFullUserDto } from './dto/CreateFullUserDto';
@@ -46,7 +46,7 @@ export class UsersController {
   @Post('full')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async createFullUser(@Body() dto: CreateFullUserDto) {
-    // console.log('Creating full user with data:', dto);
+    console.log('Creating full user with data:', dto);
     const user = await this.usersService.create(dto.user);
 
     const basicData = await this.basicDataService.create(
@@ -158,5 +158,13 @@ export class UsersController {
   async removeUserRole(@Param('userId') userId: string) {
     const updatedUser = await this.usersService.removeRole(userId);
     return { message: 'Role removed successfully', user: updatedUser };
+  }
+
+  @ApiOperation({ summary: 'Remove dependency from user' })
+  @ApiResponse({ status: 200, description: 'Dependency removed successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @Patch(':id/remove-dependency')
+  async removeUserDependency(@Param('id') id: string) {
+    return this.usersService.removeDependency(id);
   }
 }

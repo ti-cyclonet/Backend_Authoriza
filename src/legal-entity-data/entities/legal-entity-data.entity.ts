@@ -18,6 +18,9 @@ export class LegalEntityData {
   @Column({ nullable: true })
   webSite?: string;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  contactName: string;
+
   @Column()
   contactEmail: string;
 
