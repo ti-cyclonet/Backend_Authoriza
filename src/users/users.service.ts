@@ -22,10 +22,11 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(dto.strPassword, 10);
+    console.log('Creating user:', dto);
     const user = this.userRepository.create({
       strUserName: dto.strUserName,
       strPassword: hashedPassword,
-      strStatus: 'ACTIVE',
+      strStatus: 'UNCONFIRMED',
       dtmCreateDate: new Date(),
       dtmLatestUpdateDate: new Date(),
     });
@@ -224,6 +225,22 @@ export class UsersService {
     const user = await this.findOne(userId);
     user.rol = null;
     user.dtmLatestUpdateDate = new Date();
+    return this.userRepository.save(user);
+  }
+
+  async removeDependency(userId: string): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['dependentOn'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID '${userId}' not found`);
+    }
+
+    user.dependentOn = null;
+    user.dtmLatestUpdateDate = new Date();
+
     return this.userRepository.save(user);
   }
 }
