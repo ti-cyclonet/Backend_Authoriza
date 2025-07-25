@@ -47,9 +47,12 @@ export class AuthService {
       throw new UnauthorizedException('Incorrect credentials');
     }
 
-    // 4. validar si el usuario está activo
-    if (user.strStatus?.toUpperCase() !== 'ACTIVE') {
-      throw new UnauthorizedException('Inactive user. Access denied.');
+    // 4. validar si el usuario está activo o por vencer
+    const allowedStatuses = ['ACTIVE', 'EXPIRING'];
+    if (!allowedStatuses.includes(user.strStatus?.toUpperCase())) {
+      throw new UnauthorizedException(
+        'Inactive or expired user. Access denied.',
+      );
     }
 
     // 5. Validar si su rol está dentro de los roles válidos
