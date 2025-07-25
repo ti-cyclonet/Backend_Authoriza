@@ -22,7 +22,6 @@ export class UsersService {
 
   async create(dto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(dto.strPassword, 10);
-    console.log('Creating user:', dto);
     const user = this.userRepository.create({
       strUserName: dto.strUserName,
       strPassword: hashedPassword,
@@ -219,6 +218,36 @@ export class UsersService {
     const user = await this.findOne(userId);
     user.strStatus = user.strStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     return this.userRepository.save(user);
+  }
+
+  async updateStatusWithDependents(
+    userId: string,
+    newStatus: string,
+  ): Promise<User> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['dependents'],
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID '${userId}' not found`);
+    }
+
+    // Actualizar estado del usuario padre
+    user.strStatus = newStatus;
+    user.dtmLatestUpdateDate = new Date();
+    await this.userRepository.save(user);
+
+    // Actualizar estado de todos los hijos que dependan de este usuario
+    await this.userRepository.update(
+      { dependentOn: { id: userId } },
+      {
+        strStatus: newStatus,
+        dtmLatestUpdateDate: new Date(),
+      },
+    );
+
+    return user;
   }
 
   async removeRole(userId: string): Promise<User> {

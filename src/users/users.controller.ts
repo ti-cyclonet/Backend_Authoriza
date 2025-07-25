@@ -12,6 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
   Delete,
+  BadRequestException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -19,7 +20,13 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginationDto } from './dto/pagination.dto';
-import { ApiTags, ApiOperation, ApiParam, ApiBody, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CreateFullUserDto } from './dto/CreateFullUserDto';
@@ -46,7 +53,6 @@ export class UsersController {
   @Post('full')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
   async createFullUser(@Body() dto: CreateFullUserDto) {
-    console.log('Creating full user with data:', dto);
     const user = await this.usersService.create(dto.user);
 
     const basicData = await this.basicDataService.create(
@@ -153,6 +159,28 @@ export class UsersController {
   toggleStatus(@Param('id') id: string) {
     return this.usersService.toggleStatus(id);
   }
+
+  @Patch(':id/status-with-dependents')
+  async updateStatusAndDependents(
+    @Param('id') id: string,
+    @Body('status') status: string,
+  ) {
+    const allowedStatuses = [
+      'ACTIVE',
+      'INACTIVE',
+      'UNCONFIRMED',
+      'EXPIRING',
+      'SUSPENDED',
+      'DELINQUENT',
+    ];
+    if (!allowedStatuses.includes(status)) {
+      throw new BadRequestException('Invalid status provided');
+    }
+
+    return this.usersService.updateStatusWithDependents(id, status);
+  }
+
+  
 
   @Delete(':userId/roles')
   async removeUserRole(@Param('userId') userId: string) {
