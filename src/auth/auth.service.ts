@@ -26,7 +26,13 @@ export class AuthService {
 
   async validateUser(
     loginDto: LoginDto,
-  ): Promise<{ access_token: string; user: AuthenticatedUser }> {
+  ): Promise<{
+    access_token: string;
+    user: AuthenticatedUser & {
+      mustChangePassword?: boolean;
+      passwordExpired?: boolean;
+    };
+  }> {
     const { email, password, applicationName } = loginDto;
 
     // 1. Obtener los roles válidos para esta aplicación
@@ -60,15 +66,26 @@ export class AuthService {
       throw new UnauthorizedException('UNAUTHORIZED');
     }
 
-    // 6. Generar token JWT
+    // 6. Validar si debe cambiar su contraseña
+    const mustChangePassword = !!user.mustChangePassword;
+
+    // 7. Validar si han pasado más de 90 días desde el último cambio
+    const now = new Date();
+    const expirationDate = new Date(user.lastPasswordChange || now);
+    expirationDate.setDate(expirationDate.getDate() + 90);
+    const passwordExpired = now > expirationDate;
+
+    // 8. Generar token JWT
     const payload = { sub: user.id, email: user.strUserName };
     const token = this.jwtService.sign(payload);
 
-    // 7. Retornar usuario sin datos sensibles
+    // 9. Construir usuario sin datos sensibles
     const userWithoutSensitiveData: AuthenticatedUser & {
       firstName?: string;
       secondName?: string;
       businessName?: string;
+      mustChangePassword?: boolean;
+      passwordExpired?: boolean;
     } = {
       id: user.id,
       email: user.strUserName,
@@ -78,6 +95,8 @@ export class AuthService {
       name: user.strUserName,
       rol: user.rol.strName,
       rolDescription: user.rol.strDescription1 || '',
+      mustChangePassword,
+      passwordExpired,
     };
 
     // Si es persona natural
@@ -93,6 +112,7 @@ export class AuthService {
       userWithoutSensitiveData.businessName =
         user.basicData?.legalEntityData?.businessName || '';
     }
+
     return {
       access_token: token,
       user: userWithoutSensitiveData,
