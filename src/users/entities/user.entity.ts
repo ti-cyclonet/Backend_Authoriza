@@ -23,6 +23,12 @@ export class User {
   @Column()
   strPassword: string;
 
+  @Column({ default: true })
+  mustChangePassword: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  lastPasswordChange: Date;
+
   @Column({
     type: 'enum',
     enum: [

@@ -11,14 +11,14 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @ApiOperation({ summary: 'Login user and return access token' })
-
   @Public()
   @Post('login')
   async login(
     @Body() loginDto: LoginDto,
-  ): Promise<{ access_token: string; user: AuthenticatedUser }> {
+  ): Promise<{ access_token: string; user: AuthenticatedUser } | { status: string; message: string }> {
     return this.authService.validateUser(loginDto);
   }
+
   @ApiOperation({ summary: 'Get user profile' })
   @Post('profile')
   getProfile(@Request() req) {
