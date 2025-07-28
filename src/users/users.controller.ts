@@ -140,7 +140,7 @@ export class UsersController {
   @ApiOperation({ summary: 'Change password' })
   @Post(':id/change-password')
   async changePassword(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ChangePasswordDto,
   ) {
     return this.usersService.changePassword(
@@ -179,8 +179,6 @@ export class UsersController {
 
     return this.usersService.updateStatusWithDependents(id, status);
   }
-
-  
 
   @Delete(':userId/roles')
   async removeUserRole(@Param('userId') userId: string) {

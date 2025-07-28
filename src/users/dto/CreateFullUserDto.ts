@@ -14,13 +14,26 @@ class UserDto {
   @IsNotEmpty()
   strUserName: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  strPassword: string;
+  strPassword?: string;
 
   @IsString()
-  @IsIn(['ACTIVE', 'INACTIVE', 'UNCONFIRMED', 'EXPINING', 'SUSPENDED', 'DELINQUENT' ])
+  @IsIn([
+    'ACTIVE',
+    'INACTIVE',
+    'UNCONFIRMED',
+    'EXPIRING',
+    'SUSPENDED',
+    'DELINQUENT',
+  ])
   strStatus: string;
+
+  @IsOptional()
+  mustChangePassword?: boolean;
+
+  @IsOptional()
+  lastPasswordChange?: Date;
 }
 
 class BasicDataDto {
@@ -29,7 +42,7 @@ class BasicDataDto {
   strPersonType: string;
 
   @IsString()
-  @IsIn(['ACTIVE', 'INACTIVE' ])
+  @IsIn(['ACTIVE', 'INACTIVE'])
   strStatus: string;
 }
 
