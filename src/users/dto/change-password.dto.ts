@@ -1,6 +1,7 @@
-import { IsString, MinLength } from 'class-validator';
+import { IsString, MinLength, IsUUID } from 'class-validator';
 
 export class ChangePasswordDto {
+  
   @IsString()
   oldPassword: string;
 

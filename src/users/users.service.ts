@@ -20,14 +20,16 @@ export class UsersService {
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
   ) {}
 
-  async create(dto: CreateUserDto) {
-    const hashedPassword = await bcrypt.hash(dto.strPassword, 10);
+  async create(dto: CreateUserDto): Promise<User> {
+    const genericPassword = '1234567890';
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(genericPassword, salt);
     const user = this.userRepository.create({
       strUserName: dto.strUserName,
       strPassword: hashedPassword,
+      mustChangePassword: true,
+      lastPasswordChange: new Date(),
       strStatus: 'UNCONFIRMED',
-      dtmCreateDate: new Date(),
-      dtmLatestUpdateDate: new Date(),
     });
     return this.userRepository.save(user);
   }
@@ -207,8 +209,12 @@ export class UsersService {
       throw new NotFoundException('The old password is not valid.');
     }
 
+    // Actualizar contraseña y otros campos
     user.strPassword = await bcrypt.hash(newPassword, 10);
     user.dtmLatestUpdateDate = new Date();
+    user.mustChangePassword = false;
+    user.lastPasswordChange = new Date();
+
     await this.userRepository.save(user);
 
     return { message: 'Password updated successfully!' };
