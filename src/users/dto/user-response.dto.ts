@@ -13,6 +13,9 @@ export class UserResponseDto {
   strStatus: string;
 
   @Expose()
+  deletedAt?: Date;
+
+  @Expose()
   dtmLatestUpdateDate: Date;
 
   @Expose()
