@@ -134,8 +134,17 @@ export class UsersService {
         'dependentOn.rol',
         'dependentOn.basicData',
       ],
+      withDeleted: true, // 👈 necesario si usas soft delete y quieres incluir eliminados
     });
-    if (!user) throw new NotFoundException('User not found');
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.deletedAt) {
+      throw new NotFoundException('User has been deleted');
+    }
+
     return plainToInstance(UserResponseDto, user, {
       excludeExtraneousValues: true,
     });
