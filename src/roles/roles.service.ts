@@ -53,6 +53,7 @@ export class RolesService {
   
     return Promise.all(
       roles.map(async (rol) => ({
+        id: rol.id,
         strName: rol.strName,
         strDescription1: rol.strDescription1,
         strDescription2: rol.strDescription2,
@@ -105,6 +106,7 @@ export class RolesService {
         });
   
         return {
+          id: rol.id,
           strName: menuoption?.strName || rolMenuoption.menuoption.strName,
           strDescription: menuoption?.strDescription || rolMenuoption.menuoption.strDescription,
           strUrl: menuoption?.strUrl || rolMenuoption.menuoption.strUrl,
