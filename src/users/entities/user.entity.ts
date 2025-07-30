@@ -8,6 +8,8 @@ import {
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
+  DeleteDateColumn,
 } from 'typeorm';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
@@ -42,12 +44,15 @@ export class User {
     default: 'UNCONFIRMED',
   })
   strStatus: string;
-
+  
   @CreateDateColumn({ type: 'timestamp' })
   dtmCreateDate: Date;
-
+  
   @UpdateDateColumn({ type: 'timestamp', name: 'dtmLatestUpdateDate' })
   dtmLatestUpdateDate: Date;
+  
+  @DeleteDateColumn({ type: 'timestamp', name: 'deleted_at', nullable: true })
+  deletedAt?: Date;
 
   @ManyToOne(() => Rol, { nullable: true })
   rol: Rol;
