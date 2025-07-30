@@ -13,6 +13,7 @@ import {
   ValidationPipe,
   Delete,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -26,6 +27,7 @@ import {
   ApiParam,
   ApiBody,
   ApiResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
@@ -44,17 +46,17 @@ export class UsersController {
     private readonly legalEntityService: LegalEntityDataService,
   ) {}
 
-  @ApiOperation({ summary: 'Create an user' })
   @Post()
+  @ApiOperation({ summary: 'Create an user' })
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
   @Post('full')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Create full user with nested data' })
   async createFullUser(@Body() dto: CreateFullUserDto) {
     const user = await this.usersService.create(dto.user);
-
     const basicData = await this.basicDataService.create(
       user.id,
       dto.basicData,
@@ -80,26 +82,34 @@ export class UsersController {
     };
   }
 
-  @ApiOperation({ summary: 'Get all users' })
   @Get()
+  @ApiOperation({ summary: 'Get all users, optionally including soft-deleted' })
   async findAll(
     @Query() findUsersDto: FindUsersDto,
   ): Promise<UserResponseDto[]> {
-    const { dependentOnId, ...pagination } = findUsersDto;
-    const users = await this.usersService.findAll(pagination, dependentOnId);
+    const { dependentOnId, withDeleted, ...pagination } = findUsersDto;
+
+    const includeDeleted = withDeleted === 'true';
+    const users = await this.usersService.findAll(
+      pagination,
+      dependentOnId,
+      includeDeleted,
+    );
+
     return plainToInstance(UserResponseDto, users, {
       excludeExtraneousValues: true,
     });
   }
 
   @Get('check-username/:userName')
+  @ApiOperation({ summary: 'Check if a username is taken' })
   async checkUsername(@Param('userName') userName: string) {
     const isTaken = await this.usersService.isUserNameTaken(userName);
     return { available: !isTaken };
   }
 
-  @ApiOperation({ summary: 'Get user by id' })
   @Get(':id')
+  @ApiOperation({ summary: 'Get user by ID' })
   async findOne(@Param('id') id: string): Promise<UserResponseDto> {
     const user = await this.usersService.findOne(id);
     return plainToInstance(UserResponseDto, user, {
@@ -107,8 +117,8 @@ export class UsersController {
     });
   }
 
-  @ApiOperation({ summary: 'Get user by email' })
   @Get('email/:email')
+  @ApiOperation({ summary: 'Get user by email (with soft-deleted included)' })
   async findByEmail(@Param('email') email: string): Promise<UserResponseDto> {
     const user = await this.usersService.findByEmail(email);
     return plainToInstance(UserResponseDto, user, {
@@ -118,27 +128,29 @@ export class UsersController {
 
   @Get('without-dependency/:id')
   @ApiOperation({
-    summary: 'List all users excluding the user that the given user depends on',
+    summary: 'List users excluding the one this user depends on',
   })
-  @ApiParam({
-    name: 'id',
-    type: 'string',
-    format: 'uuid',
-    description: 'UUID of the user to evaluate',
-  })
-  getUsers(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findAllExcludingUserThatThisUserDependsOn(id);
+  @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
+  @ApiQuery({ name: 'includeDeleted', required: false, type: Boolean })
+  async getUsers(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('includeDeleted') includeDeleted: boolean,
+  ) {
+    return this.usersService.findAllExcludingUserThatThisUserDependsOn(
+      id,
+      includeDeleted,
+    );
   }
 
-  @ApiOperation({ summary: 'Assign a role to user' })
-  @ApiBody({ schema: { example: { roleId: 'uuid-of-role' } } })
   @Post(':id/assign-role')
+  @ApiOperation({ summary: 'Assign a role to a user' })
+  @ApiBody({ schema: { example: { roleId: 'uuid-of-role' } } })
   assignRole(@Param('id') id: string, @Body() body: { roleId: string }) {
     return this.usersService.assignRole(id, body.roleId);
   }
 
-  @ApiOperation({ summary: 'Change password' })
   @Post(':id/change-password')
+  @ApiOperation({ summary: 'Change user password' })
   async changePassword(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ChangePasswordDto,
@@ -151,16 +163,19 @@ export class UsersController {
   }
 
   @Put(':id')
+  @ApiOperation({ summary: 'Update user data' })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
   }
 
   @Patch(':id/toggle-status')
+  @ApiOperation({ summary: 'Toggle user status between ACTIVE and INACTIVE' })
   toggleStatus(@Param('id') id: string) {
     return this.usersService.toggleStatus(id);
   }
 
   @Patch(':id/status-with-dependents')
+  @ApiOperation({ summary: 'Update status for user and its dependents' })
   async updateStatusAndDependents(
     @Param('id') id: string,
     @Body('status') status: string,
@@ -176,21 +191,45 @@ export class UsersController {
     if (!allowedStatuses.includes(status)) {
       throw new BadRequestException('Invalid status provided');
     }
-
     return this.usersService.updateStatusWithDependents(id, status);
   }
 
   @Delete(':userId/roles')
+  @ApiOperation({ summary: 'Remove role from user' })
   async removeUserRole(@Param('userId') userId: string) {
     const updatedUser = await this.usersService.removeRole(userId);
     return { message: 'Role removed successfully', user: updatedUser };
   }
 
-  @ApiOperation({ summary: 'Remove dependency from user' })
+  @Patch(':id/remove-dependency')
+  @ApiOperation({ summary: 'Remove dependency relation from a user' })
   @ApiResponse({ status: 200, description: 'Dependency removed successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
-  @Patch(':id/remove-dependency')
   async removeUserDependency(@Param('id') id: string) {
     return this.usersService.removeDependency(id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Soft delete a user' })
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('force') force: string,
+  ) {
+    const forceFlag = force === 'true';
+    return this.usersService.remove(id, forceFlag);
+  }
+
+  @Patch(':id/restore')
+  @ApiOperation({ summary: 'Restore a soft-deleted user' })
+  async restore(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.restore(id);
+  }
+
+  @Patch(':id/restore-with-dependents')
+  @ApiOperation({ summary: 'Restore a soft-deleted user and its dependents' })
+  async restoreWithDependents(@Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.restore(id);
+    await this.usersService.restoreDependents(id);
+    return { message: `User '${id}' and dependents have been restored.` };
   }
 }

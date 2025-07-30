@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
@@ -34,7 +39,11 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async findAll(paginationDto: PaginationDto, dependentOnId?: string) {
+  async findAll(
+    paginationDto: PaginationDto,
+    dependentOnId?: string,
+    withDeleted = false,
+  ): Promise<UserResponseDto[]> {
     const { limit = 10, offset = 0 } = paginationDto;
 
     const qb = this.userRepository
@@ -47,8 +56,14 @@ export class UsersService {
       .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
       .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData');
 
+    if (!withDeleted) {
+      qb.where('user.deletedAt IS NULL');
+    } else {
+      qb.withDeleted();
+    }
+
     if (dependentOnId) {
-      qb.where('user.dependentOnId = :dependentOnId', { dependentOnId });
+      qb.andWhere('user.dependentOnId = :dependentOnId', { dependentOnId });
     }
 
     const users = await qb.take(limit).skip(offset).getMany();
@@ -59,6 +74,7 @@ export class UsersService {
 
   async findAllExcludingUserThatThisUserDependsOn(
     userId: string,
+    withDeleted: boolean | string = false,
   ): Promise<UserResponseDto[]> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
@@ -69,19 +85,31 @@ export class UsersService {
 
     const qb = this.userRepository
       .createQueryBuilder('user')
+      .withDeleted()
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
       .leftJoinAndSelect('user.dependentOn', 'dependentOn')
       .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData');
+      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
+      .where('1=1');
+
+    const shouldIncludeDeleted =
+      typeof withDeleted === 'string' ? withDeleted === 'true' : withDeleted;
+
+    if (!shouldIncludeDeleted) {
+      qb.andWhere('user.deletedAt IS NULL');
+    }
 
     if (user.dependentOn) {
-      qb.where('user.id != :excludedId', { excludedId: user.dependentOn.id });
+      qb.andWhere('user.id != :excludedId', {
+        excludedId: user.dependentOn.id,
+      });
     }
 
     const users = await qb.getMany();
+
     return plainToInstance(UserResponseDto, users, {
       excludeExtraneousValues: true,
     });
@@ -125,6 +153,7 @@ export class UsersService {
   async findByEmail(email: string): Promise<UserResponseDto | null> {
     const user = await this.userRepository.findOne({
       where: { strUserName: email },
+      withDeleted: true,
       relations: [
         'rol',
         'basicData',
@@ -144,6 +173,7 @@ export class UsersService {
   async findEntityByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { strUserName: email },
+      withDeleted: true,
       relations: [
         'rol',
         'basicData',
@@ -195,6 +225,7 @@ export class UsersService {
   ): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
+      withDeleted: true,
     });
 
     if (!user) {
@@ -266,6 +297,7 @@ export class UsersService {
   async removeDependency(userId: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
+      withDeleted: true,
       relations: ['dependentOn'],
     });
 
@@ -277,5 +309,57 @@ export class UsersService {
     user.dtmLatestUpdateDate = new Date();
 
     return this.userRepository.save(user);
+  }
+
+  async remove(id: string, force = false): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { id } });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID '${id}' not found`);
+    }
+
+    // Verificar si tiene dependientes
+    const dependents = await this.userRepository.find({
+      where: { dependentOn: { id } },
+    });
+
+    if (dependents.length > 0 && !force) {
+      throw new ConflictException(
+        `Cannot delete user '${id}' because there are dependent users. Use force=true to override.`,
+      );
+    }
+
+    if (dependents.length > 0 && force) {
+      for (const dep of dependents) {
+        await this.userRepository.softDelete(dep.id);
+      }
+    }
+
+    await this.userRepository.softDelete(id);
+
+    return {
+      message: `User with ID '${id}' has been soft-deleted${
+        force && dependents.length ? ' along with dependents' : ''
+      }.`,
+    };
+  }
+
+  // reestablece usuarios eliminados
+  async restore(userId: string): Promise<{ message: string }> {
+    const result = await this.userRepository.restore(userId);
+    if (result.affected === 0) {
+      throw new NotFoundException(
+        `User with ID '${userId}' not found or not deleted`,
+      );
+    }
+    return { message: `User with ID '${userId}' has been restored.` };
+  }
+
+  async restoreDependents(userId: string): Promise<void> {
+    await this.userRepository
+      .createQueryBuilder()
+      .restore()
+      .where('dependentOnId = :userId', { userId })
+      .execute();
   }
 }
