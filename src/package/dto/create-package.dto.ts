@@ -5,9 +5,21 @@ import {
   ValidateNested,
   IsArray,
   IsInt,
-  IsUUID
+  IsUUID,
+  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class RoleConfigDto {
+  @IsUUID()
+  rolId: string;
+
+  @IsNumber()
+  totalAccount: number;
+
+  @IsNumber()
+  price: number;
+}
 
 class CreateConfigurationDto {
   @IsUUID()
@@ -26,11 +38,16 @@ export class CreatePackageDto {
   name: string;
 
   @IsString()
-  @IsOptional()
-  description?: string;
+  @IsNotEmpty()
+  description: string;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateConfigurationDto)
-  configurations: CreateConfigurationDto[];
+  @Type(() => RoleConfigDto)
+  configurations?: RoleConfigDto[];
+
+  @IsOptional()
+  @IsArray()
+  images?: string[];
 }

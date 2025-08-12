@@ -9,7 +9,7 @@
         {  
             "strName": "adminAuthoriza",
             "strDescription1": "Administrador",
-            "strDescription2": "Acceso a todas las opciones de la aplicación",            
+            "strDescription2": "Full access",            
             "menuOptions": [
                 {
                     "strName": "homeAuthoriza",
@@ -38,13 +38,22 @@
                     "ingOrder": 3,
                     "strSubmenus": []
                 },
+                {
+                    "strName": "packagesAuthoriza",
+                    "strDescription": "Packages",
+                    "strUrl": "/packages",
+                    "strIcon": "boxes",
+                    "strType": "main_menu",
+                    "ingOrder": 4,
+                    "strSubmenus": []
+                },
 				{
                     "strName": "settingsAuthoriza",
                     "strDescription": "Settings",
                     "strUrl": "/setup",
                     "strIcon": "gear",
                     "strType": "main_menu",
-                    "ingOrder": 4,
+                    "ingOrder": 5,
                     "strSubmenus": []
                 }
             ]
@@ -62,7 +71,7 @@
         {  
             "strName": "adminAidcash",
             "strDescription1": "Administrador",
-            "strDescription2": "Acceso a todas las opciones de la aplicación",
+            "strDescription2": "Full access",
             "menuOptions": [
                 {
                     "strName": "dashboardAidcash",
@@ -124,7 +133,7 @@
         {  
             "strName": "adminInout",
             "strDescription1": "Administrador",
-            "strDescription2": "Acceso a todas las opciones de la aplicación",
+            "strDescription2": "Full access",
             "menuOptions": [                
 				{
                     "strName": "materialInout",
@@ -158,7 +167,7 @@
 		{  
             "strName": "userInout",
             "strDescription1": "Usuario",
-            "strDescription2": "Acceso limitado a las opciones de la aplicación",
+            "strDescription2": "Partial access",
             "menuOptions": [
 				{
                     "strName": "dashboardInout",
