@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { ConfigurationPackage } from 'src/configuration-package/entities/configuration-package.entity';
+import { Image } from 'src/images/entities/image.entity';
 
 @Entity()
 export class Package {
@@ -14,4 +15,7 @@ export class Package {
 
   @OneToMany(() => ConfigurationPackage, (config) => config.package)
   configurations: ConfigurationPackage[];
+
+  @OneToMany(() => Image, (image) => image.package, { cascade: true })
+  images: Image[];
 }
