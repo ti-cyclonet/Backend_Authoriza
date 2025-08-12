@@ -7,21 +7,52 @@ import {
   Delete,
   Put,
   Query,
+  UseInterceptors,
+  UploadedFiles,
+  BadRequestException,
 } from '@nestjs/common';
 import { PackageService } from './package.service';
 import { CreatePackageDto } from './dto/create-package.dto';
 import { UpdatePackageDto } from './dto/update-package.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 
 @Controller('packages')
 export class PackageController {
   constructor(private readonly packageService: PackageService) {}
 
   @Post()
-  async create(@Body() createPackageDto: CreatePackageDto) {
-    return this.packageService.createPackageWithConfigurations(
-      createPackageDto,
-    );
+  @UseInterceptors(
+    FilesInterceptor('files', 3, {
+      // máximo 3 imágenes
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 20 * 1024 * 1024, // 20 MB por archivo
+      },
+    }),
+  )
+  async createPackage(
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: any,
+  ) {
+    let configurations;
+    try {
+      configurations =
+        typeof body.configurations === 'string'
+          ? JSON.parse(body.configurations)
+          : body.configurations;
+    } catch {
+      throw new BadRequestException('Invalid configurations JSON');
+    }
+
+    const createPackageDto: CreatePackageDto = {
+      name: body.name,
+      description: body.description,
+      configurations,
+    };
+
+    return this.packageService.create(createPackageDto, files);
   }
 
   @Get()

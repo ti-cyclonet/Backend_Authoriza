@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { json, urlencoded } from 'express'; 
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,7 +15,6 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
   });
-
   app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
@@ -26,6 +26,7 @@ async function bootstrap() {
     }),
   );
 
+  // 🔹 Configuración de Swagger
   const config = new DocumentBuilder()
     .setTitle('Documentation of the API')
     .setVersion('1.0')
@@ -38,6 +39,10 @@ async function bootstrap() {
   // 🔹 Aplica el guard global DESPUÉS de Swagger
   // const reflector = app.get(Reflector);
   // app.useGlobalGuards(new JwtAuthGuard(reflector));  
+
+ // 🔹 Límite de tamaño de payload (20 MB)
+  app.use(json({ limit: '20mb' }));
+  app.use(urlencoded({ limit: '20mb', extended: true }));
 
   await app.listen(process.env.PORT ?? 3000);
 }
