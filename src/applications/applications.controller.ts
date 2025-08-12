@@ -20,6 +20,7 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { UseGuards } from '@nestjs/common';
+import { Rol } from 'src/roles/entities/rol.entity';
 
 @ApiTags('Applications')
 @Controller('applications')
@@ -75,6 +76,11 @@ export class ApplicationsController {
   @Get(':appName/rol')
   async getRolesByApplicationName(@Param('appName') appName: string) {
     return this.applicationsService.findRolesByApplicationName(appName);
+  }
+
+  @Get(':appName/full-roles')
+  async getFullRolesByApplication(@Param('appName') appName: string): Promise<Rol[]> {
+    return this.applicationsService.fullRolesByApplicationName(appName);
   }
 
   @ApiOperation({ summary: 'Update an application by ID' })
