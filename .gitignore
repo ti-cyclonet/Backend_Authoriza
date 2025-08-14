@@ -4,6 +4,7 @@
 /build
 /postgres
 .env
+# src/app.module.ts
 
 # Logs
 logs
