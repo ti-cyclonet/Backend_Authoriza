@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
+import { Contract } from 'src/contract/entities/contract.entity';
 
 @Entity()
 export class User {
@@ -71,4 +72,7 @@ export class User {
 
   @OneToMany(() => User, (user) => user.dependentOn)
   dependents: User[];
+
+  @OneToMany(() => Contract, (contract) => contract.user)
+  contracts: Contract[];
 }

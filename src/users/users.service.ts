@@ -115,6 +115,37 @@ export class UsersService {
     });
   }
 
+  async findAllWithoutDependency(
+    page = 1,
+    withDeleted = false,
+  ): Promise<UserResponseDto[]> {
+    const limit = 5;
+    const offset = (page - 1) * limit;
+
+    const qb = this.userRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.rol', 'rol')
+      .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
+      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
+      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
+      .where('user.dependentOnId IS NULL');
+
+    if (!withDeleted) {
+      qb.andWhere('user.deletedAt IS NULL');
+    } else {
+      qb.withDeleted();
+    }
+
+    const users = await qb.take(limit).skip(offset).getMany();
+
+    return plainToInstance(UserResponseDto, users, {
+      excludeExtraneousValues: true,
+    });
+  }
+
   async isUserNameTaken(userName: string): Promise<boolean> {
     const user = await this.userRepository.findOne({
       where: { strUserName: userName },

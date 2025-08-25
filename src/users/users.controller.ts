@@ -14,6 +14,8 @@ import {
   Delete,
   BadRequestException,
   NotFoundException,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -108,15 +110,6 @@ export class UsersController {
     return { available: !isTaken };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get user by ID' })
-  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
-    const user = await this.usersService.findOne(id);
-    return plainToInstance(UserResponseDto, user, {
-      excludeExtraneousValues: true,
-    });
-  }
-
   @Get('email/:email')
   @ApiOperation({ summary: 'Get user by email (with soft-deleted included)' })
   async findByEmail(@Param('email') email: string): Promise<UserResponseDto> {
@@ -140,6 +133,24 @@ export class UsersController {
       id,
       includeDeleted,
     );
+  }
+
+  @Get('independent')
+  @ApiOperation({ summary: 'Get all users without dependency (paginated)' })
+  async findIndependentUsers(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('withDeleted', new DefaultValuePipe(false)) withDeleted: boolean,
+  ): Promise<UserResponseDto[]> {
+    return this.usersService.findAllWithoutDependency(page, withDeleted);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get user by ID' })
+  async findOne(@Param('id') id: string): Promise<UserResponseDto> {
+    const user = await this.usersService.findOne(id);
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Post(':id/assign-role')
