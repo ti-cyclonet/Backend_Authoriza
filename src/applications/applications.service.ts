@@ -42,11 +42,6 @@ export class ApplicationsService {
     file?: Express.Multer.File,
   ) {
     try {
-      // 🔍 Imprimir el DTO completo recibido del frontend
-      // console.log('📦 DTO recibido del frontend:');
-      // console.log(JSON.stringify(createApplicationDto, null, 2)); // Formato legible
-      // console.log('📥 Archivo recibido:', file?.originalname, file?.mimetype);
-
       const { strRoles = [], ...applicationDetails } = createApplicationDto;
 
       // Subir imagen a Cloudinary si se proporcionó un archivo
@@ -388,6 +383,19 @@ export class ApplicationsService {
     }
 
     return application.strRoles.map((rol) => rol.strName);
+  }
+
+  async fullRolesByApplicationName(applicationName: string): Promise<Rol[]> {
+    const application = await this.applicationRepository.findOne({
+      where: { strName: ILike(applicationName) },
+      relations: { strRoles: true },
+    });
+
+    if (!application) {
+      throw new NotFoundException(`Application '${applicationName}' not found`);
+    }
+
+    return application.strRoles;
   }
 
   async findOnePlain(term: string) {

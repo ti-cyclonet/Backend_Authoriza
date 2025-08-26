@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config'; // Asegúrate de importar el servicio ConfigService
+import { ConfigService } from '@nestjs/config';
 
 @Module({
-  providers: [ConfigService], // Asegúrate de incluirlo en los proveedores
-  exports: [ConfigService], // Exporta ConfigService para poder usarlo en otros módulos
+  providers: [ConfigService], 
+  exports: [ConfigService], 
 })
 export class ConfigModule {}

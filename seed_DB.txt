@@ -2,14 +2,14 @@
 {
    "strName": "Authoriza",
    "strDescription": "Control Access for Cyclonet Applications",
-   "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1729559448/logos-applications/zfu82lfrmao7v6gponew.png",
+   "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1755136261/Authoriza-logo_qxdabx.png,
    "strSlug": "authoriza app",
    "strTags": ["control access", "security", "users"],
    "strRoles": [
         {  
             "strName": "adminAuthoriza",
             "strDescription1": "Administrador",
-            "strDescription2": "Acceso a todas las opciones de la aplicación",            
+            "strDescription2": "Full access",            
             "menuOptions": [
                 {
                     "strName": "homeAuthoriza",
@@ -38,85 +38,41 @@
                     "ingOrder": 3,
                     "strSubmenus": []
                 },
+                {
+                    "strName": "packagesAuthoriza",
+                    "strDescription": "Packages",
+                    "strUrl": "/packages",
+                    "strIcon": "boxes",
+                    "strType": "main_menu",
+                    "ingOrder": 4,
+                    "strSubmenus": []
+                },
+                {
+                    "strName": "contractsAuthoriza",
+                    "strDescription": "Contracts",
+                    "strUrl": "/contracts",
+                    "strIcon": "file-earmark-text",
+                    "strType": "main_menu",
+                    "ingOrder": 5,
+                    "strSubmenus": []
+                },
 				{
                     "strName": "settingsAuthoriza",
                     "strDescription": "Settings",
                     "strUrl": "/setup",
                     "strIcon": "gear",
                     "strType": "main_menu",
-                    "ingOrder": 4,
+                    "ingOrder": 5,
                     "strSubmenus": []
                 }
             ]
         }
     ]
 }
-// CREAR APLICACION AID CASH
-{
-   "strName": "AidCash",
-   "strDescription": "Financial Aid Cash",
-   "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1729559767/logos-applications/ljvrqakrx5f8iicqr7ah.png",
-   "strSlug": "aidcash app",
-   "strTags": ["financial", "cash", "money", "aid"],
-   "strRoles": [
-        {  
-            "strName": "adminAidcash",
-            "strDescription1": "Administrador",
-            "strDescription2": "Acceso a todas las opciones de la aplicación",
-            "menuOptions": [
-                {
-                    "strName": "dashboardAidcash",
-                    "strDescription": "Dashboard",
-                    "strUrl": "/dashboard",
-                    "strIcon": "file-bar-graph",
-                    "strType": "main_menu",
-                    "ingOrder": 1,
-                    "strSubmenus": []
-                },
-				{
-                    "strName": "userAidcash",
-                    "strDescription": "Users",
-                    "strUrl": "",
-                    "strIcon": "people",
-                    "strType": "main_menu",
-                    "ingOrder": 2,
-                    "strSubmenus": [
-                        {
-                            "strName": "createUserAidcash",
-                            "strDescription": "Nuevo",
-                            "strUrl": "/createUser",
-                            "strIcon": "person-fill-add",
-                            "strType": "submenu_n1",
-                            "ingOrder": 1
-                        },
-                        {
-                            "strName": "deleteUserAidcash",
-                            "strDescription": "Borrar",
-                            "strUrl": "/deleteUser",
-                            "strIcon": "person-fill-dash",
-                            "strType": "submenu_n1",
-                            "ingOrder": 2
-                        }
-                    ]
-                },
-				{
-                    "strName": "settingsAidcash",
-                    "strDescription": "Settings",
-                    "strUrl": "/setup",
-                    "strIcon": "gear",
-                    "strType": "main_menu",
-                    "ingOrder": 3,
-                    "strSubmenus": []
-                }
-            ]
-        }
-    ]
-}
-
 // CREAR APLICACION INOUT
 {
    "strName": "Inout",
-   "strDescription": "Inventory Management and Manufacturing",
+   "strDescription": "Inventory and Manufacturing Management",
    "strUrlImage": "https://res.cloudinary.com/dn8ki4idz/image/upload/v1729560292/logos-applications/yhnunl8rbjciuqaksecb.png",
    "strSlug": "inout app",
    "strTags": ["inventory", "products", "raw material"],
@@ -124,7 +80,7 @@
         {  
             "strName": "adminInout",
             "strDescription1": "Administrador",
-            "strDescription2": "Acceso a todas las opciones de la aplicación",
+            "strDescription2": "Full access",
             "menuOptions": [                
 				{
                     "strName": "materialInout",
@@ -158,7 +114,7 @@
 		{  
             "strName": "userInout",
             "strDescription1": "Usuario",
-            "strDescription2": "Acceso limitado a las opciones de la aplicación",
+            "strDescription2": "Partial access",
             "menuOptions": [
 				{
                     "strName": "dashboardInout",
