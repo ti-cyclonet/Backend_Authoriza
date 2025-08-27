@@ -17,9 +17,16 @@ import { NaturalPersonData } from 'src/natural-person-data/entities/natural-pers
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
+import { PaginatedResponse } from 'src/common/dtos/paginated-response';
 
 @Injectable()
 export class UsersService {
+  private toResponseDto(user: User): UserResponseDto {
+    return plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
+  }
+
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
@@ -115,13 +122,7 @@ export class UsersService {
     });
   }
 
-  async findAllWithoutDependency(
-    page = 1,
-    withDeleted = false,
-  ): Promise<UserResponseDto[]> {
-    const limit = 5;
-    const offset = (page - 1) * limit;
-
+  async findAllWithoutDependency(withDeleted: boolean): Promise<User[]> {
     const qb = this.userRepository
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.rol', 'rol')
@@ -133,17 +134,14 @@ export class UsersService {
       .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
       .where('user.dependentOnId IS NULL');
 
-    if (!withDeleted) {
-      qb.andWhere('user.deletedAt IS NULL');
-    } else {
+    // manejar eliminados
+    if (withDeleted) {
       qb.withDeleted();
+    } else {
+      qb.andWhere('user.deletedAt IS NULL');
     }
 
-    const users = await qb.take(limit).skip(offset).getMany();
-
-    return plainToInstance(UserResponseDto, users, {
-      excludeExtraneousValues: true,
-    });
+    return qb.getMany();
   }
 
   async isUserNameTaken(userName: string): Promise<boolean> {
