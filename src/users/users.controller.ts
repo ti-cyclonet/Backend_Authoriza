@@ -37,6 +37,8 @@ import { CreateFullUserDto } from './dto/CreateFullUserDto';
 import { BasicDataService } from 'src/basic-data/basic-data.service';
 import { NaturalPersonDataService } from 'src/natural-person-data/natural-person-data.service';
 import { LegalEntityDataService } from 'src/legal-entity-data/legal-entity-data.service';
+import { IndependentUsersDto } from 'src/common/dtos/independent-user.dto';
+import { PaginatedResponse } from 'src/common/dtos/paginated-response';
 
 @ApiTags('Users')
 @Controller('users')
@@ -136,12 +138,15 @@ export class UsersController {
   }
 
   @Get('independent')
-  @ApiOperation({ summary: 'Get all users without dependency (paginated)' })
+  @ApiOperation({ summary: 'Get all users without dependency' })
   async findIndependentUsers(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('withDeleted', new DefaultValuePipe(false)) withDeleted: boolean,
   ): Promise<UserResponseDto[]> {
-    return this.usersService.findAllWithoutDependency(page, withDeleted);
+    const users = await this.usersService.findAllWithoutDependency(withDeleted);
+
+    return plainToInstance(UserResponseDto, users, {
+      excludeExtraneousValues: true,
+    });
   }
 
   @Get(':id')
