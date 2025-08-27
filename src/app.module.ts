@@ -13,6 +13,7 @@ import { NaturalPersonDataModule } from './natural-person-data/natural-person-da
 import { LegalEntityDataModule } from './legal-entity-data/legal-entity-data.module';
 import { PackageModule } from './package/package.module';
 import { ConfigurationPackageModule } from './configuration-package/configuration-package.module';
+import { ContractModule } from './contract/contract.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { ConfigurationPackageModule } from './configuration-package/configuratio
     AuthModule,
     PackageModule,
     ConfigurationPackageModule,
+    ContractModule,
   ],
 })
 export class AppModule {}

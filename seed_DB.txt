@@ -47,6 +47,15 @@
                     "ingOrder": 4,
                     "strSubmenus": []
                 },
+                {
+                    "strName": "contractsAuthoriza",
+                    "strDescription": "Contracts",
+                    "strUrl": "/contracts",
+                    "strIcon": "file-earmark-text",
+                    "strType": "main_menu",
+                    "ingOrder": 5,
+                    "strSubmenus": []
+                },
 				{
                     "strName": "settingsAuthoriza",
                     "strDescription": "Settings",
