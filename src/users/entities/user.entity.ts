@@ -45,13 +45,13 @@ export class User {
     default: 'UNCONFIRMED',
   })
   strStatus: string;
-  
+
   @CreateDateColumn({ type: 'timestamp' })
   dtmCreateDate: Date;
-  
+
   @UpdateDateColumn({ type: 'timestamp', name: 'dtmLatestUpdateDate' })
   dtmLatestUpdateDate: Date;
-  
+
   @DeleteDateColumn({ type: 'timestamp', name: 'deleted_at', nullable: true })
   deletedAt?: Date;
 
@@ -66,9 +66,13 @@ export class User {
   @JoinColumn({ name: 'basicDataId' })
   basicData: BasicData;
 
+  // 🔹 relación y FK explícita
   @ManyToOne(() => User, (user) => user.dependents, { nullable: true })
   @JoinColumn({ name: 'dependentOnId' })
   dependentOn: User;
+
+  @Column({ type: 'uuid', nullable: true })
+  dependentOnId: string | null;
 
   @OneToMany(() => User, (user) => user.dependentOn)
   dependents: User[];
