@@ -14,6 +14,8 @@ import { LegalEntityDataModule } from './legal-entity-data/legal-entity-data.mod
 import { PackageModule } from './package/package.module';
 import { ConfigurationPackageModule } from './configuration-package/configuration-package.module';
 import { ContractModule } from './contract/contract.module';
+import { PeriodModule } from './period/period.module';
+import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 
 @Module({
   imports: [
@@ -59,6 +61,8 @@ import { ContractModule } from './contract/contract.module';
     PackageModule,
     ConfigurationPackageModule,
     ContractModule,
+    PeriodModule,
+    CustomerParametersModule,
   ],
 })
 export class AppModule {}

@@ -110,22 +110,6 @@
                     "strSubmenus": []
                 }
             ]
-        },
-		{  
-            "strName": "userInout",
-            "strDescription1": "Usuario",
-            "strDescription2": "Partial access",
-            "menuOptions": [
-				{
-                    "strName": "dashboardInout",
-                    "strDescription": "Dashboard",
-                    "strUrl": "/home",
-                    "strIcon": "file-bar-graph",
-                    "strType": "main_menu",
-                    "ingOrder": 1,
-                    "strSubmenus": []
-                }
-            ]
         }
     ]
 }

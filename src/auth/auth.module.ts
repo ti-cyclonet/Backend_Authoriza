@@ -7,12 +7,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { ApplicationsModule } from 'src/applications/applications.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersModule } from 'src/users/users.module';
+import { jwtConstants } from './constants';
 @Module({
   imports: [
     UsersModule,
     PassportModule,
     JwtModule.register({
-      secret: 'SECRET_KEY',
+      secret: jwtConstants.secret,
       signOptions: { expiresIn: '1h' },
     }),
     ApplicationsModule,
