@@ -7,8 +7,8 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Expose, Type } from 'class-transformer';
-import { NaturalPersonData } from 'src/natural-person-data/entities/natural-person-data.entity';
-import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
+import { NaturalPersonData } from '../../natural-person-data/entities/natural-person-data.entity';
+import { LegalEntityData } from '../../legal-entity-data/entities/legal-entity-data.entity';
 
 @Entity()
 export class BasicData {

@@ -5,7 +5,7 @@ import {
   OneToOne,
   JoinColumn,
 } from 'typeorm';
-import { BasicData } from 'src/basic-data/entities/basic-data.entity';
+import { BasicData } from '../../basic-data/entities/basic-data.entity';
 
 @Entity()
 export class NaturalPersonData {
