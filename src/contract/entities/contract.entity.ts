@@ -8,8 +8,8 @@ import {
   UpdateDateColumn,
   DeleteDateColumn,
 } from 'typeorm';
-import { User } from 'src/users/entities/user.entity';
-import { Package } from 'src/package/entities/package.entity';
+import { User } from '../../users/entities/user.entity';
+import { Package } from '../../package/entities/package.entity';
 import { ContractStatus } from '../enums/contract-status.enum';
 import { PaymentMode } from '../enums/payment-mode.enum';
 

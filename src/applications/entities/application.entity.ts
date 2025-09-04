@@ -6,7 +6,7 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { Rol } from 'src/roles/entities/rol.entity';
+import { Rol } from '../../roles/entities/rol.entity';
 
 @Entity()
 export class Application {
@@ -40,14 +40,13 @@ export class Application {
     array: true,
     default: [],
   })
-  strTags: string[];  
+  strTags: string[];
 
   //Roles
-  @OneToMany(
-    () => Rol,
-    (rol) => rol.strApplication,
-    { cascade: true, eager: true },
-  )
+  @OneToMany(() => Rol, (rol) => rol.strApplication, {
+    cascade: true,
+    eager: true,
+  })
   strRoles?: Rol[];
 
   @BeforeInsert()
@@ -57,15 +56,15 @@ export class Application {
     }
     this.strSlug = this.strSlug
       .toLowerCase()
-      .replaceAll(' ', '_')
-      .replaceAll("'", '');
+      .replace(/ /g, '_')
+      .replace(/'/g, '');
   }
 
   @BeforeUpdate()
   checkSlugUpdate() {
     this.strSlug = this.strSlug
       .toLowerCase()
-      .replaceAll(' ', '_')
-      .replaceAll("'", '');
+      .replace(/ /g, '_')
+      .replace(/'/g, '');
   }
 }
