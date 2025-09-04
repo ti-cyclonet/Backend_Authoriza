@@ -1,5 +1,5 @@
 import { Column, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
+import { RolMenuoption } from '../../roles/entities/rol-menuoption.entity';
 
 @Entity()
 export class Menuoption {

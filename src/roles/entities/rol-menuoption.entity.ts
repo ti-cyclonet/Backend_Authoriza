@@ -1,6 +1,6 @@
 import { Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 import { Menuoption } from '../../menuoptions/entities/menuoption.entity';
-import { Rol } from './rol.entity';
+import { Rol } from '../../roles/entities/rol.entity';
 
 @Entity()
 export class RolMenuoption {

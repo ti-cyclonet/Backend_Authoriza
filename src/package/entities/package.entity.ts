@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
-import { ConfigurationPackage } from 'src/configuration-package/entities/configuration-package.entity';
-import { Image } from 'src/images/entities/image.entity';
-import { Contract } from 'src/contract/entities/contract.entity';
+import { ConfigurationPackage } from '../../configuration-package/entities/configuration-package.entity';
+import { Image } from '../../images/entities/image.entity';
+import { Contract } from '../../contract/entities/contract.entity';
 
 @Entity()
 export class Package {
