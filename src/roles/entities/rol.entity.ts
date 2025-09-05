@@ -1,4 +1,4 @@
-import { Application } from 'src/applications/entities';
+import { Application } from '../../applications/entities';
 import {
   Column,
   Entity,
@@ -7,9 +7,9 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { RolMenuoption } from './rol-menuoption.entity';
+import { RolMenuoption } from '../../roles/entities/rol-menuoption.entity';
 import { Expose } from 'class-transformer';
-import { ConfigurationPackage } from 'src/configuration-package/entities/configuration-package.entity';
+import { ConfigurationPackage } from '../../configuration-package/entities/configuration-package.entity';
 
 @Entity()
 export class Rol {

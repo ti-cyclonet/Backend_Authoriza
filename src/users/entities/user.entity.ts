@@ -11,9 +11,9 @@ import {
   Index,
   DeleteDateColumn,
 } from 'typeorm';
-import { Rol } from 'src/roles/entities/rol.entity';
-import { BasicData } from 'src/basic-data/entities/basic-data.entity';
-import { Contract } from 'src/contract/entities/contract.entity';
+import { Rol } from '../../roles/entities/rol.entity';
+import { BasicData } from '../../basic-data/entities/basic-data.entity';
+import { Contract } from '../../contract/entities/contract.entity';
 
 @Entity()
 export class User {

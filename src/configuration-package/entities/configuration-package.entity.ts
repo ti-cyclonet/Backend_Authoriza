@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne, PrimaryGeneratedColumn, JoinColumn } from 'typeorm';
 
-import { Package } from 'src/package/entities/package.entity';
-import { Rol } from 'src/roles/entities/rol.entity';
+import { Package } from '../../package/entities/package.entity';
+import { Rol } from '../../roles/entities/rol.entity';
 
 @Entity()
 export class ConfigurationPackage {

@@ -1,1 +1,1 @@
-export { Application } from "./application.entity";
+export { Application } from "../../applications/entities/application.entity";

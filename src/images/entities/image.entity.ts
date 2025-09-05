@@ -1,4 +1,4 @@
-import { Package } from 'src/package/entities/package.entity';
+import { Package } from '../../package/entities/package.entity';
 import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm';
 
 @Entity()
