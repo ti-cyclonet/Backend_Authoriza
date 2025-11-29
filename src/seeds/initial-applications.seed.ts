@@ -125,6 +125,39 @@ export default class InitialApplicationsSeed {
           },
         ],
       },
+      {
+        strName: 'Factonet',
+        strDescription: 'Invoice and payment management for Cyclonet Applications',
+        strUrlImage:
+          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1763930796/logos-applications/eviplcxfodjcezc6zjkn.png',
+        strSlug: 'factonet app',
+        strTags: ['invoice', 'security', 'payment'],
+        roles: [
+          {
+            strName: 'adminFactonet',
+            strDescription1: 'Administrador',
+            strDescription2: 'Full access',
+            menuOptions: [
+              {
+                strName: 'contratosFactonet',
+                strDescription: 'Contratos',
+                strUrl: '/contracts',
+                strIcon: 'journal-richtext',
+                strType: 'main_menu',
+                ingOrder: 1,
+              },
+              {
+                strName: 'facturasFactonet',
+                strDescription: 'Facturas',
+                strUrl: '/invoices',
+                strIcon: 'file-earmark-text',
+                strType: 'main_menu',
+                ingOrder: 2,
+              },
+            ],
+          },
+        ],
+      },
     ];
 
     for (const appData of applications) {

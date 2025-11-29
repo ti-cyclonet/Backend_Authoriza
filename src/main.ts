@@ -53,15 +53,17 @@ async function bootstrap() {
 
   const dataSource = app.get(DataSource);
   
-  await app.listen(process.env.PORT ?? 3000);
-  
-  // 👇 Ejecutar seed de global_parameters
+  // 👇 Ejecutar seeds antes de iniciar el servidor
   const globalParametersSeed = new GlobalParametersSeed();
   await globalParametersSeed.run(dataSource);
   const initialApplicationsSeed = new InitialApplicationsSeed();
   await initialApplicationsSeed.run(dataSource);
   const userSeed = new UserSeed();
   await userSeed.run(dataSource);
+  
+  const port = process.env.PORT ?? 3000;
+  await app.listen(port);
+  console.log(`Escuchando en http://localhost:${port}`);
 
 }
 
