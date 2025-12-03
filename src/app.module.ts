@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { ApplicationsModule } from './applications/applications.module';
 import { CommonModule } from './common/common.module';
@@ -16,6 +17,8 @@ import { ConfigurationPackageModule } from './configuration-package/configuratio
 import { ContractModule } from './contract/contract.module';
 import { PeriodModule } from './period/period.module';
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
+import { InvoicesModule } from './invoices/invoices.module';
+import { SweepModule } from './sweep/sweep.module';
 
 @Module({
   imports: [
@@ -24,6 +27,9 @@ import { CustomerParametersModule } from './customer-parameters/customer-paramet
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // Configuración de tareas programadas
+    ScheduleModule.forRoot(),
 
     // Configuración de TypeORM sin data-source.ts
     TypeOrmModule.forRoot({
@@ -36,6 +42,9 @@ import { CustomerParametersModule } from './customer-parameters/customer-paramet
 
       // Cargar todas las entidades automáticamente
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      
+      // Registrar subscribers
+      subscribers: [__dirname + '/**/*.listener{.ts,.js}'],
 
       // Solo en desarrollo
       synchronize: true,
@@ -63,6 +72,8 @@ import { CustomerParametersModule } from './customer-parameters/customer-paramet
     ContractModule,
     PeriodModule,
     CustomerParametersModule,
+    InvoicesModule,
+    SweepModule,
   ],
 })
 export class AppModule {}

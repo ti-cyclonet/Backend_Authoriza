@@ -13,6 +13,7 @@ import { Package } from 'src/package/entities/package.entity';
 import { ContractStatus } from './enums/contract-status.enum';
 import { PaymentMode } from './enums/payment-mode.enum';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { InvoiceGeneratorService } from '../invoices/invoice-generator.service';
 
 @Injectable()
 export class ContractService {
@@ -23,6 +24,7 @@ export class ContractService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Package)
     private readonly packageRepository: Repository<Package>,
+    private readonly invoiceGeneratorService: InvoiceGeneratorService,
   ) {}
 
   async create(dto: CreateContractDto) {
@@ -47,7 +49,14 @@ export class ContractService {
       status: dto.status ?? ContractStatus.PENDING,
     });
 
-    return this.contractRepository.save(entity);
+    const savedContract = await this.contractRepository.save(entity);
+    
+    // Si el contrato se crea como ACTIVE, generar la primera factura
+    if (savedContract.status === ContractStatus.ACTIVE) {
+      await this.invoiceGeneratorService.generateInvoiceForContract(savedContract.id);
+    }
+    
+    return savedContract;
   }
 
   async findOne(id: string) {
@@ -96,7 +105,14 @@ export class ContractService {
       status: dto.status ?? contract.status,
     });
 
-    return this.contractRepository.save(contract);
+    const savedContract = await this.contractRepository.save(contract);
+    
+    // Si el contrato cambia a ACTIVE, generar factura
+    if (dto.status === ContractStatus.ACTIVE && contract.status !== ContractStatus.ACTIVE) {
+      await this.invoiceGeneratorService.generateInvoiceForContract(savedContract.id);
+    }
+    
+    return savedContract;
   }
 
   async remove(id: string) {
@@ -145,5 +161,21 @@ export class ContractService {
       offset,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async activateContract(id: string): Promise<Contract> {
+    const contract = await this.findOne(id);
+    
+    if (contract.status === ContractStatus.ACTIVE) {
+      throw new BadRequestException('Contract is already active');
+    }
+    
+    contract.status = ContractStatus.ACTIVE;
+    const savedContract = await this.contractRepository.save(contract);
+    
+    // Generar primera factura al activar
+    await this.invoiceGeneratorService.generateInvoiceForContract(savedContract.id);
+    
+    return savedContract;
   }
 }

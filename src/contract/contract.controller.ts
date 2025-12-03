@@ -57,4 +57,9 @@ export class ContractController {
   findAll(@Query() paginationDto: PaginationDto) {
     return this.contractService.findAll(paginationDto);
   }
+
+  @Patch(':id/activate')
+  activateContract(@Param('id') id: string) {
+    return this.contractService.activateContract(id);
+  }
 }

@@ -43,9 +43,9 @@ async function bootstrap() {
   // ----------------------------------------------
 
 
-  // 🔹 Guard global
-  const reflector = app.get(Reflector);
-  app.useGlobalGuards(new JwtAuthGuard(reflector));
+  // 🔹 Guard global (temporalmente deshabilitado)
+  // const reflector = app.get(Reflector);
+  // app.useGlobalGuards(new JwtAuthGuard(reflector));
 
   // 🔹 Límite de tamaño de payload (20 MB)
   app.use(json({ limit: '20mb' }));
