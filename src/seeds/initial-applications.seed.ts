@@ -127,7 +127,8 @@ export default class InitialApplicationsSeed {
       },
       {
         strName: 'Factonet',
-        strDescription: 'Invoice and payment management for Cyclonet Applications',
+        strDescription:
+          'Invoice and payment management for Cyclonet Applications',
         strUrlImage:
           'https://res.cloudinary.com/dn8ki4idz/image/upload/v1763930796/logos-applications/eviplcxfodjcezc6zjkn.png',
         strSlug: 'factonet app',
@@ -139,20 +140,34 @@ export default class InitialApplicationsSeed {
             strDescription2: 'Full access',
             menuOptions: [
               {
-                strName: 'contratosFactonet',
-                strDescription: 'Contratos',
-                strUrl: '/contracts',
-                strIcon: 'journal-richtext',
-                strType: 'main_menu',
-                ingOrder: 1,
-              },
-              {
+                id: '0dcd4725-5f61-40ed-9c5d-70ed7ecbd250',
                 strName: 'facturasFactonet',
                 strDescription: 'Facturas',
                 strUrl: '/invoices',
                 strIcon: 'file-earmark-text',
                 strType: 'main_menu',
-                ingOrder: 2,
+                ingOrder: '2',
+                strSubmenus: [],
+              },
+              {
+                id: '07ff9168-58af-4f34-a5a5-fd746fa525d0',
+                strName: 'contratosFactonet',
+                strDescription: 'Contratos',
+                strUrl: '/contracts',
+                strIcon: 'journal-richtext',
+                strType: 'main_menu',
+                ingOrder: '1',
+                strSubmenus: [],
+              },
+              {
+                id: 'e1872e8e-eeda-472f-a90d-22a52e5d52ef',
+                strName: 'parametersAuthoriza',
+                strDescription: 'Parametros',
+                strUrl: '/parametros-globales',
+                strIcon: 'gear-fill',
+                strType: 'main_menu',
+                ingOrder: '3',
+                strSubmenus: [],
               },
             ],
           },
