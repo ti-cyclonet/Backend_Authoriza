@@ -19,6 +19,7 @@ export default class InitialApplicationsSeed {
 
     // =============== 🔹 SEED APPLICATIONS ==================
     const applications = [
+      // Authoriza
       {
         strName: 'Authoriza',
         strDescription: 'Control Access for Cyclonet Applications',
@@ -84,6 +85,7 @@ export default class InitialApplicationsSeed {
           },
         ],
       },
+      // InOut
       {
         strName: 'Inout',
         strDescription: 'Inventory and Manufacturing Management',
@@ -96,20 +98,20 @@ export default class InitialApplicationsSeed {
             strName: 'adminInout',
             strDescription1: 'Administrador',
             strDescription2: 'Full access',
-            menuOptions: [
-              {
-                strName: 'materialInout',
-                strDescription: 'Materials',
-                strUrl: '/materials',
-                strIcon: 'boxes',
-                strType: 'main_menu',
-                ingOrder: 1,
-              },
+            menuOptions: [              
               {
                 strName: 'dashboardInout',
                 strDescription: 'Dashboard',
                 strUrl: '/home',
                 strIcon: 'file-bar-graph',
+                strType: 'main_menu',
+                ingOrder: 1,
+              },
+              {
+                strName: 'materialInout',
+                strDescription: 'Materials',
+                strUrl: '/materials',
+                strIcon: 'boxes',
                 strType: 'main_menu',
                 ingOrder: 2,
               },
@@ -117,7 +119,7 @@ export default class InitialApplicationsSeed {
                 strName: 'kardexInout',
                 strDescription: 'Kardex',
                 strUrl: '/kardex',
-                strIcon: 'file-ppt-fill',
+                strIcon: 'clipboard-check',
                 strType: 'main_menu',
                 ingOrder: 3,
               },
@@ -125,6 +127,7 @@ export default class InitialApplicationsSeed {
           },
         ],
       },
+      // FactoNet
       {
         strName: 'Factonet',
         strDescription:
@@ -140,23 +143,23 @@ export default class InitialApplicationsSeed {
             strDescription2: 'Full access',
             menuOptions: [
               {
-                id: '0dcd4725-5f61-40ed-9c5d-70ed7ecbd250',
-                strName: 'facturasFactonet',
-                strDescription: 'Facturas',
-                strUrl: '/invoices',
-                strIcon: 'file-earmark-text',
-                strType: 'main_menu',
-                ingOrder: '2',
-                strSubmenus: [],
-              },
-              {
                 id: '07ff9168-58af-4f34-a5a5-fd746fa525d0',
                 strName: 'contratosFactonet',
                 strDescription: 'Contratos',
                 strUrl: '/contracts',
                 strIcon: 'journal-richtext',
                 strType: 'main_menu',
-                ingOrder: '1',
+                ingOrder: 1,
+                strSubmenus: [],
+              },
+              {
+                id: '0dcd4725-5f61-40ed-9c5d-70ed7ecbd250',
+                strName: 'facturasFactonet',
+                strDescription: 'Facturas',
+                strUrl: '/invoices',
+                strIcon: 'file-earmark-text',
+                strType: 'main_menu',
+                ingOrder: 2,
                 strSubmenus: [],
               },
               {
@@ -166,7 +169,7 @@ export default class InitialApplicationsSeed {
                 strUrl: '/parametros-globales',
                 strIcon: 'gear-fill',
                 strType: 'main_menu',
-                ingOrder: '3',
+                ingOrder: 3,
                 strSubmenus: [],
               },
             ],
