@@ -19,6 +19,7 @@ import { PeriodModule } from './period/period.module';
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { SweepModule } from './sweep/sweep.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { SweepModule } from './sweep/sweep.module';
     CustomerParametersModule,
     InvoicesModule,
     SweepModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}
