@@ -24,6 +24,9 @@ export class Contract {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ unique: true, nullable: true })
+  code: string;
+
   @ManyToOne(() => User, (user) => user.contracts, {
     eager: true,
     onDelete: 'CASCADE',

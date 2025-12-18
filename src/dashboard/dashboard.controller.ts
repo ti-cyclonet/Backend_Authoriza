@@ -23,4 +23,9 @@ export class DashboardController {
   async getRecentActivity() {
     return this.dashboardService.getRecentActivity();
   }
+
+  @Get('entity-codes')
+  async getEntityCodes() {
+    return this.dashboardService.getEntityCodes();
+  }
 }

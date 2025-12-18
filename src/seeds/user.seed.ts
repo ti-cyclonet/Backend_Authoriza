@@ -4,6 +4,8 @@ import { User } from 'src/users/entities/user.entity';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
 import { Rol } from 'src/roles/entities/rol.entity';
+import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
+import { EntityCode } from 'src/entity-codes/entities/entity-code.entity';
 import * as bcrypt from 'bcrypt';
 
 export default class UserSeed {
@@ -12,6 +14,11 @@ export default class UserSeed {
     const basicRepo = dataSource.getRepository(BasicData);
     const legalRepo = dataSource.getRepository(LegalEntityData);
     const roleRepo = dataSource.getRepository(Rol);
+    const entityCodeRepo = dataSource.getRepository(EntityCode);
+    
+    // Initialize entity code service
+    const entityCodeService = new EntityCodeService(entityCodeRepo);
+    await entityCodeService.initializeEntityCodes();
 
     // ========== 1️⃣ CREAR USUARIO ==========
     let user = await userRepo.findOne({
@@ -22,16 +29,18 @@ export default class UserSeed {
     if (!user) {
       const plainPassword = '1234567890';
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
+      const code = await entityCodeService.generateCode('User');
 
       user = userRepo.create({
         strUserName: 'ti.cyclonet@authoriza.com',
         strPassword: hashedPassword,
+        code,
         strStatus: 'ACTIVE',
         mustChangePassword: true,
         dtmLatestUpdateDate: new Date(),
       });
       await userRepo.save(user);
-      console.log('✅ Usuario creado:', user.id);
+      console.log('✅ Usuario creado:', user.id, 'Code:', code);
     } else {
       console.log('⚠️ Usuario ya existe con ID:', user.id);
     }

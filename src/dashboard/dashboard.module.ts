@@ -8,6 +8,7 @@ import { User } from '../users/entities/user.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { jwtConstants } from '../auth/constants';
+import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 
 @Module({
   imports: [
@@ -15,7 +16,8 @@ import { jwtConstants } from '../auth/constants';
     JwtModule.register({
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '1h' },
-    })
+    }),
+    EntityCodesModule
   ],
   controllers: [DashboardController],
   providers: [DashboardService, RolesGuard],

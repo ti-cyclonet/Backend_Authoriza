@@ -16,6 +16,7 @@ import { Rol } from 'src/roles/entities/rol.entity';
 import { Menuoption } from 'src/menuoptions/entities/menuoption.entity';
 import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger('ApplicationsService');
@@ -35,6 +36,7 @@ export class ApplicationsService {
     private readonly dataSource: DataSource,
 
     private readonly cloudinaryService: CloudinaryService,
+    private readonly entityCodeService: EntityCodeService,
   ) {}
 
   async create(
@@ -54,10 +56,12 @@ export class ApplicationsService {
         imageUrl = result.secure_url;
       }
 
-      // Crear la aplicación con la URL de la imagen
+      // Crear la aplicación con la URL de la imagen y código
+      const code = await this.entityCodeService.generateCode('Application');
       const application = this.applicationRepository.create({
         ...applicationDetails,
         strUrlImage: imageUrl,
+        code,
       });
 
       await this.applicationRepository.save(application);

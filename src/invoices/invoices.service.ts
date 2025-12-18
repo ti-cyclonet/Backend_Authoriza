@@ -4,16 +4,19 @@ import { Repository } from 'typeorm';
 import { Invoice } from './entities/invoice.entity';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 
 @Injectable()
 export class InvoicesService {
   constructor(
     @InjectRepository(Invoice)
     private invoiceRepository: Repository<Invoice>,
+    private entityCodeService: EntityCodeService,
   ) {}
 
   async create(createInvoiceDto: CreateInvoiceDto): Promise<Invoice> {
-    const invoice = this.invoiceRepository.create(createInvoiceDto);
+    const code = await this.entityCodeService.generateCode('Invoice');
+    const invoice = this.invoiceRepository.create({ ...createInvoiceDto, code });
     return await this.invoiceRepository.save(invoice);
   }
 

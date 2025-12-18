@@ -1,12 +1,13 @@
 import { DataSource } from 'typeorm';
 import { Application } from '../applications/entities/application.entity';
-
 import { User } from '../users/entities/user.entity';
 import { BasicData } from '../basic-data/entities/basic-data.entity';
 import { NaturalPersonData } from '../natural-person-data/entities/natural-person-data.entity';
 import { Rol } from '../roles/entities/rol.entity';
 import { Menuoption } from '../menuoptions/entities/menuoption.entity';
 import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
+import { EntityCodeService } from '../entity-codes/services/entity-code.service';
+import { EntityCode } from '../entity-codes/entities/entity-code.entity';
 
 export default class InitialApplicationsSeed {
   public async run(dataSource: DataSource): Promise<void> {
@@ -16,6 +17,11 @@ export default class InitialApplicationsSeed {
     const userRepo = dataSource.getRepository(User);
     const basicRepo = dataSource.getRepository(BasicData);
     const naturalRepo = dataSource.getRepository(NaturalPersonData);
+    const entityCodeRepo = dataSource.getRepository(EntityCode);
+    
+    // Initialize entity code service
+    const entityCodeService = new EntityCodeService(entityCodeRepo);
+    await entityCodeService.initializeEntityCodes();
 
     // =============== 🔹 SEED APPLICATIONS ==================
     const applications = [
@@ -181,14 +187,17 @@ export default class InitialApplicationsSeed {
     for (const appData of applications) {
       let app = await appRepo.findOne({ where: { strName: appData.strName } });
       if (!app) {
+        const appCode = await entityCodeService.generateCode('Application');
         app = appRepo.create({
           strName: appData.strName,
           strDescription: appData.strDescription,
           strUrlImage: appData.strUrlImage,
           strSlug: appData.strSlug,
           strTags: appData.strTags,
+          code: appCode,
         });
         await appRepo.save(app);
+        console.log('✅ Application created:', app.strName, 'Code:', appCode);
       }
 
       for (const roleData of appData.roles) {
@@ -196,14 +205,17 @@ export default class InitialApplicationsSeed {
           where: { strName: roleData.strName },
         });
         if (!role) {
+          const roleCode = await entityCodeService.generateCode('Rol');
           role = roleRepo.create({
             strName: roleData.strName,
             strDescription1: roleData.strDescription1,
             strDescription2: roleData.strDescription2,
             strApplication: app,
+            code: roleCode,
           });
 
           await roleRepo.save(role);
+          console.log('✅ Role created:', role.strName, 'Code:', roleCode);
         }
 
         for (const menu of roleData.menuOptions) {

@@ -17,6 +17,9 @@ export class Invoice {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ unique: true, nullable: true })
+  code: string;
+
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   value: number;
 

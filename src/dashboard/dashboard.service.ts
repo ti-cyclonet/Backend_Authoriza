@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, Not } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { Invoice, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { DashboardStatsDto, UserStats, InvoiceStats, ContractStats } from './dto/dashboard-stats.dto';
 import { DateRangeDto } from './dto/date-range.dto';
+import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 
 @Injectable()
 export class DashboardService {
@@ -17,6 +18,7 @@ export class DashboardService {
     private invoiceRepository: Repository<Invoice>,
     @InjectRepository(Contract)
     private contractRepository: Repository<Contract>,
+    private entityCodeService: EntityCodeService,
   ) {}
 
   async getStats(): Promise<DashboardStatsDto> {
@@ -226,5 +228,30 @@ export class DashboardService {
         createdAt: contract.createdAt
       }))
     };
+  }
+
+  async getEntityCodes(): Promise<any> {
+    const recentCodes = {
+      users: await this.userRepository.find({
+        select: ['id', 'code', 'strUserName', 'dtmCreateDate'],
+        order: { dtmCreateDate: 'DESC' },
+        take: 5,
+        where: { code: Not(null) }
+      }),
+      invoices: await this.invoiceRepository.find({
+        select: ['id', 'code', 'value', 'createdAt'],
+        order: { createdAt: 'DESC' },
+        take: 5,
+        where: { code: Not(null) }
+      }),
+      contracts: await this.contractRepository.find({
+        select: ['id', 'code', 'value', 'createdAt'],
+        order: { createdAt: 'DESC' },
+        take: 5,
+        where: { code: Not(null) }
+      })
+    };
+
+    return recentCodes;
   }
 }

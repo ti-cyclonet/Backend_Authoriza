@@ -18,6 +18,7 @@ import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-dat
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
+import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
 
 @Injectable()
 export class UsersService {
@@ -30,15 +31,18 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
+    private readonly entityCodeService: EntityCodeService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
     const genericPassword = '1234567890';
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(genericPassword, salt);
+    const code = await this.entityCodeService.generateCode('User');
     const user = this.userRepository.create({
       strUserName: dto.strUserName,
       strPassword: hashedPassword,
+      code,
       mustChangePassword: true,
       lastPasswordChange: new Date(),
       strStatus: 'UNCONFIRMED',
@@ -55,6 +59,15 @@ export class UsersService {
 
     const qb = this.userRepository
       .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.strUserName', 
+        'user.code',
+        'user.strStatus',
+        'user.dtmCreateDate',
+        'user.dtmLatestUpdateDate',
+        'user.deletedAt'
+      ])
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
