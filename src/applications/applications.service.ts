@@ -68,11 +68,13 @@ export class ApplicationsService {
 
       // Crear roles y sus opciones de menú
       for (const rolDto of strRoles) {
+        const rolCode = await this.entityCodeService.generateCode('Rol');
         const rol = this.RolRepository.create({
           strName: rolDto.strName,
           strDescription1: rolDto.strDescription1,
           strDescription2: rolDto.strDescription2,
           strApplication: application,
+          code: rolCode,
         });
 
         await this.RolRepository.save(rol);
@@ -186,6 +188,7 @@ export class ApplicationsService {
 
             return {
               id: rol.id,
+              code: rol.code,
               strName: rol.strName,
               strDescription1: rol.strDescription1,
               strDescription2: rol.strDescription2,
@@ -261,6 +264,7 @@ export class ApplicationsService {
         if (!rolMenuoptions || rolMenuoptions.length === 0) {
           return {
             id: rol.id,
+            code: rol.code,
             strName: rol.strName,
             strDescription1: rol.strDescription1,
             strDescription2: rol.strDescription2,
@@ -275,6 +279,7 @@ export class ApplicationsService {
 
         return {
           id: rol.id,
+          code: rol.code,
           strName: rol.strName,
           strDescription1: rol.strDescription1,
           strDescription2: rol.strDescription2,
@@ -363,6 +368,7 @@ export class ApplicationsService {
     const rolesWithMenuOptions = [
       {
         id: rol.id,
+        code: rol.code,
         strName: rol.strName,
         strDescription1: rol.strDescription1,
         strDescription2: rol.strDescription2,
@@ -409,12 +415,14 @@ export class ApplicationsService {
       ? application.strRoles.map(
           (rol: {
             id: string;
+            code?: string;
             strName: string;
             strDescription1: string;
             strDescription2: string;
             menuOptions?: any[];
           }) => ({
             id: rol.id,
+            code: rol.code,
             strName: rol.strName,
             strDescription1: rol.strDescription1,
             strDescription2: rol.strDescription2,
@@ -501,11 +509,13 @@ export class ApplicationsService {
         rol.strDescription1 = rolDto.strDescription1;
         rol.strDescription2 = rolDto.strDescription2;
       } else {
+        const rolCode = await this.entityCodeService.generateCode('Rol');
         rol = this.RolRepository.create({
           strName: rolDto.strName,
           strDescription1: rolDto.strDescription1 ?? null,
           strDescription2: rolDto.strDescription2 ?? null,
           strApplication: app,
+          code: rolCode,
         });
       }
 

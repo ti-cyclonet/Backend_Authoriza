@@ -6,11 +6,14 @@ import { PackageController } from './package.controller';
 import { PackageService } from './package.service';
 import { ConfigurationPackage } from 'src/configuration-package/entities/configuration-package.entity';
 import { ImageModule } from 'src/images/image.module';
+import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
+import { Contract } from 'src/contract/entities/contract.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Package, ConfigurationPackage, Image]),
-    ImageModule
+    TypeOrmModule.forFeature([Package, ConfigurationPackage, Image, Contract]),
+    ImageModule,
+    EntityCodesModule
   ],
   controllers: [PackageController],
   providers: [PackageService],
