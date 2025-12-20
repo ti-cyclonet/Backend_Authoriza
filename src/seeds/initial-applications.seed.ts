@@ -36,7 +36,7 @@ export default class InitialApplicationsSeed {
         roles: [
           {
             strName: 'adminAuthoriza',
-            strDescription1: 'Administrador',
+            strDescription1: 'Administrator',
             strDescription2: 'Full access',
             menuOptions: [
               {
@@ -102,7 +102,7 @@ export default class InitialApplicationsSeed {
         roles: [
           {
             strName: 'adminInout',
-            strDescription1: 'Administrador',
+            strDescription1: 'Administrator',
             strDescription2: 'Full access',
             menuOptions: [              
               {
@@ -145,13 +145,13 @@ export default class InitialApplicationsSeed {
         roles: [
           {
             strName: 'adminFactonet',
-            strDescription1: 'Administrador',
+            strDescription1: 'Administrator',
             strDescription2: 'Full access',
             menuOptions: [
               {
                 id: '07ff9168-58af-4f34-a5a5-fd746fa525d0',
                 strName: 'contratosFactonet',
-                strDescription: 'Contratos',
+                strDescription: 'Contracts',
                 strUrl: '/contracts',
                 strIcon: 'journal-richtext',
                 strType: 'main_menu',
@@ -161,7 +161,7 @@ export default class InitialApplicationsSeed {
               {
                 id: '0dcd4725-5f61-40ed-9c5d-70ed7ecbd250',
                 strName: 'facturasFactonet',
-                strDescription: 'Facturas',
+                strDescription: 'Invoices',
                 strUrl: '/invoices',
                 strIcon: 'file-earmark-text',
                 strType: 'main_menu',
@@ -171,7 +171,7 @@ export default class InitialApplicationsSeed {
               {
                 id: 'e1872e8e-eeda-472f-a90d-22a52e5d52ef',
                 strName: 'parametersAuthoriza',
-                strDescription: 'Parametros',
+                strDescription: 'Parameters',
                 strUrl: '/parametros-globales',
                 strIcon: 'gear-fill',
                 strType: 'main_menu',

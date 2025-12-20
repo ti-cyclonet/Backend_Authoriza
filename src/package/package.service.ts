@@ -91,7 +91,7 @@ export class PackageService {
     }
 
     return {
-      message: 'Paquete creado correctamente',
+      message: 'Package created successfully',
       data: {
         ...newPackage,
         images: imageEntities,
