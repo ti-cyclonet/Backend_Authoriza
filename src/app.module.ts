@@ -21,6 +21,7 @@ import { InvoicesModule } from './invoices/invoices.module';
 import { SweepModule } from './sweep/sweep.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { EntityCodesModule } from './entity-codes/entity-codes.module';
+import { AssistantModule } from './assistant/assistant.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { EntityCodesModule } from './entity-codes/entity-codes.module';
     SweepModule,
     DashboardModule,
     EntityCodesModule,
+    AssistantModule,
   ],
 })
 export class AppModule {}
