@@ -14,6 +14,7 @@ import { ContractStatus } from './enums/contract-status.enum';
 import { PaymentMode } from './enums/payment-mode.enum';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { InvoiceGeneratorService } from '../invoices/invoice-generator.service';
+import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 
 @Injectable()
 export class ContractService {
@@ -25,6 +26,7 @@ export class ContractService {
     @InjectRepository(Package)
     private readonly packageRepository: Repository<Package>,
     private readonly invoiceGeneratorService: InvoiceGeneratorService,
+    private readonly entityCodeService: EntityCodeService,
   ) {}
 
   async create(dto: CreateContractDto) {
@@ -38,7 +40,11 @@ export class ContractService {
     });
     if (!pkg) throw new BadRequestException('Package not found');
 
+    // Generar código automáticamente
+    const code = await this.entityCodeService.generateCode('Contract');
+
     const entity = this.contractRepository.create({
+      code,
       user: { id: dto.userId } as User,
       package: { id: dto.packageId } as Package,
       value: dto.value,

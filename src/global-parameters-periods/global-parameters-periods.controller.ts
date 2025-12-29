@@ -29,7 +29,10 @@ export class GlobalParametersPeriodsController {
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateGlobalParametersPeriodDto) {
-    return this.service.update(id, dto);
+    console.log(`[AUTHORIZA] PATCH /global-parameters-periods/${id}`, dto);
+    const result = this.service.update(id, dto);
+    console.log(`[AUTHORIZA] Update result:`, result);
+    return result;
   }
 
   @Delete(':id')

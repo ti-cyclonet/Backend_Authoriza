@@ -5,8 +5,8 @@ export class CreatePeriodDto {
   name: string;
 
   @IsDateString()
-  startDate: Date;
+  startDate: string;
 
   @IsDateString()
-  endDate: Date;
+  endDate: string;
 }

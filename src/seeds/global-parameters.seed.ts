@@ -16,9 +16,36 @@ export default class GlobalParametersSeed {
     });
 
     if (!period) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      
+      let quarter;
+      if (month >= 1 && month <= 4) {
+        quarter = 'Q1';
+      } else if (month >= 5 && month <= 8) {
+        quarter = 'Q2';
+      } else {
+        quarter = 'Q3';
+      }
+      
+      // Calcular fechas del cuatrimestre
+      let startMonth, endMonth;
+      if (quarter === 'Q1') {
+        startMonth = 0; // Enero
+        endMonth = 3;   // Abril
+      } else if (quarter === 'Q2') {
+        startMonth = 4; // Mayo
+        endMonth = 7;   // Agosto
+      } else {
+        startMonth = 8; // Septiembre
+        endMonth = 11;  // Diciembre
+      }
+      
       period = periodsRepo.create({
-        startDate: new Date(),
-        endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)), // +1 año
+        startDate: new Date(year, startMonth, 1),
+        endDate: new Date(year, endMonth + 1, 0),
+        name: `${year}-${quarter}`,
         status: 'ACTIVE',
       });
       await periodsRepo.save(period);

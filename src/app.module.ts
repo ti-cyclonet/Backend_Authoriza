@@ -16,6 +16,8 @@ import { PackageModule } from './package/package.module';
 import { ConfigurationPackageModule } from './configuration-package/configuration-package.module';
 import { ContractModule } from './contract/contract.module';
 import { PeriodModule } from './period/period.module';
+import { GlobalParametersModule } from './global-parameters/global-parameters.module';
+import { GlobalParametersPeriodsModule } from './global-parameters-periods/global-parameters-periods.module';
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { SweepModule } from './sweep/sweep.module';
@@ -74,6 +76,8 @@ import { AssistantModule } from './assistant/assistant.module';
     ConfigurationPackageModule,
     ContractModule,
     PeriodModule,
+    GlobalParametersModule,
+    GlobalParametersPeriodsModule,
     CustomerParametersModule,
     InvoicesModule,
     SweepModule,

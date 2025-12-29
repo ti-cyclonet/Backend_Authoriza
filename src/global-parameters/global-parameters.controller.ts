@@ -12,6 +12,11 @@ export class GlobalParametersController {
     return this.service.create(dto);
   }
 
+  @Get('period/:periodId')
+  findByPeriod(@Param('periodId') periodId: string) {
+    return this.service.findByPeriod(periodId);
+  }
+
   @Get()
   findAll() {
     return this.service.findAll();

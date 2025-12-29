@@ -14,6 +14,9 @@ export class Period {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ nullable: true })
+  name: string;
+
   @Column({ unique: true, nullable: true })
   code: string;
 

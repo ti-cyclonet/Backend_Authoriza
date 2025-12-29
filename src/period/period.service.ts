@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { Period } from './entities/period.entity';
 import { CreatePeriodDto } from './dto/create-period.dto';
 import { UpdatePeriodDto } from './dto/update-period.dto';
@@ -12,9 +12,37 @@ export class PeriodService {
     private readonly periodRepository: Repository<Period>,
   ) {}
 
-  create(dto: CreatePeriodDto) {
-    const period = this.periodRepository.create(dto);
+  async create(dto: CreatePeriodDto) {
+    // Generar código automático
+    const code = await this.generatePeriodCode();
+    
+    const period = this.periodRepository.create({
+      ...dto,
+      code,
+      status: 'INACTIVE'
+    });
     return this.periodRepository.save(period);
+  }
+
+  private async generatePeriodCode(): Promise<string> {
+    let nextNumber = 1;
+    let codeExists = true;
+    
+    // Buscar el siguiente código disponible
+    while (codeExists) {
+      const code = `PE${nextNumber.toString().padStart(5, '0')}`;
+      const existingPeriod = await this.periodRepository.findOne({
+        where: { code }
+      });
+      
+      if (!existingPeriod) {
+        return code;
+      }
+      
+      nextNumber++;
+    }
+    
+    return `PE${nextNumber.toString().padStart(5, '0')}`;
   }
 
   findAll() {

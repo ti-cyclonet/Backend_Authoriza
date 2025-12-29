@@ -8,11 +8,13 @@ import { ContractListener } from './listeners/contract.listener';
 import { User } from 'src/users/entities/user.entity';
 import { Package } from 'src/package/entities/package.entity';
 import { InvoicesModule } from '../invoices/invoices.module';
+import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contract, User, Package]),
-    forwardRef(() => InvoicesModule)
+    forwardRef(() => InvoicesModule),
+    EntityCodesModule
   ],
   controllers: [ContractController],
   providers: [ContractService, ContractListener],

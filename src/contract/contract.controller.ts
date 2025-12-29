@@ -23,19 +23,9 @@ export class ContractController {
     return this.contractService.create(dto);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.contractService.findOne(id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateContractDto) {
-    return this.contractService.update(id, dto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.contractService.remove(id);
+  @Get('active')
+  findActive() {
+    return this.contractService.findActive();
   }
 
   @Get('user/:userId')
@@ -48,9 +38,9 @@ export class ContractController {
     return this.contractService.findByPackage(packageId);
   }
 
-  @Get('active')
-  findActive() {
-    return this.contractService.findActive();
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.contractService.findOne(id);
   }
 
   @Get()
@@ -61,5 +51,15 @@ export class ContractController {
   @Patch(':id/activate')
   activateContract(@Param('id') id: string) {
     return this.contractService.activateContract(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() dto: UpdateContractDto) {
+    return this.contractService.update(id, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.contractService.remove(id);
   }
 }

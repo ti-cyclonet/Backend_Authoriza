@@ -18,6 +18,7 @@ export class GlobalParametersPeriodsService {
       period: { id: dto.periodId },
       value: dto.value,
       status: dto.status || 'active',
+      showInDocs: dto.showInDocs !== undefined ? dto.showInDocs : true,
     });
     return this.repo.save(entity);
   }
@@ -40,10 +41,23 @@ export class GlobalParametersPeriodsService {
     });
   }
 
+  findByPeriod(periodId: string) {
+    return this.repo.find({
+      where: { period: { id: periodId } },
+      relations: ['globalParameter'],
+    });
+  }
+
   async update(id: string, dto: UpdateGlobalParametersPeriodDto) {
+    console.log(`[AUTHORIZA SERVICE] Updating parameter ${id} with:`, dto);
     const entity = await this.repo.preload({ id, ...dto });
-    if (!entity) throw new Error('GlobalParametersPeriod not found');
-    return this.repo.save(entity);
+    if (!entity) {
+      console.log(`[AUTHORIZA SERVICE] Parameter ${id} not found`);
+      throw new Error('GlobalParametersPeriod not found');
+    }
+    const result = await this.repo.save(entity);
+    console.log(`[AUTHORIZA SERVICE] Parameter updated successfully:`, result);
+    return result;
   }
 
   remove(id: string) {

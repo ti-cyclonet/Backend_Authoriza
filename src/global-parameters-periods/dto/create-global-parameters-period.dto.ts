@@ -2,5 +2,6 @@ export class CreateGlobalParametersPeriodDto {
   globalParameterId: string;
   periodId: string;
   value: string;
-  status?: string = "ACTIVE"; 
+  status?: string = "ACTIVE";
+  showInDocs?: boolean = true;
 }
