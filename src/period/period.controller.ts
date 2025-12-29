@@ -37,6 +37,11 @@ export class PeriodController {
     return this.periodService.remove(id);
   }
 
+  @Patch(':id/activate')
+  activate(@Param('id') id: string) {
+    return this.periodService.activate(id);
+  }
+
   @Post(':id/parameters')
   async addParameter(@Param('id') periodId: string, @Body() body: any) {
     try {
