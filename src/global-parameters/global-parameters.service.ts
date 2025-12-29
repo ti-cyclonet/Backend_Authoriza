@@ -30,6 +30,11 @@ export class GlobalParametersService {
     }));
   }
 
+  async validateName(name: string): Promise<boolean> {
+    const parameter = await this.repo.findOne({ where: { name } });
+    return !!parameter;
+  }
+
   async create(dto: CreateGlobalParameterDto): Promise<GlobalParameter> {
     const parameter = this.repo.create(dto);
     return this.repo.save(parameter);

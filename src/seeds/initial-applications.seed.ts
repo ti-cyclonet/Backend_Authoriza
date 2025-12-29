@@ -170,7 +170,7 @@ export default class InitialApplicationsSeed {
               },
               {
                 id: 'e1872e8e-eeda-472f-a90d-22a52e5d52ef',
-                strName: 'parametersAuthoriza',
+                strName: 'parametersFactonet',
                 strDescription: 'Parameters',
                 strUrl: '/parametros-globales',
                 strIcon: 'gear-fill',
