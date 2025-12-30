@@ -18,7 +18,6 @@ export class GlobalParametersPeriodsService {
       period: { id: dto.periodId },
       value: dto.value,
       status: dto.status || 'active',
-      showInDocs: dto.showInDocs !== undefined ? dto.showInDocs : true,
     });
     return this.repo.save(entity);
   }
@@ -32,6 +31,16 @@ export class GlobalParametersPeriodsService {
       where: { id },
       relations: ['globalParameter', 'period'],
     });
+  }
+
+  async findActiveParameters() {
+    const result = await this.repo.createQueryBuilder('gpp')
+      .leftJoinAndSelect('gpp.globalParameter', 'gp')
+      .leftJoinAndSelect('gpp.period', 'p')
+      .where('gpp.status = :status', { status: 'ACTIVE' })
+      .getMany();
+    
+    return result;
   }
 
   findByParameter(paramId: string) {

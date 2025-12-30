@@ -12,6 +12,42 @@ export class PeriodService {
     private readonly periodRepository: Repository<Period>,
   ) {}
 
+  async createSubperiod(dto: any) {
+    // Generar código automático para subperíodo
+    const code = await this.generateSubperiodCode(dto.parentPeriodId);
+    
+    const subperiod = this.periodRepository.create({
+      name: dto.name,
+      code,
+      startDate: new Date(dto.startDate),
+      endDate: new Date(dto.endDate),
+      status: 'INACTIVE',
+      parentPeriodId: dto.parentPeriodId
+    });
+    return this.periodRepository.save(subperiod);
+  }
+
+  private async generateSubperiodCode(parentPeriodId: string): Promise<string> {
+    const parentPeriod = await this.findOne(parentPeriodId);
+    let nextNumber = 1;
+    let codeExists = true;
+    
+    while (codeExists) {
+      const code = `${parentPeriod.code}-SP${nextNumber.toString().padStart(2, '0')}`;
+      const existingPeriod = await this.periodRepository.findOne({
+        where: { code }
+      });
+      
+      if (!existingPeriod) {
+        return code;
+      }
+      
+      nextNumber++;
+    }
+    
+    return `${parentPeriod.code}-SP${nextNumber.toString().padStart(2, '0')}`;
+  }
+
   async create(dto: CreatePeriodDto) {
     // Generar código automático
     const code = await this.generatePeriodCode();
@@ -80,24 +116,48 @@ export class PeriodService {
     return this.periodRepository.remove(period);
   }
 
+  async deactivate(id: string) {
+    const period = await this.findOne(id);
+    await this.periodRepository.update(id, { status: 'INACTIVE' });
+    return this.findOne(id);
+  }
+
   async activate(id: string) {
     const period = await this.findOne(id);
     
-    // Validar fechas
-    const fechaActual = new Date();
-    const fechaInicio = new Date(period.startDate);
-    const fechaFin = new Date(period.endDate);
-    
-    if (fechaInicio > fechaActual) {
-      throw new BadRequestException('No se puede activar un período futuro');
+    // Validar fechas solo para períodos principales (no subperíodos)
+    if (!period.parentPeriodId) {
+      const fechaActual = new Date();
+      const fechaInicio = new Date(period.startDate);
+      const fechaFin = new Date(period.endDate);
+      
+      if (fechaInicio > fechaActual) {
+        throw new BadRequestException('No se puede activar un período futuro');
+      }
+      
+      if (fechaFin < fechaActual) {
+        throw new BadRequestException('No se puede activar un período pasado');
+      }
+    } else {
+      // Para subperíodos, solo validar si ya expiró
+      const fechaActual = new Date();
+      const fechaFin = new Date(period.endDate);
+      
+      if (fechaFin < fechaActual) {
+        throw new BadRequestException('No se puede activar un subperíodo expirado');
+      }
     }
     
-    if (fechaFin < fechaActual) {
-      throw new BadRequestException('No se puede activar un período pasado');
+    // Desactivar todos los períodos activos del mismo nivel
+    if (!period.parentPeriodId) {
+      await this.periodRepository.update({}, { status: 'INACTIVE' });
+    } else {
+      // Para subperíodos, desactivar solo otros subperíodos del mismo período padre
+      await this.periodRepository.update(
+        { parentPeriodId: period.parentPeriodId }, 
+        { status: 'INACTIVE' }
+      );
     }
-    
-    // Desactivar todos los períodos activos
-    await this.periodRepository.update({}, { status: 'INACTIVE' });
     
     // Activar el período seleccionado
     await this.periodRepository.update(id, { status: 'ACTIVE' });

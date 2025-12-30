@@ -29,6 +29,9 @@ export class Period {
   @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
   status: 'ACTIVE' | 'INACTIVE';
 
+  @Column({ nullable: true })
+  parentPeriodId: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

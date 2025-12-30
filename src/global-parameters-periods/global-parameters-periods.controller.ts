@@ -12,6 +12,11 @@ export class GlobalParametersPeriodsController {
     return this.service.create(dto);
   }
 
+  @Get('active')
+  findActiveParameters() {
+    return this.service.findActiveParameters();
+  }
+
   @Get()
   findAll() {
     return this.service.findAll();

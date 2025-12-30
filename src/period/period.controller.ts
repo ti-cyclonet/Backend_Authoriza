@@ -12,6 +12,11 @@ export class PeriodController {
     private readonly globalParametersPeriodsService: GlobalParametersPeriodsService
   ) {}
 
+  @Post('subperiods')
+  createSubperiod(@Body() dto: any) {
+    return this.periodService.createSubperiod(dto);
+  }
+
   @Post()
   create(@Body() dto: CreatePeriodDto) {
     return this.periodService.create(dto);
@@ -35,6 +40,11 @@ export class PeriodController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.periodService.remove(id);
+  }
+
+  @Patch(':id/deactivate')
+  deactivate(@Param('id') id: string) {
+    return this.periodService.deactivate(id);
   }
 
   @Patch(':id/activate')

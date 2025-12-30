@@ -19,7 +19,4 @@ export class GlobalParametersPeriods {
 
   @Column({ default: 'active' })
   status: string;
-
-  @Column({ default: true })
-  showInDocs: boolean;
 }
