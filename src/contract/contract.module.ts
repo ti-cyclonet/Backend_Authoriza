@@ -9,12 +9,14 @@ import { User } from 'src/users/entities/user.entity';
 import { Package } from 'src/package/entities/package.entity';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contract, User, Package]),
     forwardRef(() => InvoicesModule),
-    EntityCodesModule
+    EntityCodesModule,
+    CloudinaryModule
   ],
   controllers: [ContractController],
   providers: [ContractService, ContractListener],

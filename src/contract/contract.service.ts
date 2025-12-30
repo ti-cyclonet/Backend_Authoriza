@@ -15,6 +15,7 @@ import { PaymentMode } from './enums/payment-mode.enum';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { InvoiceGeneratorService } from '../invoices/invoice-generator.service';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class ContractService {
@@ -27,6 +28,7 @@ export class ContractService {
     private readonly packageRepository: Repository<Package>,
     private readonly invoiceGeneratorService: InvoiceGeneratorService,
     private readonly entityCodeService: EntityCodeService,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
 
   async create(dto: CreateContractDto) {
@@ -207,6 +209,30 @@ export class ContractService {
       offset,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async savePdfUrl(contractId: string, pdfUrl: string): Promise<Contract> {
+    const contract = await this.findOne(contractId);
+    contract.pdfUrl = pdfUrl;
+    return await this.contractRepository.save(contract);
+  }
+
+  async uploadContractPDF(contractId: string, pdfBuffer: Buffer): Promise<string> {
+    const contract = await this.findOne(contractId);
+    
+    // Si ya existe un PDF, eliminarlo de Cloudinary
+    if (contract.pdfUrl) {
+      await this.cloudinaryService.deletePDFByUrl(contract.pdfUrl);
+    }
+    
+    // Subir nuevo PDF
+    const fileName = `contract_${contract.code || contractId}`;
+    const uploadResult = await this.cloudinaryService.uploadPDF(pdfBuffer, fileName);
+    
+    // Guardar URL en la base de datos
+    await this.savePdfUrl(contractId, uploadResult.secure_url);
+    
+    return uploadResult.secure_url;
   }
 
   async activateContract(id: string): Promise<Contract> {

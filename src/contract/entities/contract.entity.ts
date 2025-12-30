@@ -67,6 +67,9 @@ export class Contract {
   })
   status: ContractStatus;
 
+  @Column({ type: 'text', nullable: true })
+  pdfUrl?: string;
+
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 

@@ -23,6 +23,16 @@ export class ContractController {
     return this.contractService.create(dto);
   }
 
+  @Post(':id/pdf')
+  async uploadPDF(
+    @Param('id') contractId: string,
+    @Body() body: { pdfBuffer: string }
+  ) {
+    const pdfBuffer = Buffer.from(body.pdfBuffer, 'base64');
+    const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer);
+    return { pdfUrl };
+  }
+
   @Get('active')
   findActive() {
     return this.contractService.findActive();
