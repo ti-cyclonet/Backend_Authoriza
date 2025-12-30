@@ -66,7 +66,18 @@ export class ContractService {
   }
 
   async findOne(id: string) {
-    const contract = await this.contractRepository.findOne({ where: { id } });
+    const contract = await this.contractRepository.findOne({ 
+      where: { id },
+      relations: [
+        'user',
+        'user.basicData',
+        'user.basicData.naturalPersonData',
+        'user.basicData.legalEntityData',
+        'package',
+        'package.configurations',
+        'package.configurations.rol',
+      ],
+    });
     if (!contract) throw new NotFoundException('Contract not found');
     return contract;
   }
@@ -137,7 +148,18 @@ export class ContractService {
   }
 
   async findByUser(userId: string) {
-    return this.contractRepository.find({ where: { user: { id: userId } } });
+    return this.contractRepository.find({ 
+      where: { user: { id: userId } },
+      relations: {
+        user: {
+          basicData: {
+            naturalPersonData: true,
+            legalEntityData: true,
+          },
+        },
+        package: true,
+      },
+    });
   }
 
   async findByPackage(packageId: string) {
@@ -149,6 +171,15 @@ export class ContractService {
   async findActive() {
     return this.contractRepository.find({
       where: { status: ContractStatus.ACTIVE },
+      relations: {
+        user: {
+          basicData: {
+            naturalPersonData: true,
+            legalEntityData: true,
+          },
+        },
+        package: true,
+      },
     });
   }
 
@@ -158,6 +189,15 @@ export class ContractService {
     const [contracts, total] = await this.contractRepository.findAndCount({
       take: limit,
       skip: offset,
+      relations: [
+        'user',
+        'user.basicData',
+        'user.basicData.naturalPersonData',
+        'user.basicData.legalEntityData',
+        'package',
+        'package.configurations',
+        'package.configurations.rol',
+      ],
     });
 
     return {

@@ -29,12 +29,18 @@ export class BasicData {
   @JoinColumn()
   user: User;
 
-  @OneToOne(() => NaturalPersonData, (natural) => natural.basicData)
+  @OneToOne(() => NaturalPersonData, (natural) => natural.basicData, {
+    eager: true,
+    cascade: true,
+  })
   @Expose()
   @Type(() => NaturalPersonData)
   naturalPersonData: NaturalPersonData;
 
-  @OneToOne(() => LegalEntityData, (legal) => legal.basicData)
+  @OneToOne(() => LegalEntityData, (legal) => legal.basicData, {
+    eager: true,
+    cascade: true,
+  })
   @Expose()
   @Type(() => LegalEntityData)
   legalEntityData: LegalEntityData;
