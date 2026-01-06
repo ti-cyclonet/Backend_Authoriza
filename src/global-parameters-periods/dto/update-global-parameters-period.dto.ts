@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, IsIn } from 'class-validator';
 
 export class UpdateGlobalParametersPeriodDto {
   @IsOptional()
@@ -12,4 +12,9 @@ export class UpdateGlobalParametersPeriodDto {
   @IsOptional()
   @IsBoolean()
   showInDocs?: boolean;
+  
+  @IsOptional()
+  @IsString()
+  @IsIn(['add', 'subtract'])
+  operationType?: 'add' | 'subtract';
 }

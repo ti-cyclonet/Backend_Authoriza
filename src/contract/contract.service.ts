@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Contract } from './entities/contract.entity';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
@@ -13,9 +13,10 @@ import { Package } from 'src/package/entities/package.entity';
 import { ContractStatus } from './enums/contract-status.enum';
 import { PaymentMode } from './enums/payment-mode.enum';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
-import { InvoiceGeneratorService } from '../invoices/invoice-generator.service';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { LogsService } from '../logs/logs.service';
+import { LogAction } from '../logs/entities/log.entity';
 
 @Injectable()
 export class ContractService {
@@ -26,9 +27,9 @@ export class ContractService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Package)
     private readonly packageRepository: Repository<Package>,
-    private readonly invoiceGeneratorService: InvoiceGeneratorService,
     private readonly entityCodeService: EntityCodeService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly logsService: LogsService,
   ) {}
 
   async create(dto: CreateContractDto) {
@@ -58,11 +59,6 @@ export class ContractService {
     });
 
     const savedContract = await this.contractRepository.save(entity);
-    
-    // Si el contrato se crea como ACTIVE, generar la primera factura
-    if (savedContract.status === ContractStatus.ACTIVE) {
-      await this.invoiceGeneratorService.generateInvoiceForContract(savedContract.id);
-    }
     
     return savedContract;
   }
@@ -125,11 +121,6 @@ export class ContractService {
     });
 
     const savedContract = await this.contractRepository.save(contract);
-    
-    // Si el contrato cambia a ACTIVE, generar factura
-    if (dto.status === ContractStatus.ACTIVE && contract.status !== ContractStatus.ACTIVE) {
-      await this.invoiceGeneratorService.generateInvoiceForContract(savedContract.id);
-    }
     
     return savedContract;
   }
@@ -242,11 +233,143 @@ export class ContractService {
       throw new BadRequestException('Contract is already active');
     }
     
+    // Validar que tenga usuarios dependientes
+    const dependentUsers = await this.userRepository.count({
+      where: { 
+        dependentOnId: contract.user.id,
+        deletedAt: IsNull()
+      }
+    });
+    
+    if (dependentUsers === 0) {
+      throw new BadRequestException('No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.');
+    }
+    
+    // Validar que tenga PDF generado
+    if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
+      throw new BadRequestException('No se puede activar el contrato. Debe generar el PDF del contrato antes de activarlo.');
+    }
+    
+    // Activar contrato
     contract.status = ContractStatus.ACTIVE;
     const savedContract = await this.contractRepository.save(contract);
     
-    // Generar primera factura al activar
-    await this.invoiceGeneratorService.generateInvoiceForContract(savedContract.id);
+    // Activar usuario principal
+    await this.userRepository.update(
+      { id: contract.user.id },
+      { strStatus: 'ACTIVE' }
+    );
+    
+    // Activar usuarios dependientes
+    await this.userRepository.update(
+      { 
+        dependentOnId: contract.user.id,
+        deletedAt: IsNull()
+      },
+      { strStatus: 'ACTIVE' }
+    );
+    
+    return savedContract;
+  }
+
+  async updateStatus(id: string, status: string): Promise<Contract> {
+    console.log(`Updating contract ${id} to status ${status}`);
+    const contract = await this.findOne(id);
+    console.log(`Current status: ${contract.status}`);
+    
+    // Validar regla de negocio para estado ACTIVE
+    if (status === ContractStatus.ACTIVE) {
+      const dependentUsers = await this.userRepository.count({
+        where: { 
+          dependentOnId: contract.user.id,
+          deletedAt: IsNull()
+        }
+      });
+      console.log(`Dependent users count: ${dependentUsers}`);
+      
+      if (dependentUsers === 0) {
+        throw new BadRequestException('No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.');
+      }
+      
+      // Validar que tenga PDF generado
+      if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
+        throw new BadRequestException('No se puede activar el contrato. Debe generar el PDF del contrato antes de activarlo.');
+      }
+    }
+    
+    contract.status = status as ContractStatus;
+    console.log(`About to save with status: ${contract.status}`);
+    const savedContract = await this.contractRepository.save(contract);
+    console.log(`Saved contract status: ${savedContract.status}`);
+    
+    // Si se activó el contrato, activar usuarios
+    if (status === ContractStatus.ACTIVE) {
+      // Activar usuario principal
+      await this.userRepository.update(
+        { id: contract.user.id },
+        { strStatus: 'ACTIVE' }
+      );
+      
+      // Activar usuarios dependientes
+      await this.userRepository.update(
+        { 
+          dependentOnId: contract.user.id,
+          deletedAt: IsNull()
+        },
+        { strStatus: 'ACTIVE' }
+      );
+      
+      console.log(`Activated main user ${contract.user.id} and dependent users`);
+      
+      // Registrar log de activación
+      await this.logsService.info(
+        LogAction.CONTRACT_ACTIVATED,
+        `Contract ${contract.code} activated successfully`,
+        contract.user.id,
+        contract.id,
+        { contractCode: contract.code, userEmail: contract.user.strUserName }
+      );
+      
+      await this.logsService.info(
+        LogAction.USER_ACTIVATED,
+        `User ${contract.user.strUserName} and dependents activated`,
+        contract.user.id,
+        contract.id
+      );
+    } else {
+      // Si no es ACTIVE, desactivar usuarios
+      await this.userRepository.update(
+        { id: contract.user.id },
+        { strStatus: 'INACTIVE' }
+      );
+      
+      // Desactivar usuarios dependientes
+      await this.userRepository.update(
+        { 
+          dependentOnId: contract.user.id,
+          deletedAt: IsNull()
+        },
+        { strStatus: 'INACTIVE' }
+      );
+      
+      console.log(`Deactivated main user ${contract.user.id} and dependent users`);
+      
+      // Registrar log de desactivación
+      await this.logsService.info(
+        LogAction.CONTRACT_DEACTIVATED,
+        `Contract ${contract.code} status changed to ${status}`,
+        contract.user.id,
+        contract.id,
+        { contractCode: contract.code, newStatus: status }
+      );
+      
+      await this.logsService.info(
+        LogAction.USER_DEACTIVATED,
+        `User ${contract.user.strUserName} and dependents deactivated`,
+        contract.user.id,
+        contract.id
+      );
+    }
     
     return savedContract;
   }

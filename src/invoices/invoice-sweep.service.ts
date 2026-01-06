@@ -94,8 +94,12 @@ export class InvoiceSweepService {
         // Calcular próxima fecha de pago mensual
         nextDate.setDate(payDay);
         
-        // Si ya pasó este mes, ir al siguiente
-        if (nextDate <= currentDate) {
+        // Si hoy es el día de pago o ya pasó este mes, considerar este mes
+        if (currentDate.getDate() <= payDay) {
+          // Estamos en el mes correcto, usar este mes
+          return nextDate;
+        } else {
+          // Ya pasó el día de pago este mes, ir al siguiente
           nextDate.setMonth(nextDate.getMonth() + 1);
         }
         break;

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/commo
 import { PeriodService } from './period.service';
 import { CreatePeriodDto } from './dto/create-period.dto';
 import { UpdatePeriodDto } from './dto/update-period.dto';
+import { PeriodValidationService } from './period-validation.service';
 import { GlobalParametersPeriodsService } from '../global-parameters-periods/global-parameters-periods.service';
 import { CreateGlobalParametersPeriodDto } from '../global-parameters-periods/dto/create-global-parameters-period.dto';
 
@@ -9,6 +10,7 @@ import { CreateGlobalParametersPeriodDto } from '../global-parameters-periods/dt
 export class PeriodController {
   constructor(
     private readonly periodService: PeriodService,
+    private readonly periodValidationService: PeriodValidationService,
     private readonly globalParametersPeriodsService: GlobalParametersPeriodsService
   ) {}
 
@@ -40,6 +42,11 @@ export class PeriodController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.periodService.remove(id);
+  }
+
+  @Delete(':id/force')
+  forceRemove(@Param('id') id: string) {
+    return this.periodService.forceRemove(id);
   }
 
   @Patch(':id/deactivate')
@@ -79,5 +86,22 @@ export class PeriodController {
   @Get(':id/parameters')
   async getParametersByPeriod(@Param('id') periodId: string) {
     return this.globalParametersPeriodsService.findByPeriod(periodId);
+  }
+
+  @Get('active/current')
+  async getActivePeriod() {
+    return this.periodService.getActivePeriod();
+  }
+
+  @Get('validation/check-active')
+  async checkActivePeriodValidity() {
+    const hasValid = await this.periodService.hasValidActivePeriod();
+    return { hasValidActivePeriod: hasValid };
+  }
+
+  @Post('validation/validate-expiry')
+  async validateExpiry() {
+    await this.periodValidationService.validateActivePeriodExpiry();
+    return { message: 'Validación de vigencia completada' };
   }
 }

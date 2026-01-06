@@ -19,4 +19,7 @@ export class GlobalParametersPeriods {
 
   @Column({ default: 'active' })
   status: string;
+
+  @Column({ name: 'operation_type', default: 'add' })
+  operationType: 'add' | 'subtract';
 }

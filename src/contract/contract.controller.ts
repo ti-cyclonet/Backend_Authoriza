@@ -63,6 +63,11 @@ export class ContractController {
     return this.contractService.activateContract(id);
   }
 
+  @Patch(':id/status')
+  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
+    return this.contractService.updateStatus(id, body.status);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateContractDto) {
     return this.contractService.update(id, dto);

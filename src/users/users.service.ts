@@ -19,6 +19,8 @@ import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
 import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
+import { LogsService } from '../logs/logs.service';
+import { LogAction } from '../logs/entities/log.entity';
 
 @Injectable()
 export class UsersService {
@@ -32,6 +34,7 @@ export class UsersService {
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
     private readonly entityCodeService: EntityCodeService,
+    private readonly logsService: LogsService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -47,7 +50,18 @@ export class UsersService {
       lastPasswordChange: new Date(),
       strStatus: 'UNCONFIRMED',
     });
-    return this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+    
+    // Log creación de usuario
+    await this.logsService.info(
+      LogAction.USER_CREATED,
+      `User created: ${savedUser.strUserName}`,
+      savedUser.id,
+      null,
+      { userCode: savedUser.code, email: savedUser.strUserName }
+    );
+    
+    return savedUser;
   }
 
   async findAll(
@@ -383,10 +397,27 @@ export class UsersService {
     if (dependents.length > 0 && force) {
       for (const dep of dependents) {
         await this.userRepository.softDelete(dep.id);
+        // Log eliminación de dependiente
+        await this.logsService.info(
+          LogAction.USER_DELETED,
+          `Dependent user deleted: ${dep.strUserName}`,
+          dep.id,
+          null,
+          { parentUserId: id, forced: true }
+        );
       }
     }
 
     await this.userRepository.softDelete(id);
+    
+    // Log eliminación de usuario principal
+    await this.logsService.info(
+      LogAction.USER_DELETED,
+      `User deleted: ${user.strUserName}`,
+      user.id,
+      null,
+      { userCode: user.code, dependentsCount: dependents.length, force }
+    );
 
     return {
       message: `User with ID '${id}' has been soft-deleted${

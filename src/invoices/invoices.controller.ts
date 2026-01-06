@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { InvoiceGeneratorService } from './invoice-generator.service';
 import { InvoiceSweepService } from './invoice-sweep.service';
@@ -73,6 +73,12 @@ export class InvoicesController {
   async sweepInvoices() {
     console.log('Sweep endpoint called');
     return await this.invoiceSweepService.sweepAndGenerateInvoices();
+  }
+
+  @Get('check-period')
+  @Public()
+  checkInvoicesInPeriod(@Query('startDate') startDate: string, @Query('endDate') endDate: string) {
+    return this.invoicesService.checkInvoicesInPeriod(startDate, endDate);
   }
 
   @Get('test')

@@ -9,9 +9,6 @@ export class GlobalParametersForInvoices {
   @Column({ name: 'global_parameter_period_id' })
   globalParameterPeriodId: string;
 
-  @Column({ name: 'applies_to_invoices', default: true })
-  appliesToInvoices: boolean;
-
   @Column({ name: 'show_in_docs', default: true })
   showInDocs: boolean;
 

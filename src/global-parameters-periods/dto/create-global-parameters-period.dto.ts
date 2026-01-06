@@ -3,4 +3,5 @@ export class CreateGlobalParametersPeriodDto {
   periodId: string;
   value: string;
   status?: string = "ACTIVE";
+  operationType?: 'add' | 'subtract' = 'add';
 }

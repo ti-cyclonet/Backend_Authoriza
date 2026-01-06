@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { Invoice } from './entities/invoice.entity';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
@@ -59,6 +59,19 @@ export class InvoicesService {
   async update(id: number, updateInvoiceDto: UpdateInvoiceDto): Promise<Invoice> {
     await this.invoiceRepository.update(id, updateInvoiceDto);
     return await this.findOne(id);
+  }
+
+  async checkInvoicesInPeriod(startDate: string, endDate: string): Promise<{ hasInvoices: boolean; count: number }> {
+    const count = await this.invoiceRepository.count({
+      where: {
+        issueDate: Between(new Date(startDate), new Date(endDate))
+      }
+    });
+    
+    return {
+      hasInvoices: count > 0,
+      count
+    };
   }
 
   async remove(id: number): Promise<void> {

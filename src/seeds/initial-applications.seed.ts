@@ -171,7 +171,7 @@ export default class InitialApplicationsSeed {
               {
                 id: 'e1872e8e-eeda-472f-a90d-22a52e5d52ef',
                 strName: 'parametersFactonet',
-                strDescription: 'Parameters',
+                strDescription: 'Periods',
                 strUrl: '/parametros-globales',
                 strIcon: 'gear-fill',
                 strType: 'main_menu',

@@ -8,10 +8,11 @@ import { InvoiceSweepService } from './invoice-sweep.service';
 import { Invoice } from './entities/invoice.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { GlobalParametersPeriods } from '../global-parameters-periods/entities/global-parameters-periods.entity';
+import { GlobalParametersForInvoices } from '../global-parameters-invoices/entities/global-parameters-for-invoices.entity';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, Contract, GlobalParametersPeriods]), EntityCodesModule],
+  imports: [TypeOrmModule.forFeature([Invoice, Contract, GlobalParametersPeriods, GlobalParametersForInvoices]), EntityCodesModule],
   controllers: [InvoicesController, PublicInvoicesController],
   providers: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService],
   exports: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService]

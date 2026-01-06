@@ -9,9 +9,10 @@ import { BasicDataModule } from 'src/basic-data/basic-data.module';
 import { NaturalPersonDataModule } from 'src/natural-person-data/natural-person-data.module';
 import { LegalEntityDataModule } from 'src/legal-entity-data/legal-entity-data.module';
 import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
+import { LogsModule } from '../logs/logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Rol]), BasicDataModule, NaturalPersonDataModule, LegalEntityDataModule, EntityCodesModule],
+  imports: [TypeOrmModule.forFeature([User, Rol]), BasicDataModule, NaturalPersonDataModule, LegalEntityDataModule, EntityCodesModule, LogsModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

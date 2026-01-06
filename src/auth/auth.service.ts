@@ -4,6 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { UsersService } from 'src/users/users.service';
+import { LogsService } from '../logs/logs.service';
+import { LogAction } from '../logs/entities/log.entity';
 export interface AuthenticatedUser {
   id: string;
   email: string;
@@ -22,6 +24,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly applicationsService: ApplicationsService,
     private readonly usersService: UsersService,
+    private readonly logsService: LogsService,
   ) {}
 
   async validateUser(
@@ -78,6 +81,21 @@ export class AuthService {
     // 8. Generar token JWT
     const payload = { sub: user.id, email: user.strUserName };
     const token = this.jwtService.sign(payload);
+    
+    // Log login exitoso
+    await this.logsService.info(
+      LogAction.LOGIN,
+      `User logged in: ${user.strUserName}`,
+      user.id,
+      null,
+      { 
+        application: applicationName,
+        role: user.rol.strName,
+        userStatus: user.strStatus,
+        mustChangePassword,
+        passwordExpired
+      }
+    );
 
     // 9. Construir usuario sin datos sensibles
     const userWithoutSensitiveData: AuthenticatedUser & {

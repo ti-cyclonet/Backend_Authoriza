@@ -24,7 +24,6 @@ export class GlobalParametersForInvoicesService {
     const entities = parametros.map(param => 
       this.globalParametersForInvoicesRepository.create({
         globalParameterPeriodId: param.globalParameterPeriodId,
-        appliesToInvoices: true,
         showInDocs: param.showInDocs !== undefined ? param.showInDocs : true,
       })
     );
