@@ -44,6 +44,7 @@ export class User {
       'EXPIRING',
       'SUSPENDED',
       'DELINQUENT',
+      'TEMPORARY',
     ],
     default: 'UNCONFIRMED',
   })

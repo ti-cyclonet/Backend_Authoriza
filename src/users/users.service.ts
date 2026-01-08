@@ -9,12 +9,14 @@ import { Not, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateFullUserDto } from './dto/CreateFullUserDto';
 import * as bcrypt from 'bcrypt';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { NaturalPersonData } from 'src/natural-person-data/entities/natural-person-data.entity';
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
+import { DocumentType } from 'src/document-types/entities/document-type.entity';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
@@ -64,6 +66,85 @@ export class UsersService {
     return savedUser;
   }
 
+  async createFullUser(dto: CreateFullUserDto): Promise<User> {
+    console.log('Creating full user with DTO:', JSON.stringify(dto, null, 2));
+    
+    const genericPassword = '1234567890';
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(genericPassword, salt);
+    const code = await this.entityCodeService.generateCode('User');
+
+    // Crear usuario
+    const user = this.userRepository.create({
+      strUserName: dto.user.strUserName,
+      strPassword: hashedPassword,
+      code,
+      mustChangePassword: true,
+      lastPasswordChange: new Date(),
+      strStatus: dto.user.strStatus,
+    });
+    const savedUser = await this.userRepository.save(user);
+    console.log('User created:', savedUser.id);
+
+    // Buscar el ID del tipo de documento
+    const documentTypeRecord = await this.userRepository.manager.findOne(DocumentType, {
+      where: { documentType: dto.documentType.strDocumentType }
+    });
+
+    if (!documentTypeRecord) {
+      throw new BadRequestException(`Document type ${dto.documentType.strDocumentType} not found`);
+    }
+    console.log('Document type found:', documentTypeRecord.id);
+
+    // Crear datos básicos con referencia al tipo de documento
+    const basicData = this.userRepository.manager.create(BasicData, {
+      strPersonType: dto.basicData.strPersonType,
+      strStatus: dto.basicData.strStatus,
+      documentTypeId: documentTypeRecord.id,
+      documentNumber: dto.documentType.strDocumentNumber,
+      user: savedUser,
+    });
+    const savedBasicData = await this.userRepository.manager.save(basicData);
+    console.log('BasicData created:', savedBasicData.id);
+
+    // Crear datos específicos según tipo de persona
+    if (dto.basicData.strPersonType === 'N' && dto.naturalPersonData) {
+      const naturalPersonData = this.userRepository.manager.create(NaturalPersonData, {
+        ...dto.naturalPersonData,
+        basicData: savedBasicData,
+      });
+      await this.userRepository.manager.save(naturalPersonData);
+    }
+
+    if (dto.basicData.strPersonType === 'J' && dto.legalEntityData) {
+      const legalEntityData = this.userRepository.manager.create(LegalEntityData, {
+        ...dto.legalEntityData,
+        basicData: savedBasicData,
+      });
+      await this.userRepository.manager.save(legalEntityData);
+    }
+
+    // Actualizar usuario con basicData
+    savedUser.basicData = savedBasicData;
+    await this.userRepository.save(savedUser);
+
+    // Log creación de usuario completo
+    await this.logsService.info(
+      LogAction.USER_CREATED,
+      `Full user created: ${savedUser.strUserName}`,
+      savedUser.id,
+      null,
+      { 
+        userCode: savedUser.code, 
+        email: savedUser.strUserName,
+        personType: dto.basicData.strPersonType,
+        documentType: dto.documentType.strDocumentType
+      }
+    );
+
+    return savedUser;
+  }
+
   async findAll(
     paginationDto: PaginationDto,
     dependentOnId?: string,
@@ -84,6 +165,7 @@ export class UsersService {
       ])
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
       .leftJoinAndSelect('user.dependentOn', 'dependentOn')
@@ -122,6 +204,7 @@ export class UsersService {
       .withDeleted()
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
       .leftJoinAndSelect('user.dependentOn', 'dependentOn')
@@ -154,6 +237,7 @@ export class UsersService {
       .createQueryBuilder('user')
       .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
       .leftJoinAndSelect('user.dependentOn', 'dependentOn')
@@ -184,6 +268,7 @@ export class UsersService {
       relations: [
         'rol',
         'basicData',
+        'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
         'dependentOn',
@@ -207,9 +292,15 @@ export class UsersService {
   }
 
   async assignRole(userId: string, roleId: string) {
-    const user = await this.findOne(userId);
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['basicData'],
+    });
+    if (!user) throw new NotFoundException('User not found');
+    
     const role = await this.rolRepository.findOne({ where: { id: roleId } });
     if (!role) throw new NotFoundException('Role not found');
+    
     user.rol = role;
     user.dtmLatestUpdateDate = new Date();
     return this.userRepository.save(user);
@@ -222,6 +313,7 @@ export class UsersService {
       relations: [
         'rol',
         'basicData',
+        'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
         'dependentOn',
@@ -242,6 +334,7 @@ export class UsersService {
       relations: [
         'rol',
         'basicData',
+        'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
         'dependentOn',
@@ -252,7 +345,18 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
+    console.log(`UsersService.update - ID: ${id}, DTO:`, JSON.stringify(dto, null, 2));
+    
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['basicData'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    console.log('Current user before update:', JSON.stringify(user, null, 2));
 
     if (dto.strUserName) user.strUserName = dto.strUserName;
     if (dto.strStatus) user.strStatus = dto.strStatus;
@@ -273,14 +377,75 @@ export class UsersService {
       user.basicData = basicData;
     }
 
+    // Actualizar campos de documento en BasicData
+    if (dto.basicData && user.basicData) {
+      console.log('Updating basicData with:', dto.basicData);
+      if (dto.basicData.documentTypeId) {
+        user.basicData.documentTypeId = dto.basicData.documentTypeId;
+      }
+      if (dto.basicData.documentNumber) {
+        user.basicData.documentNumber = dto.basicData.documentNumber;
+      }
+      const savedBasicData = await this.userRepository.manager.save(BasicData, user.basicData);
+      console.log('BasicData saved:', savedBasicData);
+    }
+
+    // Actualizar naturalPersonData si existe
+    if (dto.naturalPersonData && user.basicData?.naturalPersonData) {
+      console.log('Updating naturalPersonData with:', dto.naturalPersonData);
+      Object.assign(user.basicData.naturalPersonData, dto.naturalPersonData);
+      const savedNaturalPersonData = await this.userRepository.manager.save(NaturalPersonData, user.basicData.naturalPersonData);
+      console.log('NaturalPersonData saved:', savedNaturalPersonData);
+    }
+
+    // Actualizar legalEntityData si existe
+    if (dto.legalEntityData && user.basicData?.legalEntityData) {
+      console.log('Updating legalEntityData with:', dto.legalEntityData);
+      Object.assign(user.basicData.legalEntityData, dto.legalEntityData);
+      const savedLegalEntityData = await this.userRepository.manager.save(LegalEntityData, user.basicData.legalEntityData);
+      console.log('LegalEntityData saved:', savedLegalEntityData);
+    }
+
     if (dto.dependentOnId) {
-      const dependentUser = await this.findOne(dto.dependentOnId);
+      const dependentUser = await this.userRepository.findOne({
+        where: { id: dto.dependentOnId },
+        relations: ['basicData'],
+      });
+      if (!dependentUser) throw new NotFoundException('Dependent user not found');
       user.dependentOn = dependentUser;
+      user.dependentOnId = dto.dependentOnId;
     }
 
     user.dtmLatestUpdateDate = new Date();
 
-    return await this.userRepository.save(user);
+    console.log('User before save:', JSON.stringify(user, null, 2));
+    
+    // Crear una copia del usuario sin basicData para evitar conflictos
+    const userToSave = {
+      id: user.id,
+      strUserName: user.strUserName,
+      code: user.code,
+      strPassword: user.strPassword,
+      mustChangePassword: user.mustChangePassword,
+      lastPasswordChange: user.lastPasswordChange,
+      strStatus: user.strStatus,
+      dtmCreateDate: user.dtmCreateDate,
+      dtmLatestUpdateDate: new Date(), // Forzar nueva fecha
+      deletedAt: user.deletedAt,
+      dependentOnId: user.dependentOnId, // Incluir dependentOnId
+      rolId: user.rol?.id // Usar solo el ID del rol
+    };
+    
+    console.log('UserToSave:', JSON.stringify(userToSave, null, 2));
+    
+    try {
+      const savedUser = await this.userRepository.save(userToSave);
+      console.log('User saved successfully:', savedUser.id);
+      return savedUser;
+    } catch (error) {
+      console.error('Error saving user:', error);
+      throw error;
+    }
   }
 
   async changePassword(
@@ -342,7 +507,7 @@ export class UsersService {
 
     // Actualizar estado de todos los hijos que dependan de este usuario
     await this.userRepository.update(
-      { dependentOn: { id: userId } },
+      { dependentOnId: userId },
       {
         strStatus: newStatus,
         dtmLatestUpdateDate: new Date(),

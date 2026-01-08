@@ -1,8 +1,8 @@
-// src/seeds/user.seed.ts
 import { DataSource } from 'typeorm';
 import { User } from 'src/users/entities/user.entity';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
+import { DocumentType } from 'src/document-types/entities/document-type.entity';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
 import { EntityCode } from 'src/entity-codes/entities/entity-code.entity';
@@ -15,14 +15,36 @@ export default class UserSeed {
     const legalRepo = dataSource.getRepository(LegalEntityData);
     const roleRepo = dataSource.getRepository(Rol);
     const entityCodeRepo = dataSource.getRepository(EntityCode);
+    const documentTypeRepo = dataSource.getRepository(DocumentType);
     
     // Initialize entity code service
     const entityCodeService = new EntityCodeService(entityCodeRepo);
     await entityCodeService.initializeEntityCodes();
 
+    // ========== 0️⃣ CREAR TIPOS DE DOCUMENTO ==========
+    const documentTypes = [
+      { code: 'CC', description: 'Cédula de ciudadanía' },
+      { code: 'CE', description: 'Cédula de extranjería' },
+      { code: 'PP', description: 'Pasaporte' },
+      { code: 'TI', description: 'Tarjeta de identidad' },
+      { code: 'NIT', description: 'Nit' }
+    ];
+
+    for (const docType of documentTypes) {
+      const existing = await documentTypeRepo.findOne({ where: { documentType: docType.code } });
+      if (!existing) {
+        const newDocType = documentTypeRepo.create({
+          documentType: docType.code,
+          description: docType.description
+        });
+        await documentTypeRepo.save(newDocType);
+        console.log(`✅ Tipo de documento creado: ${docType.code}`);
+      }
+    }
+
     // ========== 1️⃣ CREAR USUARIO ==========
     let user = await userRepo.findOne({
-      where: { strUserName: 'ti.cyclonet@authoriza.com' },
+      where: { strUserName: 'ti.cyclonet@hotmail.com' },
       relations: ['rol'],
     });
 
@@ -32,7 +54,7 @@ export default class UserSeed {
       const code = await entityCodeService.generateCode('User');
 
       user = userRepo.create({
-        strUserName: 'ti.cyclonet@authoriza.com',
+        strUserName: 'ti.cyclonet@hotmail.com',
         strPassword: hashedPassword,
         code,
         strStatus: 'ACTIVE',
@@ -51,9 +73,16 @@ export default class UserSeed {
     });
 
     if (!basic) {
+      // Buscar el tipo de documento NIT
+      const nitDocumentType = await documentTypeRepo.findOne({
+        where: { documentType: 'NIT' }
+      });
+
       basic = basicRepo.create({
         strPersonType: 'J',
         strStatus: 'ACTIVE',
+        documentTypeId: nitDocumentType?.id,
+        documentNumber: '900515884-4',
         user,
       });
       await basicRepo.save(basic);

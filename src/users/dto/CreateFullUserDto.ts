@@ -89,6 +89,16 @@ class LegalEntityDto {
   contactPhone: string;
 }
 
+class DocumentTypeDto {
+  @IsString()
+  @IsNotEmpty()
+  strDocumentType: string;
+
+  @IsString()
+  @IsNotEmpty()
+  strDocumentNumber: string;
+}
+
 export class CreateFullUserDto {
   @ValidateNested()
   @Type(() => UserDto)
@@ -97,6 +107,10 @@ export class CreateFullUserDto {
   @ValidateNested()
   @Type(() => CreateBasicDataDto)
   basicData: CreateBasicDataDto;
+
+  @ValidateNested()
+  @Type(() => DocumentTypeDto)
+  documentType: DocumentTypeDto;
 
   @ValidateNested()
   @Type(() => NaturalPersonDto)

@@ -32,16 +32,24 @@ export class CloudinaryService {
     fileName: string,
     folder: string = 'contracts'
   ): Promise<UploadApiResponse> {
+    console.log(`Uploading PDF: ${fileName} to folder: ${folder}`);
+    console.log(`PDF buffer size: ${pdfBuffer.length} bytes`);
+    
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { 
-          folder,
+          folder: folder,
           resource_type: 'raw',
-          public_id: fileName,
-          format: 'pdf'
+          public_id: `${folder}/${fileName}`,
+          use_filename: true,
+          unique_filename: false
         },
         (error, result) => {
-          if (error) return reject(error);
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            return reject(error);
+          }
+          console.log('Cloudinary upload success:', result.secure_url);
           resolve(result);
         },
       );

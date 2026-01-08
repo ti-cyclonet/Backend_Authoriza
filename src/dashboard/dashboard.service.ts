@@ -66,7 +66,7 @@ export class DashboardService {
   private async getInvoiceStats(): Promise<InvoiceStats> {
     const total = await this.invoiceRepository.count();
     const paid = await this.invoiceRepository.count({ where: { status: InvoiceStatus.PAID } });
-    const pending = await this.invoiceRepository.count({ where: { status: InvoiceStatus.ISSUED } });
+    const pending = await this.invoiceRepository.count({ where: { status: InvoiceStatus.UNCONFIRMED } });
     const overdue = await this.invoiceRepository.count({ where: { status: InvoiceStatus.IN_ARREARS } });
 
     const totalValueResult = await this.invoiceRepository
@@ -145,7 +145,7 @@ export class DashboardService {
       where: { ...whereCondition, status: InvoiceStatus.PAID } 
     });
     const pending = await this.invoiceRepository.count({ 
-      where: { ...whereCondition, status: InvoiceStatus.ISSUED } 
+      where: { ...whereCondition, status: InvoiceStatus.UNCONFIRMED } 
     });
     const overdue = await this.invoiceRepository.count({ 
       where: { ...whereCondition, status: InvoiceStatus.IN_ARREARS } 

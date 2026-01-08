@@ -209,18 +209,23 @@ export class ContractService {
   }
 
   async uploadContractPDF(contractId: string, pdfBuffer: Buffer): Promise<string> {
+    console.log(`Starting PDF upload for contract: ${contractId}`);
     const contract = await this.findOne(contractId);
     
     // Si ya existe un PDF, eliminarlo de Cloudinary
     if (contract.pdfUrl) {
+      console.log(`Deleting existing PDF: ${contract.pdfUrl}`);
       await this.cloudinaryService.deletePDFByUrl(contract.pdfUrl);
     }
     
     // Subir nuevo PDF
     const fileName = `contract_${contract.code || contractId}`;
+    console.log(`Uploading new PDF with filename: ${fileName}`);
     const uploadResult = await this.cloudinaryService.uploadPDF(pdfBuffer, fileName);
+    console.log(`Upload result:`, uploadResult);
     
     // Guardar URL en la base de datos
+    console.log(`Saving PDF URL to database: ${uploadResult.secure_url}`);
     await this.savePdfUrl(contractId, uploadResult.secure_url);
     
     return uploadResult.secure_url;

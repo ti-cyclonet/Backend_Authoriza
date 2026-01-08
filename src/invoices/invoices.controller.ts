@@ -42,6 +42,12 @@ export class InvoicesController {
     return this.invoicesService.update(+id, updateInvoiceDto);
   }
 
+  @Patch(':id/status')
+  @Public()
+  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
+    return this.invoicesService.updateStatus(+id, body.status);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.invoicesService.remove(+id);

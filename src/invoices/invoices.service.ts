@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
-import { Invoice } from './entities/invoice.entity';
+import { Invoice, InvoiceStatus } from './entities/invoice.entity';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
@@ -58,6 +58,12 @@ export class InvoicesService {
 
   async update(id: number, updateInvoiceDto: UpdateInvoiceDto): Promise<Invoice> {
     await this.invoiceRepository.update(id, updateInvoiceDto);
+    return await this.findOne(id);
+  }
+
+  async updateStatus(id: number, status: string): Promise<Invoice> {
+    const invoice = await this.findOne(id);
+    await this.invoiceRepository.update(id, { status: status as InvoiceStatus });
     return await this.findOne(id);
   }
 

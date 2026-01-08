@@ -1,4 +1,4 @@
-import { IsIn, IsString } from 'class-validator';
+import { IsIn, IsString, IsOptional, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateBasicDataDto {
@@ -9,4 +9,12 @@ export class CreateBasicDataDto {
 
   @IsString()
   strStatus: string;
+
+  @IsOptional()
+  @IsUUID()
+  documentTypeId?: string;
+
+  @IsOptional()
+  @IsString()
+  documentNumber?: string;
 }

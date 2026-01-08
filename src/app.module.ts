@@ -12,6 +12,7 @@ import { UsersModule } from './users/users.module';
 import { BasicDataModule } from './basic-data/basic-data.module';
 import { NaturalPersonDataModule } from './natural-person-data/natural-person-data.module';
 import { LegalEntityDataModule } from './legal-entity-data/legal-entity-data.module';
+import { DocumentTypesModule } from './document-types/document-types.module';
 import { PackageModule } from './package/package.module';
 import { ConfigurationPackageModule } from './configuration-package/configuration-package.module';
 import { ContractModule } from './contract/contract.module';
@@ -71,6 +72,7 @@ import { AssistantModule } from './assistant/assistant.module';
     BasicDataModule,
     NaturalPersonDataModule,
     LegalEntityDataModule,
+    DocumentTypesModule,
     CommonModule,
     AuthModule,
     PackageModule,

@@ -58,28 +58,9 @@ export class UsersController {
 
   @Post('full')
   @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
-  @ApiOperation({ summary: 'Create full user with nested data' })
+  @ApiOperation({ summary: 'Create full user with nested data including document type' })
   async createFullUser(@Body() dto: CreateFullUserDto) {
-    const user = await this.usersService.create(dto.user);
-    const basicData = await this.basicDataService.create(
-      user.id,
-      dto.basicData,
-    );
-
-    if (dto.basicData.strPersonType === 'N' && dto.naturalPersonData) {
-      await this.naturalPersonService.create({
-        ...dto.naturalPersonData,
-        basicDataId: basicData.id,
-      });
-    }
-
-    if (dto.basicData.strPersonType === 'J' && dto.legalEntityData) {
-      await this.legalEntityService.create({
-        ...dto.legalEntityData,
-        basicDataId: basicData.id,
-      });
-    }
-
+    const user = await this.usersService.createFullUser(dto);
     return {
       id: user.id,
       message: 'User created successfully',
@@ -181,6 +162,7 @@ export class UsersController {
   @Put(':id')
   @ApiOperation({ summary: 'Update user data' })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
+    console.log(`PUT /users/${id} - Updating user with data:`, JSON.stringify(dto, null, 2));
     return this.usersService.update(id, dto);
   }
 
