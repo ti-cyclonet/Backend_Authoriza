@@ -79,7 +79,11 @@ export class AuthService {
     const passwordExpired = now > expirationDate;
 
     // 8. Generar token JWT
-    const payload = { sub: user.id, email: user.strUserName };
+    const payload = { 
+      sub: user.id, 
+      email: user.strUserName,
+      tenantId: user.id // Usar el ID del usuario como tenantId
+    };
     const token = this.jwtService.sign(payload);
     
     // Log login exitoso
