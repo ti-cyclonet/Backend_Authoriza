@@ -10,6 +10,7 @@ import {
 import { RolMenuoption } from '../../roles/entities/rol-menuoption.entity';
 import { Expose } from 'class-transformer';
 import { ConfigurationPackage } from '../../configuration-package/entities/configuration-package.entity';
+import { UserRole } from '../../user-roles/entities/user-role.entity';
 
 @Entity()
 export class Rol {
@@ -54,4 +55,7 @@ export class Rol {
 
   @OneToMany(() => ConfigurationPackage, (config) => config.rol)
   configurations: ConfigurationPackage[];
+
+  @OneToMany(() => UserRole, (userRole) => userRole.role)
+  userRoles: UserRole[];
 }

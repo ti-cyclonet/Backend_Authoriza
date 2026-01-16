@@ -188,14 +188,6 @@ export default class InitialApplicationsSeed {
                 strType: 'main_menu',
                 ingOrder: 10,
               },
-              {
-                strName: 'manufacturingReportsInout',
-                strDescription: 'Manufacturing Reports',
-                strUrl: '/reports-manufacturing',
-                strIcon: 'graph-up',
-                strType: 'main_menu',
-                ingOrder: 11,
-              },
               // Configuración común
               {
                 strName: 'setupInout',

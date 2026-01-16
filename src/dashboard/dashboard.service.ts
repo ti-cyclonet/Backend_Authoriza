@@ -44,11 +44,8 @@ export class DashboardService {
 
     const byRole = await this.userRepository
       .createQueryBuilder('user')
-      .leftJoin('user.rol', 'rol')
-      .select('rol.strName', 'role')
-      .addSelect('COUNT(user.id)', 'count')
+      .select('COUNT(user.id)', 'count')
       .where('user.deletedAt IS NULL')
-      .groupBy('rol.strName')
       .getRawMany();
 
     return {
@@ -56,10 +53,10 @@ export class DashboardService {
       active,
       inactive,
       unconfirmed,
-      byRole: byRole.map(item => ({
-        role: item.role || 'Sin rol',
-        count: parseInt(item.count)
-      }))
+      byRole: [{
+        role: 'Total usuarios',
+        count: total
+      }]
     };
   }
 
@@ -190,7 +187,7 @@ export class DashboardService {
     const recentUsers = await this.userRepository.find({
       order: { dtmCreateDate: 'DESC' },
       take: 5,
-      relations: ['rol', 'basicData']
+      relations: ['basicData']
     });
 
     const recentInvoices = await this.invoiceRepository.find({
@@ -209,7 +206,7 @@ export class DashboardService {
       recentUsers: recentUsers.map(user => ({
         id: user.id,
         username: user.strUserName,
-        role: user.rol?.strName || 'Sin rol',
+        role: 'Sin rol', // TODO: Implementar con UserRole
         status: user.strStatus,
         createdAt: user.dtmCreateDate
       })),

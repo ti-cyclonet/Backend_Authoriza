@@ -4,6 +4,7 @@ import { CreatePeriodDto } from './dto/create-period.dto';
 import { UpdatePeriodDto } from './dto/update-period.dto';
 import { PeriodValidationService } from './period-validation.service';
 import { GlobalParametersPeriodsService } from '../global-parameters-periods/global-parameters-periods.service';
+import { GlobalParametersService } from '../global-parameters/global-parameters.service';
 import { CreateGlobalParametersPeriodDto } from '../global-parameters-periods/dto/create-global-parameters-period.dto';
 
 @Controller('periods')
@@ -11,7 +12,8 @@ export class PeriodController {
   constructor(
     private readonly periodService: PeriodService,
     private readonly periodValidationService: PeriodValidationService,
-    private readonly globalParametersPeriodsService: GlobalParametersPeriodsService
+    private readonly globalParametersPeriodsService: GlobalParametersPeriodsService,
+    private readonly globalParametersService: GlobalParametersService
   ) {}
 
   @Post('subperiods')
@@ -97,6 +99,11 @@ export class PeriodController {
   async checkActivePeriodValidity() {
     const hasValid = await this.periodService.hasValidActivePeriod();
     return { hasValidActivePeriod: hasValid };
+  }
+
+  @Get('global-parameters')
+  async getGlobalParameters() {
+    return this.globalParametersService.findAll();
   }
 
   @Post('validation/validate-expiry')

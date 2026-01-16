@@ -35,6 +35,11 @@ export class AuthService {
       mustChangePassword?: boolean;
       passwordExpired?: boolean;
     };
+    contracts?: Array<{
+      contractId: string;
+      clientName: string;
+      packageName: string;
+    }>;
   }> {
     const { email, password, applicationName } = loginDto;
 
@@ -65,9 +70,58 @@ export class AuthService {
     }
 
     // 5. Validar si su rol está dentro de los roles válidos
-    if (!validRoles.includes(user.rol?.strName)) {
+    // Buscar roles activos del usuario para la aplicación solicitada
+    const userActiveRoles = user.userRoles?.filter(ur => 
+      ur.status === 'ACTIVE' && 
+      validRoles.includes(ur.role?.strName)
+    ) || [];
+
+    if (userActiveRoles.length === 0) {
       throw new UnauthorizedException('UNAUTHORIZED');
     }
+
+    // Detectar múltiples contratos
+    const uniqueContracts = new Map();
+    userActiveRoles.forEach(ur => {
+      if (ur.contractId && ur.contract) {
+        uniqueContracts.set(ur.contractId, {
+          contractId: ur.contractId,
+          clientName: ur.contract.user?.basicData?.strPersonType === 'N' 
+            ? `${ur.contract.user.basicData.naturalPersonData?.firstName || ''} ${ur.contract.user.basicData.naturalPersonData?.firstSurname || ''}`.trim()
+            : ur.contract.user?.basicData?.legalEntityData?.businessName || 'Cliente',
+          packageName: ur.contract.package?.name || 'Paquete'
+        });
+      }
+    });
+
+    console.log('🔍 Total de roles activos:', userActiveRoles.length);
+    console.log('📋 Contratos únicos detectados:', uniqueContracts.size);
+    console.log('📦 Contratos:', Array.from(uniqueContracts.values()));
+
+    // Si hay múltiples contratos, retornarlos
+    if (uniqueContracts.size > 1) {
+      const contracts = Array.from(uniqueContracts.values());
+      
+      console.log('✅ Retornando múltiples contratos al frontend');
+      
+      return {
+        access_token: '',
+        user: {
+          id: user.id,
+          email: user.strUserName,
+          image: '',
+          name: user.strUserName,
+          rol: '',
+          rolDescription: ''
+        },
+        contracts
+      };
+    }
+
+    console.log('ℹ️ Un solo contrato, continuando con login normal');
+
+    // Usar el primer rol válido encontrado
+    const activeRole = userActiveRoles[0].role;
 
     // 6. Validar si debe cambiar su contraseña
     const mustChangePassword = !!user.mustChangePassword;
@@ -78,11 +132,14 @@ export class AuthService {
     expirationDate.setDate(expirationDate.getDate() + 90);
     const passwordExpired = now > expirationDate;
 
-    // 8. Generar token JWT
+    // 8. Generar token JWT con tenantId basado en el contrato
+    // El tenantId debe ser el userId del propietario del contrato
+    let tenantId = userActiveRoles[0].contract?.user?.id || user.id;
+
     const payload = { 
       sub: user.id, 
       email: user.strUserName,
-      tenantId: user.id // Usar el ID del usuario como tenantId
+      tenantId: tenantId
     };
     const token = this.jwtService.sign(payload);
     
@@ -94,7 +151,7 @@ export class AuthService {
       null,
       { 
         application: applicationName,
-        role: user.rol.strName,
+        role: activeRole.strName,
         userStatus: user.strStatus,
         mustChangePassword,
         passwordExpired
@@ -115,8 +172,8 @@ export class AuthService {
         'https://ui-avatars.com/api/?name=' +
         encodeURIComponent(user.strUserName),
       name: user.strUserName,
-      rol: user.rol.strName,
-      rolDescription: user.rol.strDescription1 || '',
+      rol: activeRole.strName,
+      rolDescription: activeRole.strDescription1 || '',
       mustChangePassword,
       passwordExpired,
     };
@@ -133,6 +190,101 @@ export class AuthService {
     if (user.basicData?.strPersonType === 'J') {
       userWithoutSensitiveData.businessName =
         user.basicData?.legalEntityData?.businessName || '';
+    }
+
+    return {
+      access_token: token,
+      user: userWithoutSensitiveData,
+    };
+  }
+
+  async completeLoginWithContract(
+    email: string,
+    applicationName: string,
+    contractId: string,
+  ): Promise<{
+    access_token: string;
+    user: AuthenticatedUser & {
+      mustChangePassword?: boolean;
+      passwordExpired?: boolean;
+    };
+  }> {
+    // Buscar el usuario
+    const user = await this.usersService.findEntityByEmail(email);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Obtener los roles válidos para esta aplicación
+    const validRoles = await this.applicationsService.findRolesByApplicationName(applicationName);
+
+    // Buscar el rol activo para el contrato seleccionado
+    const userRoleForContract = user.userRoles?.find(ur => 
+      ur.status === 'ACTIVE' && 
+      ur.contractId === contractId &&
+      validRoles.includes(ur.role?.strName)
+    );
+
+    if (!userRoleForContract) {
+      throw new UnauthorizedException('No valid role found for selected contract');
+    }
+
+    const activeRole = userRoleForContract.role;
+
+    // Validar cambio de contraseña
+    const mustChangePassword = !!user.mustChangePassword;
+    const now = new Date();
+    const expirationDate = new Date(user.lastPasswordChange || now);
+    expirationDate.setDate(expirationDate.getDate() + 90);
+    const passwordExpired = now > expirationDate;
+
+    // Generar token con tenantId basado en el propietario del contrato seleccionado
+    let tenantId = userRoleForContract.contract?.user?.id || user.id;
+
+    const payload = { 
+      sub: user.id, 
+      email: user.strUserName,
+      tenantId: tenantId,
+      contractId: contractId
+    };
+    const token = this.jwtService.sign(payload);
+
+    // Log login exitoso
+    await this.logsService.info(
+      LogAction.LOGIN,
+      `User logged in with contract: ${user.strUserName}`,
+      user.id,
+      null,
+      { 
+        application: applicationName,
+        role: activeRole.strName,
+        contractId: contractId,
+        userStatus: user.strStatus
+      }
+    );
+
+    // Construir usuario
+    const userWithoutSensitiveData: AuthenticatedUser & {
+      mustChangePassword?: boolean;
+      passwordExpired?: boolean;
+    } = {
+      id: user.id,
+      email: user.strUserName,
+      image: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.strUserName),
+      name: user.strUserName,
+      rol: activeRole.strName,
+      rolDescription: activeRole.strDescription1 || '',
+      mustChangePassword,
+      passwordExpired,
+    };
+
+    if (user.basicData?.strPersonType === 'N') {
+      userWithoutSensitiveData.firstName = user.basicData?.naturalPersonData?.firstName || '';
+      userWithoutSensitiveData.secondName = user.basicData?.naturalPersonData?.secondName || '';
+    }
+
+    if (user.basicData?.strPersonType === 'J') {
+      userWithoutSensitiveData.businessName = user.basicData?.legalEntityData?.businessName || '';
     }
 
     return {

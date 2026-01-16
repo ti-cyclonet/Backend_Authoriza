@@ -4,6 +4,12 @@ import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
 import { DocumentType } from 'src/document-types/entities/document-type.entity';
 import { Rol } from 'src/roles/entities/rol.entity';
+import { UserRole } from 'src/user-roles/entities/user-role.entity';
+import { Package } from 'src/package/entities/package.entity';
+import { ConfigurationPackage } from 'src/configuration-package/entities/configuration-package.entity';
+import { Contract } from 'src/contract/entities/contract.entity';
+import { ContractStatus } from 'src/contract/enums/contract-status.enum';
+import { PaymentMode } from 'src/contract/enums/payment-mode.enum';
 import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
 import { EntityCode } from 'src/entity-codes/entities/entity-code.entity';
 import * as bcrypt from 'bcrypt';
@@ -45,7 +51,6 @@ export default class UserSeed {
     // ========== 1️⃣ CREAR USUARIO ==========
     let user = await userRepo.findOne({
       where: { strUserName: 'ti.cyclonet@hotmail.com' },
-      relations: ['rol'],
     });
 
     if (!user) {
@@ -123,21 +128,108 @@ export default class UserSeed {
       console.log('⚠️ LegalEntityData ya existe con ID:', legal.id);
     }
 
-    // ========== 4️⃣ ASIGNAR ROL ==========
+    // ========== 4️⃣ CREAR PAQUETE CYCLON PLUS [+] ==========
+    const packageRepo = dataSource.getRepository(Package);
+    let cycloPackage = await packageRepo.findOne({
+      where: { name: 'Cyclon Plus [+]' }
+    });
+
+    if (!cycloPackage) {
+      const packageCode = await entityCodeService.generateCode('Package');
+      cycloPackage = packageRepo.create({
+        name: 'Cyclon Plus [+]',
+        description: 'Paquete básico que incluye una cuenta de administrador para las aplicaciones Authoriza, FactoNet e InOut',
+        code: packageCode
+      });
+      await packageRepo.save(cycloPackage);
+      console.log('✅ Paquete Cyclon Plus [+] creado:', cycloPackage.id);
+    } else {
+      console.log('⚠️ Paquete Cyclon Plus [+] ya existe con ID:', cycloPackage.id);
+    }
+
+    // ========== 5️⃣ CREAR CONFIGURACIONES DEL PAQUETE ==========
+    const configPackageRepo = dataSource.getRepository(ConfigurationPackage);
+    const roleNames = ['adminAuthoriza', 'adminFactonet', 'adminInout'];
+
+    for (const roleName of roleNames) {
+      const role = await roleRepo.findOne({ where: { strName: roleName } });
+      
+      if (role) {
+        const existingConfig = await configPackageRepo.findOne({
+          where: { package: { id: cycloPackage.id }, rol: { id: role.id } }
+        });
+
+        if (!existingConfig) {
+          const config = configPackageRepo.create({
+            package: cycloPackage,
+            rol: role,
+            price: 0,
+            totalAccount: 1
+          });
+          await configPackageRepo.save(config);
+          console.log(`✅ Configuración creada para rol ${roleName}`);
+        }
+      } else {
+        console.log(`❌ Rol ${roleName} no encontrado`);
+      }
+    }
+
+    // ========== 6️⃣ CREAR CONTRATO ==========
+    const contractRepo = dataSource.getRepository(Contract);
+    const existingContract = await contractRepo.findOne({
+      where: { user: { id: user.id }, package: { id: cycloPackage.id } }
+    });
+
+    if (!existingContract) {
+      const contractCode = await entityCodeService.generateCode('Contract');
+      const contract = contractRepo.create({
+        code: contractCode,
+        user: user,
+        package: cycloPackage,
+        value: 0,
+        mode: PaymentMode.MONTHLY,
+        payday: 1,
+        startDate: new Date(),
+        status: ContractStatus.ACTIVE
+      });
+      await contractRepo.save(contract);
+      console.log('✅ Contrato creado:', contract.id);
+    } else {
+      console.log('⚠️ Contrato ya existe');
+    }
+
+    // ========== 7️⃣ ASIGNAR ROL USANDO USERROLE ==========
     const role = await roleRepo.findOne({
       where: { strName: 'adminAuthoriza' },
     });
 
     if (role) {
-      if (!user.rol || user.rol.id !== role.id) {
-        user.rol = role;
-        await userRepo.save(user);
-        console.log('✅ Rol asignado al usuario');
+      // Obtener el contrato creado
+      const contractRepo = dataSource.getRepository(Contract);
+      const contract = await contractRepo.findOne({
+        where: { user: { id: user.id }, package: { id: cycloPackage.id } }
+      });
+
+      // Crear UserRole en lugar de asignación directa
+      const userRoleRepo = dataSource.getRepository(UserRole);
+      const existingUserRole = await userRoleRepo.findOne({
+        where: { userId: user.id, roleId: role.id }
+      });
+
+      if (!existingUserRole) {
+        const userRole = userRoleRepo.create({
+          userId: user.id,
+          roleId: role.id,
+          contractId: contract?.id || null,
+          status: 'ACTIVE'
+        });
+        await userRoleRepo.save(userRole);
+        console.log('✅ Rol adminAuthoriza asignado al usuario principal con contractId:', contract?.id);
       } else {
         console.log('⚠️ Rol ya asignado al usuario');
       }
     } else {
-      console.log('❌ Rol ADMIN no encontrado en la base de datos');
+      console.log('❌ Rol adminAuthoriza no encontrado en la base de datos');
     }
   }
 }

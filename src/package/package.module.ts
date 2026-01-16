@@ -8,10 +8,11 @@ import { ConfigurationPackage } from 'src/configuration-package/entities/configu
 import { ImageModule } from 'src/images/image.module';
 import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
 import { Contract } from 'src/contract/entities/contract.entity';
+import { User } from 'src/users/entities/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Package, ConfigurationPackage, Image, Contract]),
+    TypeOrmModule.forFeature([Package, ConfigurationPackage, Image, Contract, User]),
     ImageModule,
     EntityCodesModule
   ],

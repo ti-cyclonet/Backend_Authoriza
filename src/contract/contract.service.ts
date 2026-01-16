@@ -150,7 +150,11 @@ export class ContractService {
             legalEntityData: true,
           },
         },
-        package: true,
+        package: {
+          configurations: {
+            rol: true,
+          },
+        },
       },
     });
   }
@@ -238,13 +242,9 @@ export class ContractService {
       throw new BadRequestException('Contract is already active');
     }
     
-    // Validar que tenga usuarios dependientes
-    const dependentUsers = await this.userRepository.count({
-      where: { 
-        dependentOnId: contract.user.id,
-        deletedAt: IsNull()
-      }
-    });
+    // Validar que tenga usuarios dependientes usando UserDependency
+    // TODO: Implementar con UserDependency service
+    const dependentUsers = 0;
     
     if (dependentUsers === 0) {
       throw new BadRequestException('No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.');
@@ -265,32 +265,24 @@ export class ContractService {
       { strStatus: 'ACTIVE' }
     );
     
-    // Activar usuarios dependientes
-    await this.userRepository.update(
-      { 
-        dependentOnId: contract.user.id,
-        deletedAt: IsNull()
-      },
-      { strStatus: 'ACTIVE' }
-    );
+    // Activar usuarios dependientes usando UserDependency
+    // TODO: Implementar con UserDependency service
     
     return savedContract;
   }
 
   async updateStatus(id: string, status: string): Promise<Contract> {
-    console.log(`Updating contract ${id} to status ${status}`);
     const contract = await this.findOne(id);
-    console.log(`Current status: ${contract.status}`);
     
     // Validar regla de negocio para estado ACTIVE
     if (status === ContractStatus.ACTIVE) {
-      const dependentUsers = await this.userRepository.count({
-        where: { 
-          dependentOnId: contract.user.id,
-          deletedAt: IsNull()
-        }
-      });
-      console.log(`Dependent users count: ${dependentUsers}`);
+      // Contar usuarios dependientes activos del usuario principal
+      const dependentUsers = await this.userRepository
+        .createQueryBuilder('user')
+        .innerJoin('user.principals', 'dependency')
+        .where('dependency.principalUserId = :principalId', { principalId: contract.user.id })
+        .andWhere('dependency.status = :status', { status: 'ACTIVE' })
+        .getCount();
       
       if (dependentUsers === 0) {
         throw new BadRequestException('No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.');
@@ -303,9 +295,7 @@ export class ContractService {
     }
     
     contract.status = status as ContractStatus;
-    console.log(`About to save with status: ${contract.status}`);
     const savedContract = await this.contractRepository.save(contract);
-    console.log(`Saved contract status: ${savedContract.status}`);
     
     // Si se activó el contrato, activar usuarios
     if (status === ContractStatus.ACTIVE) {
@@ -316,17 +306,14 @@ export class ContractService {
       );
       
       // Activar usuarios dependientes
-      await this.userRepository.update(
-        { 
-          dependentOnId: contract.user.id,
-          deletedAt: IsNull()
-        },
-        { strStatus: 'ACTIVE' }
-      );
+      await this.userRepository
+        .createQueryBuilder()
+        .update(User)
+        .set({ strStatus: 'ACTIVE' })
+        .where('id IN (SELECT "dependentUserId" FROM user_dependencies WHERE "principalUserId" = :principalId AND status = :status)', 
+          { principalId: contract.user.id, status: 'ACTIVE' })
+        .execute();
       
-      console.log(`Activated main user ${contract.user.id} and dependent users`);
-      
-      // Registrar log de activación
       await this.logsService.info(
         LogAction.CONTRACT_ACTIVATED,
         `Contract ${contract.code} activated successfully`,
@@ -349,17 +336,14 @@ export class ContractService {
       );
       
       // Desactivar usuarios dependientes
-      await this.userRepository.update(
-        { 
-          dependentOnId: contract.user.id,
-          deletedAt: IsNull()
-        },
-        { strStatus: 'INACTIVE' }
-      );
+      await this.userRepository
+        .createQueryBuilder()
+        .update(User)
+        .set({ strStatus: 'INACTIVE' })
+        .where('id IN (SELECT "dependentUserId" FROM user_dependencies WHERE "principalUserId" = :principalId AND status = :status)', 
+          { principalId: contract.user.id, status: 'ACTIVE' })
+        .execute();
       
-      console.log(`Deactivated main user ${contract.user.id} and dependent users`);
-      
-      // Registrar log de desactivación
       await this.logsService.info(
         LogAction.CONTRACT_DEACTIVATED,
         `Contract ${contract.code} status changed to ${status}`,

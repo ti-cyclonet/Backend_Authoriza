@@ -163,14 +163,10 @@ export class UsersService {
         'user.dtmLatestUpdateDate',
         'user.deletedAt'
       ])
-      .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
-      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
-      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData');
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData');
 
     if (!withDeleted) {
       qb.where('user.deletedAt IS NULL');
@@ -192,24 +188,14 @@ export class UsersService {
     userId: string,
     withDeleted: boolean | string = false,
   ): Promise<UserResponseDto[]> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['dependentOn'],
-    });
-
-    if (!user) throw new NotFoundException(`User with id ${userId} not found`);
-
+    // Esta funcionalidad necesita ser reimplementada con UserDependency
     const qb = this.userRepository
       .createQueryBuilder('user')
       .withDeleted()
-      .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
-      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
       .where('1=1');
 
     const shouldIncludeDeleted =
@@ -217,12 +203,6 @@ export class UsersService {
 
     if (!shouldIncludeDeleted) {
       qb.andWhere('user.deletedAt IS NULL');
-    }
-
-    if (user.dependentOn) {
-      qb.andWhere('user.id != :excludedId', {
-        excludedId: user.dependentOn.id,
-      });
     }
 
     const users = await qb.getMany();
@@ -235,15 +215,12 @@ export class UsersService {
   async findAllWithoutDependency(withDeleted: boolean): Promise<User[]> {
     const qb = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
-      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
-      .where('user.dependentOnId IS NULL');
+      .leftJoin('user.dependents', 'userDependency')
+      .where('userDependency.id IS NULL');
 
     // manejar eliminados
     if (withDeleted) {
@@ -266,16 +243,12 @@ export class UsersService {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: [
-        'rol',
         'basicData',
         'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
-        'dependentOn',
-        'dependentOn.rol',
-        'dependentOn.basicData',
       ],
-      withDeleted: true, // 👈 necesario si usas soft delete y quieres incluir eliminados
+      withDeleted: true,
     });
 
     if (!user) {
@@ -292,18 +265,8 @@ export class UsersService {
   }
 
   async assignRole(userId: string, roleId: string) {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['basicData'],
-    });
-    if (!user) throw new NotFoundException('User not found');
-    
-    const role = await this.rolRepository.findOne({ where: { id: roleId } });
-    if (!role) throw new NotFoundException('Role not found');
-    
-    user.rol = role;
-    user.dtmLatestUpdateDate = new Date();
-    return this.userRepository.save(user);
+    // Esta funcionalidad ahora se maneja a través de UserRole
+    throw new Error('Use UserRole service to assign roles');
   }
 
   async findByEmail(email: string): Promise<UserResponseDto | null> {
@@ -311,14 +274,12 @@ export class UsersService {
       where: { strUserName: email },
       withDeleted: true,
       relations: [
-        'rol',
         'basicData',
         'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
-        'dependentOn',
-        'dependentOn.rol',
-        'dependentOn.basicData',
+        'userRoles',
+        'userRoles.role',
       ],
     });
     if (!user) return null;
@@ -332,14 +293,20 @@ export class UsersService {
       where: { strUserName: email },
       withDeleted: true,
       relations: [
-        'rol',
         'basicData',
         'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
-        'dependentOn',
-        'dependentOn.rol',
-        'dependentOn.basicData',
+        'principals',
+        'dependents',
+        'userRoles',
+        'userRoles.role',
+        'userRoles.contract',
+        'userRoles.contract.user',
+        'userRoles.contract.user.basicData',
+        'userRoles.contract.user.basicData.naturalPersonData',
+        'userRoles.contract.user.basicData.legalEntityData',
+        'userRoles.contract.package',
       ],
     });
   }
@@ -362,11 +329,8 @@ export class UsersService {
     if (dto.strStatus) user.strStatus = dto.strStatus;
 
     if (dto.rolId) {
-      const rol = await this.rolRepository.findOne({
-        where: { id: dto.rolId },
-      });
-      if (!rol) throw new NotFoundException('Role not found');
-      user.rol = rol;
+      // Los roles ahora se manejan a través de UserRole
+      console.log('Warning: rolId ignored, use UserRole service instead');
     }
 
     if (dto.basicDataId) {
@@ -407,13 +371,8 @@ export class UsersService {
     }
 
     if (dto.dependentOnId) {
-      const dependentUser = await this.userRepository.findOne({
-        where: { id: dto.dependentOnId },
-        relations: ['basicData'],
-      });
-      if (!dependentUser) throw new NotFoundException('Dependent user not found');
-      user.dependentOn = dependentUser;
-      user.dependentOnId = dto.dependentOnId;
+      // Las dependencias ahora se manejan a través de UserDependency
+      console.log('Warning: dependentOnId ignored, use UserDependency service instead');
     }
 
     user.dtmLatestUpdateDate = new Date();
@@ -432,8 +391,7 @@ export class UsersService {
       dtmCreateDate: user.dtmCreateDate,
       dtmLatestUpdateDate: new Date(), // Forzar nueva fecha
       deletedAt: user.deletedAt,
-      dependentOnId: user.dependentOnId, // Incluir dependentOnId
-      rolId: user.rol?.id // Usar solo el ID del rol
+      // dependentOnId y rolId removidos - ahora se manejan con UserDependency y UserRole
     };
     
     console.log('UserToSave:', JSON.stringify(userToSave, null, 2));
@@ -493,52 +451,30 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['dependents'],
     });
 
     if (!user) {
       throw new NotFoundException(`User with ID '${userId}' not found`);
     }
 
-    // Actualizar estado del usuario padre
+    // Actualizar estado del usuario
     user.strStatus = newStatus;
     user.dtmLatestUpdateDate = new Date();
     await this.userRepository.save(user);
 
-    // Actualizar estado de todos los hijos que dependan de este usuario
-    await this.userRepository.update(
-      { dependentOnId: userId },
-      {
-        strStatus: newStatus,
-        dtmLatestUpdateDate: new Date(),
-      },
-    );
+    // TODO: Actualizar dependientes usando UserDependency service
 
     return user;
   }
 
   async removeRole(userId: string): Promise<User> {
-    const user = await this.findOne(userId);
-    user.rol = null;
-    user.dtmLatestUpdateDate = new Date();
-    return this.userRepository.save(user);
+    // Esta funcionalidad ahora se maneja a través de UserRole
+    throw new Error('Use UserRole service to remove roles');
   }
 
   async removeDependency(userId: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      withDeleted: true,
-      relations: ['dependentOn'],
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with ID '${userId}' not found`);
-    }
-
-    user.dependentOn = null;
-    user.dtmLatestUpdateDate = new Date();
-
-    return this.userRepository.save(user);
+    // Esta funcionalidad ahora se maneja a través de UserDependency
+    throw new Error('Use UserDependency service to remove dependencies');
   }
 
   async remove(id: string, force = false): Promise<{ message: string }> {
@@ -548,10 +484,9 @@ export class UsersService {
       throw new NotFoundException(`User with ID '${id}' not found`);
     }
 
-    // Verificar si tiene dependientes
-    const dependents = await this.userRepository.find({
-      where: { dependentOn: { id } },
-    });
+    // Verificar si tiene dependientes usando UserDependency
+    // TODO: Implementar verificación con UserDependency service
+    const dependents: any[] = [];
 
     if (dependents.length > 0 && !force) {
       throw new ConflictException(
@@ -561,6 +496,8 @@ export class UsersService {
 
     if (dependents.length > 0 && force) {
       for (const dep of dependents) {
+        dep.strStatus = 'DELETED';
+        await this.userRepository.save(dep);
         await this.userRepository.softDelete(dep.id);
         // Log eliminación de dependiente
         await this.logsService.info(
@@ -573,6 +510,9 @@ export class UsersService {
       }
     }
 
+    // Cambiar estado a DELETED antes de soft delete
+    user.strStatus = 'DELETED';
+    await this.userRepository.save(user);
     await this.userRepository.softDelete(id);
     
     // Log eliminación de usuario principal
@@ -603,10 +543,7 @@ export class UsersService {
   }
 
   async restoreDependents(userId: string): Promise<void> {
-    await this.userRepository
-      .createQueryBuilder()
-      .restore()
-      .where('dependentOnId = :userId', { userId })
-      .execute();
+    // Esta funcionalidad necesita ser reimplementada con UserDependency
+    console.log('TODO: Implement with UserDependency service');
   }
 }

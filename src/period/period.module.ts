@@ -7,10 +7,11 @@ import { PeriodController } from './period.controller';
 import { PeriodValidationService } from './period-validation.service';
 import { PeriodInitializationService } from './period-initialization.service';
 import { GlobalParametersPeriodsModule } from '../global-parameters-periods/global-parameters-periods.module';
+import { GlobalParametersModule } from '../global-parameters/global-parameters.module';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Period]), GlobalParametersPeriodsModule, EntityCodesModule, ConfigModule],
+  imports: [TypeOrmModule.forFeature([Period]), GlobalParametersPeriodsModule, GlobalParametersModule, EntityCodesModule, ConfigModule],
   controllers: [PeriodController],
   providers: [PeriodService, PeriodValidationService, PeriodInitializationService],
   exports: [PeriodService, PeriodValidationService],

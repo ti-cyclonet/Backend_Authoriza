@@ -22,7 +22,7 @@ export class InvoicesService {
 
   async findAll(): Promise<Invoice[]> {
     return await this.invoiceRepository.find({
-      relations: ['user', 'contract'],
+      relations: ['user', 'user.basicData', 'user.basicData.legalEntityData', 'contract'],
       order: { createdAt: 'DESC' }
     });
   }

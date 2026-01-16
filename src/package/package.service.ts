@@ -12,6 +12,7 @@ import { ImageService } from 'src/images/image.service';
 import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
 import { Contract } from 'src/contract/entities/contract.entity';
 import { ContractStatus } from 'src/contract/enums/contract-status.enum';
+import { User } from 'src/users/entities/user.entity';
 import { v2 as cloudinary } from 'cloudinary';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -29,6 +30,8 @@ export class PackageService {
     private readonly imageRepository: Repository<Image>,
     @InjectRepository(Contract)
     private readonly contractRepository: Repository<Contract>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async create(dto: CreatePackageDto, files: Express.Multer.File[]) {
@@ -181,6 +184,31 @@ export class PackageService {
 
     await this.packageRepository.remove(pkg);
     return { message: 'Package deleted successfully' };
+  }
+
+  async findContractedByUser(userId: string) {
+    const contracts = await this.contractRepository.find({
+      where: { 
+        user: { id: userId }
+      },
+      relations: ['package', 'package.configurations', 'package.configurations.rol']
+    });
+
+    // Eliminar duplicados usando un Map
+    const uniquePackages = new Map();
+    
+    contracts.forEach(contract => {
+      if (contract.package && !uniquePackages.has(contract.package.id)) {
+        uniquePackages.set(contract.package.id, {
+          ...contract.package,
+          contractDate: contract.createdAt,
+          expirationDate: contract.endDate,
+          roles: contract.package.configurations?.map(config => config.rol) || []
+        });
+      }
+    });
+
+    return Array.from(uniquePackages.values());
   }
 
   async checkNameExists(name: string): Promise<boolean> {
