@@ -37,6 +37,13 @@ export class CustomerParametersPeriodsService {
     });
   }
 
+  findByPeriod(periodId: string) {
+    return this.repo.find({
+      where: { period: { id: periodId } },
+      relations: ['customerParameter'],
+    });
+  }
+
   async update(id: string, dto: UpdateCustomerParametersPeriodDto) {
     const entity = await this.repo.preload({ id, ...dto });
     if (!entity) throw new Error('CustomerParametersPeriod not found');

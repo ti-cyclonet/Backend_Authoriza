@@ -70,6 +70,9 @@ export class Contract {
   @Column({ type: 'text', nullable: true })
   pdfUrl?: string;
 
+  @Column({ type: 'varchar', length: 3, nullable: true })
+  codePrefix?: string;
+
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 

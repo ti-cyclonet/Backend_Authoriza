@@ -4,7 +4,12 @@ export class AddEntityCodes1756829474480 implements MigrationInterface {
     name = 'AddEntityCodes1756829474480'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        // Create entity_codes table
+        const hasTable = await queryRunner.hasTable('entity_codes');
+        if (hasTable) {
+            console.log('entity_codes table already exists, skipping migration');
+            return;
+        }
+        
         await queryRunner.query(`
             CREATE TABLE "entity_codes" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),

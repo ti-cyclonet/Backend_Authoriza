@@ -94,16 +94,9 @@ export class AuthService {
       }
     });
 
-    console.log('🔍 Total de roles activos:', userActiveRoles.length);
-    console.log('📋 Contratos únicos detectados:', uniqueContracts.size);
-    console.log('📦 Contratos:', Array.from(uniqueContracts.values()));
-
     // Si hay múltiples contratos, retornarlos
     if (uniqueContracts.size > 1) {
       const contracts = Array.from(uniqueContracts.values());
-      
-      console.log('✅ Retornando múltiples contratos al frontend');
-      
       return {
         access_token: '',
         user: {
@@ -117,8 +110,6 @@ export class AuthService {
         contracts
       };
     }
-
-    console.log('ℹ️ Un solo contrato, continuando con login normal');
 
     // Usar el primer rol válido encontrado
     const activeRole = userActiveRoles[0].role;

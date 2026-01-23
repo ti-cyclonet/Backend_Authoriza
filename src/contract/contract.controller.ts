@@ -43,6 +43,11 @@ export class ContractController {
     return this.contractService.findByUser(userId);
   }
 
+  @Get('tenant/:tenantId')
+  findByTenant(@Param('tenantId') tenantId: string) {
+    return this.contractService.findByTenant(tenantId);
+  }
+
   @Get('package/:packageId')
   findByPackage(@Param('packageId') packageId: string) {
     return this.contractService.findByPackage(packageId);

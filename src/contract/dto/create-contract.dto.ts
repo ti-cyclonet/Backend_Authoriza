@@ -37,6 +37,10 @@ export class CreateContractDto {
   endDate?: string;
 
   @IsOptional()
+  @IsString()
+  codePrefix?: string;
+
+  @IsOptional()
   @IsEnum(ContractStatus)
   status?: ContractStatus;
 }

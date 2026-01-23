@@ -3,6 +3,12 @@ import { MigrationInterface, QueryRunner } from "typeorm";
 export class Migrations1756829474479 implements MigrationInterface {
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+    const hasMenuoption = await queryRunner.hasTable('menuoption');
+    if (hasMenuoption) {
+      console.log('Tables already exist, skipping migration');
+      return;
+    }
+    
     await queryRunner.query(`
             -- Applications
             CREATE TABLE applications (

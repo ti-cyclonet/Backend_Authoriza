@@ -95,6 +95,12 @@ export class PeriodController {
     return this.periodService.getActivePeriod();
   }
 
+  @Get('active/tenant/:tenantId')
+  async getActivePeriodByTenant(@Param('tenantId') tenantId: string) {
+    const actualTenantId = tenantId === 'null' ? null : tenantId;
+    return this.periodService.getActivePeriodByTenant(actualTenantId);
+  }
+
   @Get('validation/check-active')
   async checkActivePeriodValidity() {
     const hasValid = await this.periodService.hasValidActivePeriod();

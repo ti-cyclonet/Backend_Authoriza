@@ -2,43 +2,41 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CustomerParameter } from './entities/customer-parameter.entity';
-import { CreateCustomerParametersDto } from './dto/create-customer-parameters.dto';
-import { UpdateCustomerParametersDto } from './dto/update-customer-parameters.dto';
+import { CreateCustomerParameterDto, UpdateCustomerParameterDto } from './dto/customer-parameter.dto';
 
 @Injectable()
 export class CustomerParametersService {
   constructor(
     @InjectRepository(CustomerParameter)
-    private readonly repository: Repository<CustomerParameter>,
+    private customerParameterRepository: Repository<CustomerParameter>,
   ) {}
 
-  create(dto: CreateCustomerParametersDto) {
-    const entity = this.repository.create(dto);
-    return this.repository.save(entity);
+  async createParameter(createDto: CreateCustomerParameterDto, tenantId: string): Promise<CustomerParameter> {
+    const parameter = this.customerParameterRepository.create({ ...createDto, tenantId });
+    return await this.customerParameterRepository.save(parameter);
   }
 
-  findAll() {
-    return this.repository.find();
-  }
-
-  async findOne(id: string) {
-    const entity = await this.repository.findOne({ where: { id } });
-    if (!entity)
-      throw new NotFoundException(`CustomerParameter ${id} not found`);
-    return entity;
-  }
-
-  async update(id: string, dto: UpdateCustomerParametersDto) {
-    const entity = await this.repository.preload({
-      id,
-      ...dto,
+  async findAll(tenantId: string | null): Promise<CustomerParameter[]> {
+    const where = tenantId ? { tenantId } : {};
+    return await this.customerParameterRepository.find({
+      where,
+      order: { createdAt: 'DESC' }
     });
-    if (!entity) throw new NotFoundException('CustomerParameter not found');
-    return this.repository.save(entity);
   }
 
-  async remove(id: string) {
-    const entity = await this.findOne(id);
-    return this.repository.remove(entity);
+  async updateParameter(id: string, updateDto: UpdateCustomerParameterDto): Promise<CustomerParameter> {
+    await this.customerParameterRepository.update(id, updateDto);
+    const parameter = await this.customerParameterRepository.findOne({ where: { id } });
+    if (!parameter) {
+      throw new NotFoundException(`Parameter with ID ${id} not found`);
+    }
+    return parameter;
+  }
+
+  async deleteParameter(id: string): Promise<void> {
+    const result = await this.customerParameterRepository.delete(id);
+    if (result.affected === 0) {
+      throw new NotFoundException(`Parameter with ID ${id} not found`);
+    }
   }
 }

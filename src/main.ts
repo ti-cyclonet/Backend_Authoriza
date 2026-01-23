@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import GlobalParametersSeed from './seeds/global-parameters.seed';
 import InitialApplicationsSeed from './seeds/initial-applications.seed';
 import UserSeed from './seeds/user.seed';
+import { seedCustomerParameters } from './seeds/customer-parameters.seed';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

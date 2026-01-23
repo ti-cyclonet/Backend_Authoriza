@@ -17,6 +17,7 @@ import { Menuoption } from 'src/menuoptions/entities/menuoption.entity';
 import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
+import { PeriodService } from 'src/period/period.service';
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger('ApplicationsService');
@@ -37,6 +38,7 @@ export class ApplicationsService {
 
     private readonly cloudinaryService: CloudinaryService,
     private readonly entityCodeService: EntityCodeService,
+    private readonly periodService: PeriodService,
   ) {}
 
   async create(
@@ -316,7 +318,7 @@ export class ApplicationsService {
     };
   }
 
-  async findByApplicationAndRol(applicationName: string, rolName: string) {
+  async findByApplicationAndRol(applicationName: string, rolName: string, tenantId?: string) {
     const application = await this.applicationRepository.findOne({
       where: { strName: ILike(applicationName) },
       relations: { strRoles: true },
@@ -376,9 +378,20 @@ export class ApplicationsService {
       },
     ];
 
+    // Obtener periodo activo según la aplicación
+    let activePeriod = null;
+    if (applicationName.toLowerCase() === 'factonet') {
+      // Para FactoNet: buscar periodo activo con tenantId null (global)
+      activePeriod = await this.periodService.getActivePeriodByTenant(null);
+    } else if (tenantId) {
+      // Para otras aplicaciones: buscar por tenantId específico
+      activePeriod = await this.periodService.getActivePeriodByTenant(tenantId);
+    }
+
     return {
       ...application,
       strRoles: rolesWithMenuOptions,
+      activePeriod,
     };
   }
 

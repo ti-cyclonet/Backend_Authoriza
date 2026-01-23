@@ -65,9 +65,10 @@ export class ApplicationsController {
   async findByApplicationAndRol(
     @Param('appName') appName: string,
     @Param('rolName') rolName: string,
+    @Query('tenantId') tenantId?: string,
   ) {
     if (rolName) {
-      return this.applicationsService.findByApplicationAndRol(appName, rolName);
+      return this.applicationsService.findByApplicationAndRol(appName, rolName, tenantId);
     }
     return this.applicationsService.findRolesByApplicationName(appName);
   }

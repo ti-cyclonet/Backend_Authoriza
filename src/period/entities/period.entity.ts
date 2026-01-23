@@ -32,6 +32,9 @@ export class Period {
   @Column({ nullable: true })
   parentPeriodId: string;
 
+  @Column({ name: 'tenant_id', nullable: true })
+  tenantId: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

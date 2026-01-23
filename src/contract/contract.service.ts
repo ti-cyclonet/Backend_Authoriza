@@ -159,6 +159,15 @@ export class ContractService {
     });
   }
 
+  async findByTenant(tenantId: string) {
+    const contract = await this.contractRepository.findOne({ 
+      where: { user: { id: tenantId } },
+      relations: ['user', 'package'],
+    });
+    if (!contract) throw new NotFoundException('Contract not found for tenant');
+    return contract;
+  }
+
   async findByPackage(packageId: string) {
     return this.contractRepository.find({
       where: { package: { id: packageId } },

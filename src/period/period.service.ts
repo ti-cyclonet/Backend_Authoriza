@@ -32,7 +32,8 @@ export class PeriodService {
       startDate: new Date(dto.startDate),
       endDate: new Date(dto.endDate),
       status: 'INACTIVE',
-      parentPeriodId: dto.parentPeriodId
+      parentPeriodId: dto.parentPeriodId,
+      tenantId: dto.tenantId || null
     });
     return this.periodRepository.save(subperiod);
   }
@@ -214,9 +215,14 @@ export class PeriodService {
       }
     }
     
-    // Desactivar todos los períodos activos del mismo nivel
+    // Desactivar períodos activos del mismo tenantId solamente
     if (!period.parentPeriodId) {
-      await this.periodRepository.update({}, { status: 'INACTIVE' });
+      // Para períodos principales, desactivar otros períodos del mismo tenant
+      const whereCondition = period.tenantId === null 
+        ? { tenantId: null, status: 'ACTIVE' as const }
+        : { tenantId: period.tenantId, status: 'ACTIVE' as const };
+      
+      await this.periodRepository.update(whereCondition, { status: 'INACTIVE' });
     } else {
       // Para subperíodos, desactivar solo otros subperíodos del mismo período padre
       await this.periodRepository.update(
@@ -236,6 +242,20 @@ export class PeriodService {
    */
   async getActivePeriod(): Promise<Period | null> {
     return this.periodValidationService.getActivePeriod();
+  }
+
+  /**
+   * Obtiene el periodo activo por tenantId
+   */
+  async getActivePeriodByTenant(tenantId: string | null): Promise<Period | null> {
+    const whereCondition = tenantId === null 
+      ? { status: 'ACTIVE' as const, tenantId: null }
+      : { status: 'ACTIVE' as const, tenantId: tenantId };
+      
+    const period = await this.periodRepository.findOne({
+      where: whereCondition
+    });
+    return period;
   }
 
   /**

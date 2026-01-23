@@ -11,6 +11,7 @@ import { MenuoptionsModule } from 'src/menuoptions/menuoptions.module';
 import { RolesModule } from 'src/roles/roles.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
 import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
+import { PeriodModule } from 'src/period/period.module';
 @Module({
   controllers: [ApplicationsController],
   providers: [ApplicationsService],
@@ -19,7 +20,8 @@ import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
     MenuoptionsModule,
     RolesModule,
     CloudinaryModule,
-    EntityCodesModule
+    EntityCodesModule,
+    PeriodModule
   ],
   exports: [ApplicationsService],
 })

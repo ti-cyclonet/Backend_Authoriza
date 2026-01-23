@@ -23,6 +23,9 @@ import { EntityCodesModule } from './entity-codes/entity-codes.module';
 import { SweepModule } from './sweep/sweep.module';
 import { InvoicesModule } from './invoices/invoices.module';
 
+import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
+import { CustomerParametersPeriodsModule } from './customer-parameters-periods/customer-parameters-periods.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -62,6 +65,8 @@ import { InvoicesModule } from './invoices/invoices.module';
     GlobalParametersPeriodsModule,
     InvoicesModule,
     SweepModule,
+    CustomerParametersModule,
+    CustomerParametersPeriodsModule,
   ],
 })
 export class AppModule {}

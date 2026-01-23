@@ -94,7 +94,7 @@ export default class InitialApplicationsSeed {
       // InOut
       {
         strName: 'Inout',
-        strDescription: 'Inventory and Manufacturing Management',
+        strDescription: 'Gestión de Inventario y Manufactura',
         strUrlImage:
           'https://res.cloudinary.com/dn8ki4idz/image/upload/v1755134161/logos-applications/rejxz5x2vlaqkycvwn23.png',
         strSlug: 'inout app',
@@ -131,22 +131,22 @@ export default class InitialApplicationsSeed {
                 strType: 'main_menu',
                 ingOrder: 3,
               },
-              {
-                strName: 'movementsInout',
-                strDescription: 'Movements',
-                strUrl: '/movements',
-                strIcon: 'arrow-left-right',
-                strType: 'main_menu',
-                ingOrder: 4,
-              },
-              {
-                strName: 'inventoryReportsInout',
-                strDescription: 'Inventory Reports',
-                strUrl: '/reports-inventory',
-                strIcon: 'file-earmark-bar-graph',
-                strType: 'main_menu',
-                ingOrder: 5,
-              },
+              // {
+              //   strName: 'movementsInout',
+              //   strDescription: 'Movements',
+              //   strUrl: '/movements',
+              //   strIcon: 'arrow-left-right',
+              //   strType: 'main_menu',
+              //   ingOrder: 4,
+              // },
+              // {
+              //   strName: 'inventoryReportsInout',
+              //   strDescription: 'Inventory Reports',
+              //   strUrl: '/reports-inventory',
+              //   strIcon: 'file-earmark-bar-graph',
+              //   strType: 'main_menu',
+              //   ingOrder: 5,
+              // },
               // MÓDULO MANUFACTURA
               {
                 strName: 'materialsInout',
@@ -172,27 +172,27 @@ export default class InitialApplicationsSeed {
                 strType: 'main_menu',
                 ingOrder: 8,
               },
-              {
-                strName: 'salesInout',
-                strDescription: 'Sales',
-                strUrl: '/sales',
-                strIcon: 'cart',
-                strType: 'main_menu',
-                ingOrder: 9,
-              },
-              {
-                strName: 'costsInout',
-                strDescription: 'Costs',
-                strUrl: '/costs',
-                strIcon: 'calculator',
-                strType: 'main_menu',
-                ingOrder: 10,
-              },
+              // {
+              //   strName: 'salesInout',
+              //   strDescription: 'Sales',
+              //   strUrl: '/sales',
+              //   strIcon: 'cart',
+              //   strType: 'main_menu',
+              //   ingOrder: 9,
+              // },
+              // {
+              //   strName: 'costsInout',
+              //   strDescription: 'Costs',
+              //   strUrl: '/costs',
+              //   strIcon: 'calculator',
+              //   strType: 'main_menu',
+              //   ingOrder: 10,
+              // },
               // Configuración común
               {
                 strName: 'setupInout',
                 strDescription: 'Settings',
-                strUrl: '/setup',
+                strUrl: '/setting',
                 strIcon: 'gear',
                 strType: 'main_menu',
                 ingOrder: 99,
