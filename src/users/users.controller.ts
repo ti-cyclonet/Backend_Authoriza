@@ -93,6 +93,13 @@ export class UsersController {
     return { available: !isTaken };
   }
 
+  @Get('check-company-code/:companyCode')
+  @ApiOperation({ summary: 'Check if a company code is taken' })
+  async checkCompanyCode(@Param('companyCode') companyCode: string) {
+    const isTaken = await this.usersService.isCompanyCodeTaken(companyCode);
+    return { available: !isTaken };
+  }
+
   @Get('email/:email')
   @ApiOperation({ summary: 'Get user by email (with soft-deleted included)' })
   async findByEmail(@Param('email') email: string): Promise<UserResponseDto> {

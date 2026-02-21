@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, Request } from '@nestjs/common';
 import { UserRolesService } from './user-roles.service';
 import { CreateUserRoleDto } from './dto/create-user-role.dto';
+import { TransferAdminRoleDto } from './dto/transfer-admin-role.dto';
 
 @Controller('user-roles')
 export class UserRolesController {
@@ -41,6 +42,16 @@ export class UserRolesController {
 
   @Delete(':userId/:roleId')
   remove(@Param('userId') userId: string, @Param('roleId') roleId: string) {
-    return this.userRolesService.remove(userId, roleId);
+    return this.userRolesService.removeRole(userId, roleId);
+  }
+
+  @Delete('unassign/:userId/:roleId')
+  unassignRole(@Param('userId') userId: string, @Param('roleId') roleId: string) {
+    return this.userRolesService.removeRole(userId, roleId);
+  }
+
+  @Post('transfer-admin')
+  transferAdminRole(@Request() req, @Body() dto: TransferAdminRoleDto) {
+    return this.userRolesService.transferAdminRole(req.user.id, dto.newAdminEmail, dto.contractId);
   }
 }

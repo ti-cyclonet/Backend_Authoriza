@@ -13,4 +13,8 @@ export class CreateCustomerParametersPeriodDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsOptional()
+  @IsString()
+  customerId?: string;
 }

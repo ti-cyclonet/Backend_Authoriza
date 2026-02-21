@@ -8,13 +8,15 @@ import { Package } from 'src/package/entities/package.entity';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { LogsModule } from '../logs/logs.module';
+import { UserRolesModule } from '../user-roles/user-roles.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Contract, User, Package]),
     EntityCodesModule,
     CloudinaryModule,
-    LogsModule
+    LogsModule,
+    UserRolesModule
   ],
   controllers: [ContractController],
   providers: [ContractService],

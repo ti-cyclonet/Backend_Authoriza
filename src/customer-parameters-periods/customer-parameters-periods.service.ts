@@ -14,10 +14,15 @@ export class CustomerParametersPeriodsService {
 
   async create(dto: CreateCustomerParametersPeriodDto) {
     const entity = this.repo.create({
-      customerParameter: { id: dto.customerParameterId },
-      period: { id: dto.periodId },
+      customerParameterId: dto.customerParameterId,
+      periodId: dto.periodId,
+      parameterId: dto.customerParameterId,
+      customerId: dto['customerId'] || '00000000-0000-0000-0000-000000000000',
       value: dto.value,
       status: dto.status || 'active',
+      name: '',
+      startDate: new Date(),
+      endDate: new Date(),
     });
     return this.repo.save(entity);
   }

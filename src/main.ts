@@ -15,9 +15,9 @@ async function bootstrap() {
 
   // 🔹 Habilitar CORS
   app.enableCors({
-    origin: 'http://localhost:4200',
+    origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: 'Content-Type, Authorization',
+    allowedHeaders: 'Content-Type, Authorization, x-tenant-id',
     credentials: true,
   });
   app.setGlobalPrefix('api');

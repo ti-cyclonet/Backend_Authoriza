@@ -17,6 +17,7 @@ import { EntityCodeService } from '../entity-codes/services/entity-code.service'
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { LogsService } from '../logs/logs.service';
 import { LogAction } from '../logs/entities/log.entity';
+import { UserRolesService } from '../user-roles/user-roles.service';
 
 @Injectable()
 export class ContractService {
@@ -30,6 +31,7 @@ export class ContractService {
     private readonly entityCodeService: EntityCodeService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly logsService: LogsService,
+    private readonly userRolesService: UserRolesService,
   ) {}
 
   async create(dto: CreateContractDto) {
@@ -42,6 +44,11 @@ export class ContractService {
       where: { id: dto.packageId },
     });
     if (!pkg) throw new BadRequestException('Package not found');
+
+    // Validar que el codePrefix no esté siendo usado por otro tenant con contrato activo
+    if (dto.codePrefix) {
+      await this.validateCodePrefix(dto.codePrefix, dto.userId);
+    }
 
     // Generar código automáticamente
     const code = await this.entityCodeService.generateCode('Contract');
@@ -56,9 +63,14 @@ export class ContractService {
       startDate: dto.startDate,
       endDate: dto.endDate ?? null,
       status: dto.status ?? ContractStatus.PENDING,
+      codePrefix: dto.codePrefix ?? null,
+      businessSector: dto.businessSector ?? 'general',
     });
 
     const savedContract = await this.contractRepository.save(entity);
+    
+    // Actualizar el rol del usuario a accountOwner
+    await this.userRolesService.updateUserToAccountOwner(dto.userId, savedContract.id);
     
     return savedContract;
   }
@@ -160,10 +172,24 @@ export class ContractService {
   }
 
   async findByTenant(tenantId: string) {
-    const contract = await this.contractRepository.findOne({ 
-      where: { user: { id: tenantId } },
+    // Buscar si el tenantId es un usuario dependiente
+    const dependency = await this.contractRepository.manager
+      .createQueryBuilder()
+      .select('ud.principalUserId')
+      .from('user_dependencies', 'ud')
+      .where('ud.dependentUserId = :tenantId', { tenantId })
+      .andWhere('ud.status = :status', { status: 'ACTIVE' })
+      .getRawOne();
+    
+    // Si es dependiente, usar el principalUserId, sino usar el tenantId
+    const userId = dependency?.principalUserId || tenantId;
+    
+    // Buscar el contrato del usuario (principal o directo)
+    const contract = await this.contractRepository.findOne({
+      where: { user: { id: userId } },
       relations: ['user', 'package'],
     });
+    
     if (!contract) throw new NotFoundException('Contract not found for tenant');
     return contract;
   }
@@ -294,12 +320,12 @@ export class ContractService {
         .getCount();
       
       if (dependentUsers === 0) {
-        throw new BadRequestException('No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.');
+        throw new BadRequestException('Cannot activate contract. At least one dependent user account must be created.');
       }
       
       // Validar que tenga PDF generado
       if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
-        throw new BadRequestException('No se puede activar el contrato. Debe generar el PDF del contrato antes de activarlo.');
+        throw new BadRequestException('Cannot activate contract. Contract PDF must be generated before activation.');
       }
     }
     
@@ -370,5 +396,40 @@ export class ContractService {
     }
     
     return savedContract;
+  }
+
+  /**
+   * Valida que el codePrefix no esté siendo usado por otro tenant con contrato activo
+   * Permite reutilizar el prefijo si el mismo tenant lo usó en contratos expirados
+   */
+  private async validateCodePrefix(codePrefix: string, userId: string): Promise<void> {
+    const existingContract = await this.contractRepository
+      .createQueryBuilder('contract')
+      .innerJoin('contract.user', 'user')
+      .where('contract.codePrefix = :codePrefix', { codePrefix })
+      .andWhere('user.id != :userId', { userId })
+      .getOne();
+
+    if (existingContract) {
+      throw new BadRequestException(
+        `El prefijo '${codePrefix}' ya fue utilizado por otro cliente`
+      );
+    }
+  }
+
+  /**
+   * Método público para validar disponibilidad del codePrefix desde el frontend
+   */
+  async validateCodePrefixPublic(codePrefix: string): Promise<void> {
+    const existingContract = await this.contractRepository
+      .createQueryBuilder('contract')
+      .where('contract.codePrefix = :codePrefix', { codePrefix })
+      .getOne();
+
+    if (existingContract) {
+      throw new BadRequestException(
+        `El prefijo '${codePrefix}' ya fue utilizado por otro cliente`
+      );
+    }
   }
 }

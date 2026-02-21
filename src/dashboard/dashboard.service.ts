@@ -8,6 +8,7 @@ import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { DashboardStatsDto, UserStats, InvoiceStats, ContractStats } from './dto/dashboard-stats.dto';
 import { DateRangeDto } from './dto/date-range.dto';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
+import { LogsService } from '../logs/logs.service';
 
 @Injectable()
 export class DashboardService {
@@ -19,19 +20,22 @@ export class DashboardService {
     @InjectRepository(Contract)
     private contractRepository: Repository<Contract>,
     private entityCodeService: EntityCodeService,
+    private logsService: LogsService,
   ) {}
 
   async getStats(): Promise<DashboardStatsDto> {
-    const [userStats, invoiceStats, contractStats] = await Promise.all([
+    const [userStats, principalUserStats, applicationStats, packageStats] = await Promise.all([
       this.getUserStats(),
-      this.getInvoiceStats(),
-      this.getContractStats(),
+      this.getPrincipalUserStats(),
+      this.getApplicationStats(),
+      this.getPackageStats(),
     ]);
 
     return {
       users: userStats,
-      invoices: invoiceStats,
-      contracts: contractStats,
+      principalUsers: principalUserStats,
+      applications: applicationStats,
+      packages: packageStats,
       lastUpdated: new Date(),
     };
   }
@@ -44,8 +48,13 @@ export class DashboardService {
 
     const byRole = await this.userRepository
       .createQueryBuilder('user')
-      .select('COUNT(user.id)', 'count')
+      .leftJoin('user.userRoles', 'userRole')
+      .leftJoin('userRole.role', 'role')
+      .select('role.strName', 'role')
+      .addSelect('COUNT(DISTINCT user.id)', 'count')
       .where('user.deletedAt IS NULL')
+      .andWhere('userRole.status = :status', { status: 'ACTIVE' })
+      .groupBy('role.strName')
       .getRawMany();
 
     return {
@@ -53,79 +62,81 @@ export class DashboardService {
       active,
       inactive,
       unconfirmed,
-      byRole: [{
-        role: 'Total usuarios',
-        count: total
-      }]
-    };
-  }
-
-  private async getInvoiceStats(): Promise<InvoiceStats> {
-    const total = await this.invoiceRepository.count();
-    const paid = await this.invoiceRepository.count({ where: { status: InvoiceStatus.PAID } });
-    const pending = await this.invoiceRepository.count({ where: { status: InvoiceStatus.UNCONFIRMED } });
-    const overdue = await this.invoiceRepository.count({ where: { status: InvoiceStatus.IN_ARREARS } });
-
-    const totalValueResult = await this.invoiceRepository
-      .createQueryBuilder('invoice')
-      .select('SUM(invoice.value)', 'total')
-      .getRawOne();
-
-    const byStatus = await this.invoiceRepository
-      .createQueryBuilder('invoice')
-      .select('invoice.status', 'status')
-      .addSelect('COUNT(invoice.id)', 'count')
-      .addSelect('SUM(invoice.value)', 'value')
-      .groupBy('invoice.status')
-      .getRawMany();
-
-    const monthlyRevenue = await this.invoiceRepository
-      .createQueryBuilder('invoice')
-      .select("TO_CHAR(invoice.issueDate, 'YYYY-MM')", 'month')
-      .addSelect('SUM(invoice.value)', 'revenue')
-      .where('invoice.status = :status', { status: InvoiceStatus.PAID })
-      .groupBy("TO_CHAR(invoice.issueDate, 'YYYY-MM')")
-      .orderBy('month', 'DESC')
-      .limit(12)
-      .getRawMany();
-
-    return {
-      total,
-      totalValue: parseFloat(totalValueResult?.total || '0'),
-      paid,
-      pending,
-      overdue,
-      byStatus: byStatus.map(item => ({
-        status: item.status,
-        count: parseInt(item.count),
-        value: parseFloat(item.value || '0')
-      })),
-      monthlyRevenue: monthlyRevenue.map(item => ({
-        month: item.month,
-        revenue: parseFloat(item.revenue || '0')
+      byRole: byRole.map(item => ({
+        role: item.role || 'Sin rol',
+        count: parseInt(item.count)
       }))
     };
   }
 
-  private async getContractStats(): Promise<ContractStats> {
-    const total = await this.contractRepository.count();
-    const active = await this.contractRepository.count({ where: { status: ContractStatus.ACTIVE } });
-    const expired = await this.contractRepository.count({ where: { status: ContractStatus.EXPIRED } });
-
-    const byStatus = await this.contractRepository
-      .createQueryBuilder('contract')
-      .select('contract.status', 'status')
-      .addSelect('COUNT(contract.id)', 'count')
-      .groupBy('contract.status')
+  private async getPrincipalUserStats(): Promise<any> {
+    const principalUsers = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('contract', 'contract', 'contract."userId" = user.id')
+      .where('user.deletedAt IS NULL')
+      .select('user.id', 'id')
+      .addSelect('user.strStatus', 'status')
       .getRawMany();
+
+    const total = principalUsers.length;
+    const unconfirmed = principalUsers.filter(u => u.status === 'UNCONFIRMED').length;
+    const active = principalUsers.filter(u => u.status === 'ACTIVE').length;
+    const suspended = principalUsers.filter(u => u.status === 'SUSPENDED').length;
+    const expiring = principalUsers.filter(u => u.status === 'EXPIRING').length;
+    const delinquent = principalUsers.filter(u => u.status === 'DELINQUENT').length;
 
     return {
       total,
+      unconfirmed,
       active,
-      expired,
-      byStatus: byStatus.map(item => ({
-        status: item.status,
-        count: parseInt(item.count)
+      suspended,
+      expiring,
+      delinquent
+    };
+  }
+
+  private async getApplicationStats(): Promise<any> {
+    const applications = await this.userRepository.manager.query(`
+      SELECT 
+        a."strName" as name,
+        COUNT(DISTINCT ur."userId") as "userCount",
+        COUNT(DISTINCT r.id) as "roleCount"
+      FROM application a
+      LEFT JOIN rol r ON r."strApplicationId" = a.id
+      LEFT JOIN user_roles ur ON ur."roleId" = r.id AND ur.status = 'ACTIVE'
+      GROUP BY a.id, a."strName"
+      ORDER BY "userCount" DESC
+    `);
+
+    return {
+      total: applications.length,
+      byApplication: applications.map(app => ({
+        name: app.name,
+        userCount: parseInt(app.userCount),
+        roleCount: parseInt(app.roleCount)
+      }))
+    };
+  }
+
+  private async getPackageStats(): Promise<any> {
+    const packages = await this.userRepository.manager.query(`
+      SELECT 
+        p.name,
+        COUNT(DISTINCT c.id) as "contractCount",
+        COUNT(DISTINCT cp.id) as "roleCount"
+      FROM package p
+      LEFT JOIN contract c ON c."packageId" = p.id
+      LEFT JOIN configuration_package cp ON cp."packageId" = p.id
+      GROUP BY p.id, p.name
+      ORDER BY "contractCount" DESC
+    `);
+
+    return {
+      total: packages.length,
+      byPackage: packages.map(pkg => ({
+        name: pkg.name,
+        contractCount: parseInt(pkg.contractCount),
+        roleCount: parseInt(pkg.roleCount)
       }))
     };
   }
@@ -184,45 +195,16 @@ export class DashboardService {
   }
 
   async getRecentActivity(): Promise<any> {
-    const recentUsers = await this.userRepository.find({
-      order: { dtmCreateDate: 'DESC' },
-      take: 5,
-      relations: ['basicData']
-    });
-
-    const recentInvoices = await this.invoiceRepository.find({
-      order: { createdAt: 'DESC' },
-      take: 5,
-      relations: ['user']
-    });
-
-    const recentContracts = await this.contractRepository.find({
-      order: { createdAt: 'DESC' },
-      take: 5,
-      relations: ['user', 'package']
-    });
+    const recentLogs = await this.logsService.getRecentLogs(6);
 
     return {
-      recentUsers: recentUsers.map(user => ({
-        id: user.id,
-        username: user.strUserName,
-        role: 'Sin rol', // TODO: Implementar con UserRole
-        status: user.strStatus,
-        createdAt: user.dtmCreateDate
-      })),
-      recentInvoices: recentInvoices.map(invoice => ({
-        id: invoice.id,
-        value: invoice.value,
-        status: invoice.status,
-        user: invoice.user.strUserName,
-        createdAt: invoice.createdAt
-      })),
-      recentContracts: recentContracts.map(contract => ({
-        id: contract.id,
-        value: contract.value,
-        status: contract.status,
-        user: contract.user.strUserName,
-        createdAt: contract.createdAt
+      recentLogs: recentLogs.map(log => ({
+        id: log.id,
+        level: log.level,
+        action: log.action,
+        message: log.message,
+        userId: log.userId,
+        createdAt: log.createdAt
       }))
     };
   }
@@ -232,18 +214,6 @@ export class DashboardService {
       users: await this.userRepository.find({
         select: ['id', 'code', 'strUserName', 'dtmCreateDate'],
         order: { dtmCreateDate: 'DESC' },
-        take: 5,
-        where: { code: Not(null) }
-      }),
-      invoices: await this.invoiceRepository.find({
-        select: ['id', 'code', 'value', 'createdAt'],
-        order: { createdAt: 'DESC' },
-        take: 5,
-        where: { code: Not(null) }
-      }),
-      contracts: await this.contractRepository.find({
-        select: ['id', 'code', 'value', 'createdAt'],
-        order: { createdAt: 'DESC' },
         take: 5,
         where: { code: Not(null) }
       })

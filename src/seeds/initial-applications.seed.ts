@@ -35,6 +35,61 @@ export default class InitialApplicationsSeed {
         strTags: ['control access', 'security', 'users'],
         roles: [
           {
+            strName: 'accountOwner',
+            strDescription1: 'Account Owner',
+            strDescription2: 'Owner of the account',
+            menuOptions: [
+              {
+                strName: 'homeAuthoriza',
+                strDescription: 'Home',
+                strUrl: '/home',
+                strIcon: 'house',
+                strType: 'main_menu',
+                ingOrder: 1,
+              },
+              {
+                strName: 'usersAuthoriza',
+                strDescription: 'Users',
+                strUrl: '/users',
+                strIcon: 'people',
+                strType: 'main_menu',
+                ingOrder: 2,
+              },
+              {
+                strName: 'applicationsAuthoriza',
+                strDescription: 'Applications',
+                strUrl: '/applications',
+                strIcon: 'window-stack',
+                strType: 'main_menu',
+                ingOrder: 3,
+              },
+              {
+                strName: 'packagesAuthoriza',
+                strDescription: 'Packages',
+                strUrl: '/packages',
+                strIcon: 'boxes',
+                strType: 'main_menu',
+                ingOrder: 4,
+              },
+              {
+                strName: 'contractsAuthoriza',
+                strDescription: 'Contracts',
+                strUrl: '/contracts',
+                strIcon: 'file-earmark-text',
+                strType: 'main_menu',
+                ingOrder: 5,
+              },
+              {
+                strName: 'settingsAuthoriza',
+                strDescription: 'Settings',
+                strUrl: '/setup',
+                strIcon: 'gear',
+                strType: 'main_menu',
+                ingOrder: 6,
+              },
+            ],
+          },
+          {
             strName: 'adminAuthoriza',
             strDescription1: 'Administrator',
             strDescription2: 'Full access',
@@ -165,20 +220,20 @@ export default class InitialApplicationsSeed {
                 ingOrder: 7,
               },
               {
-                strName: 'menusInout',
-                strDescription: 'Menus',
-                strUrl: '/menus',
-                strIcon: 'list-ul',
+                strName: 'salesInout',
+                strDescription: 'Sales',
+                strUrl: '/sales',
+                strIcon: 'cart-check',
                 strType: 'main_menu',
                 ingOrder: 8,
               },
               // {
-              //   strName: 'salesInout',
-              //   strDescription: 'Sales',
-              //   strUrl: '/sales',
-              //   strIcon: 'cart',
+              //   strName: 'usersInout',
+              //   strDescription: 'Users',
+              //   strUrl: '/users',
+              //   strIcon: 'people',
               //   strType: 'main_menu',
-              //   ingOrder: 9,
+              //   ingOrder: 10,
               // },
               // {
               //   strName: 'costsInout',
@@ -266,15 +321,7 @@ export default class InitialApplicationsSeed {
                 strIcon: 'box',
                 strType: 'main_menu',
                 ingOrder: 3,
-              },
-              {
-                strName: 'salesManufacturingInout',
-                strDescription: 'Sales',
-                strUrl: '/sales',
-                strIcon: 'cart',
-                strType: 'main_menu',
-                ingOrder: 4,
-              },
+              }
             ],
           },
         ],
@@ -382,14 +429,25 @@ export default class InitialApplicationsSeed {
               ...menu,
             });
             await menuRepo.save(existsMenu);
+            console.log('✅ Menu created:', existsMenu.strName);
+          }
 
-            // ahora vinculas el rol con el menú
-            const rolMenuoptionRepo = dataSource.getRepository(RolMenuoption);
+          // Check if rol-menuoption relationship already exists
+          const rolMenuoptionRepo = dataSource.getRepository(RolMenuoption);
+          const existingRelation = await rolMenuoptionRepo.findOne({
+            where: {
+              rol: { id: role.id },
+              menuoption: { id: existsMenu.id }
+            }
+          });
+
+          if (!existingRelation) {
             const rolMenuoption = rolMenuoptionRepo.create({
               rol: role,
               menuoption: existsMenu,
             });
             await rolMenuoptionRepo.save(rolMenuoption);
+            console.log('✅ Rol-Menu relationship created:', role.strName, '-', existsMenu.strName);
           }
         }
       }

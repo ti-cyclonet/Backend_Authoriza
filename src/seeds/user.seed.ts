@@ -167,7 +167,7 @@ export default class UserSeed {
             totalAccount: 1
           });
           await configPackageRepo.save(config);
-          console.log(`✅ Configuración creada para rol ${roleName}`);
+          console.log(`✅ Configuración creada para rol ${roleName} con 1 cuenta`);
         }
       } else {
         console.log(`❌ Rol ${roleName} no encontrado`);
@@ -184,6 +184,7 @@ export default class UserSeed {
       const contractCode = await entityCodeService.generateCode('Contract');
       const contract = contractRepo.create({
         code: contractCode,
+        codePrefix: 'CNT',
         user: user,
         package: cycloPackage,
         value: 0,
@@ -198,38 +199,31 @@ export default class UserSeed {
       console.log('⚠️ Contrato ya existe');
     }
 
-    // ========== 7️⃣ ASIGNAR ROL USANDO USERROLE ==========
-    const role = await roleRepo.findOne({
+    // ========== 7️⃣ ASIGNAR ROL ADMINAUTHORIZA ==========
+    const adminRole = await roleRepo.findOne({
       where: { strName: 'adminAuthoriza' },
     });
 
-    if (role) {
-      // Obtener el contrato creado
-      const contractRepo = dataSource.getRepository(Contract);
+    if (adminRole) {
       const contract = await contractRepo.findOne({
         where: { user: { id: user.id }, package: { id: cycloPackage.id } }
       });
 
-      // Crear UserRole en lugar de asignación directa
       const userRoleRepo = dataSource.getRepository(UserRole);
       const existingUserRole = await userRoleRepo.findOne({
-        where: { userId: user.id, roleId: role.id }
+        where: { userId: user.id, roleId: adminRole.id }
       });
 
       if (!existingUserRole) {
         const userRole = userRoleRepo.create({
           userId: user.id,
-          roleId: role.id,
+          roleId: adminRole.id,
           contractId: contract?.id || null,
           status: 'ACTIVE'
         });
         await userRoleRepo.save(userRole);
-        console.log('✅ Rol adminAuthoriza asignado al usuario principal con contractId:', contract?.id);
-      } else {
-        console.log('⚠️ Rol ya asignado al usuario');
+        console.log('✅ Rol adminAuthoriza asignado al usuario principal');
       }
-    } else {
-      console.log('❌ Rol adminAuthoriza no encontrado en la base de datos');
     }
   }
 }

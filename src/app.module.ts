@@ -22,6 +22,7 @@ import { GlobalParametersModule } from './global-parameters/global-parameters.mo
 import { EntityCodesModule } from './entity-codes/entity-codes.module';
 import { SweepModule } from './sweep/sweep.module';
 import { InvoicesModule } from './invoices/invoices.module';
+import { PotentialUsersModule } from './potential-users/potential-users.module';
 
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 import { CustomerParametersPeriodsModule } from './customer-parameters-periods/customer-parameters-periods.module';
@@ -38,10 +39,11 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
       username: process.env.DB_USERNAME || 'postgres',
       password: process.env.DB_PASSWORD || '',
       database: process.env.DB_NAME || 'authoriza',
-      synchronize: false,
+      synchronize: true,
       logging: true,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      migrations: [__dirname + '/migrations/*{.ts,.js}'],
+      migrations: [],
+      migrationsRun: false,
       autoLoadEntities: true,
     }),
     AuthModule,
@@ -67,6 +69,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
     SweepModule,
     CustomerParametersModule,
     CustomerParametersPeriodsModule,
+    PotentialUsersModule,
   ],
 })
 export class AppModule {}

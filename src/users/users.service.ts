@@ -166,7 +166,8 @@ export class UsersService {
       .leftJoinAndSelect('user.basicData', 'basicData')
       .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
-      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData');
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .leftJoinAndSelect('user.contracts', 'contracts');
 
     if (!withDeleted) {
       qb.where('user.deletedAt IS NULL');
@@ -179,8 +180,13 @@ export class UsersService {
     }
 
     const users = await qb.take(limit).skip(offset).getMany();
-    return plainToInstance(UserResponseDto, users, {
-      excludeExtraneousValues: true,
+    
+    return users.map(user => {
+      const dto = plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      });
+      dto.hasContracts = user.contracts && user.contracts.length > 0;
+      return dto;
     });
   }
 
@@ -237,6 +243,11 @@ export class UsersService {
       where: { strUserName: userName },
     });
     return !!user;
+  }
+
+  async isCompanyCodeTaken(companyCode: string): Promise<boolean> {
+    // El código de empresa ahora está en Contract, no en User
+    return false;
   }
 
   async findOne(id: string) {

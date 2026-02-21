@@ -35,6 +35,9 @@ export class AuthService {
       mustChangePassword?: boolean;
       passwordExpired?: boolean;
     };
+    contract?: {
+      codePrefix: string;
+    };
     contracts?: Array<{
       contractId: string;
       clientName: string;
@@ -78,6 +81,16 @@ export class AuthService {
 
     if (userActiveRoles.length === 0) {
       throw new UnauthorizedException('UNAUTHORIZED');
+    }
+
+    // 5.1 Bloquear roles administrativos (accountOwner no puede iniciar sesión)
+    const blockedRoles = ['accountOwner'];
+    const hasBlockedRole = userActiveRoles.some(ur => 
+      blockedRoles.includes(ur.role?.strName)
+    );
+
+    if (hasBlockedRole) {
+      throw new UnauthorizedException('This account type cannot log in to applications');
     }
 
     // Detectar múltiples contratos
@@ -124,8 +137,10 @@ export class AuthService {
     const passwordExpired = now > expirationDate;
 
     // 8. Generar token JWT con tenantId basado en el contrato
-    // El tenantId debe ser el userId del propietario del contrato
-    let tenantId = userActiveRoles[0].contract?.user?.id || user.id;
+    // Si el usuario es dependiente, usar el principalUserId como tenantId
+    const dependency = user.principals?.find(p => p.status === 'ACTIVE');
+    let tenantId = dependency ? dependency.principalUserId : (userActiveRoles[0].contract?.user?.id || user.id);
+    let codePrefix = userActiveRoles[0].contract?.codePrefix || null;
 
     const payload = { 
       sub: user.id, 
@@ -186,6 +201,9 @@ export class AuthService {
     return {
       access_token: token,
       user: userWithoutSensitiveData,
+      contract: {
+        codePrefix: codePrefix
+      }
     };
   }
 
@@ -198,6 +216,9 @@ export class AuthService {
     user: AuthenticatedUser & {
       mustChangePassword?: boolean;
       passwordExpired?: boolean;
+    };
+    contract?: {
+      codePrefix: string;
     };
   }> {
     // Buscar el usuario
@@ -230,7 +251,10 @@ export class AuthService {
     const passwordExpired = now > expirationDate;
 
     // Generar token con tenantId basado en el propietario del contrato seleccionado
-    let tenantId = userRoleForContract.contract?.user?.id || user.id;
+    // Si el usuario es dependiente, usar el principalUserId como tenantId
+    const dependency = user.principals?.find(p => p.status === 'ACTIVE');
+    let tenantId = dependency ? dependency.principalUserId : (userRoleForContract.contract?.user?.id || user.id);
+    let codePrefix = userRoleForContract.contract?.codePrefix || null;
 
     const payload = { 
       sub: user.id, 
@@ -281,6 +305,9 @@ export class AuthService {
     return {
       access_token: token,
       user: userWithoutSensitiveData,
+      contract: {
+        codePrefix: codePrefix
+      }
     };
   }
 }

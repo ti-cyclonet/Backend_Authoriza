@@ -5,6 +5,7 @@ import {
   ValidateNested,
   IsIn,
   IsEmail,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateBasicDataDto } from 'src/basic-data/dto/create-basic-data.dto';
@@ -121,4 +122,12 @@ export class CreateFullUserDto {
   @Type(() => LegalEntityDto)
   @IsOptional()
   legalEntityData?: LegalEntityDto;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrincipal?: boolean;
+
+  @IsOptional()
+  @IsString()
+  strCompanyCode?: string;
 }

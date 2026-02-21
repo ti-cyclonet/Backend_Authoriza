@@ -32,4 +32,7 @@ export class UserResponseDto {
   @Expose()
   @Type(() => UserResponseDto)
   dependentOn?: UserResponseDto;
+
+  @Expose()
+  hasContracts?: boolean;
 }

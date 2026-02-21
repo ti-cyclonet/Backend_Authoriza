@@ -31,24 +31,41 @@ export class PeriodController {
     return this.periodService.findAll();
   }
 
+  @Get('active/current')
+  async getActivePeriod() {
+    return this.periodService.getActivePeriod();
+  }
+
+  @Get('active/tenant/:tenantId')
+  async getActivePeriodByTenant(@Param('tenantId') tenantId: string) {
+    const actualTenantId = tenantId === 'null' ? null : tenantId;
+    return this.periodService.getActivePeriodByTenant(actualTenantId);
+  }
+
+  @Get('validation/check-active')
+  async checkActivePeriodValidity() {
+    const hasValid = await this.periodService.hasValidActivePeriod();
+    return { hasValidActivePeriod: hasValid };
+  }
+
+  @Get('global-parameters')
+  async getGlobalParameters() {
+    return this.globalParametersService.findAll();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.periodService.findOne(id);
   }
 
+  @Get(':id/parameters')
+  async getParametersByPeriod(@Param('id') periodId: string) {
+    return this.globalParametersPeriodsService.findByPeriod(periodId);
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdatePeriodDto) {
     return this.periodService.update(id, dto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.periodService.remove(id);
-  }
-
-  @Delete(':id/force')
-  forceRemove(@Param('id') id: string) {
-    return this.periodService.forceRemove(id);
   }
 
   @Patch(':id/deactivate')
@@ -85,31 +102,14 @@ export class PeriodController {
     }
   }
 
-  @Get(':id/parameters')
-  async getParametersByPeriod(@Param('id') periodId: string) {
-    return this.globalParametersPeriodsService.findByPeriod(periodId);
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.periodService.remove(id);
   }
 
-  @Get('active/current')
-  async getActivePeriod() {
-    return this.periodService.getActivePeriod();
-  }
-
-  @Get('active/tenant/:tenantId')
-  async getActivePeriodByTenant(@Param('tenantId') tenantId: string) {
-    const actualTenantId = tenantId === 'null' ? null : tenantId;
-    return this.periodService.getActivePeriodByTenant(actualTenantId);
-  }
-
-  @Get('validation/check-active')
-  async checkActivePeriodValidity() {
-    const hasValid = await this.periodService.hasValidActivePeriod();
-    return { hasValidActivePeriod: hasValid };
-  }
-
-  @Get('global-parameters')
-  async getGlobalParameters() {
-    return this.globalParametersService.findAll();
+  @Delete(':id/force')
+  forceRemove(@Param('id') id: string) {
+    return this.periodService.forceRemove(id);
   }
 
   @Post('validation/validate-expiry')

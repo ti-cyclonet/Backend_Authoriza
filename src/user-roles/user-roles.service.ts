@@ -1,9 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRole } from './entities/user-role.entity';
 import { CreateUserRoleDto } from './dto/create-user-role.dto';
 import { Contract } from '../contract/entities/contract.entity';
+import { User } from '../users/entities/user.entity';
+import { Rol } from '../roles/entities/rol.entity';
+import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 
 @Injectable()
 export class UserRolesService {
@@ -12,6 +15,12 @@ export class UserRolesService {
     private userRoleRepository: Repository<UserRole>,
     @InjectRepository(Contract)
     private contractRepository: Repository<Contract>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+    @InjectRepository(Rol)
+    private rolRepository: Repository<Rol>,
+    @InjectRepository(UserDependency)
+    private userDependencyRepository: Repository<UserDependency>,
   ) {}
 
   async create(createUserRoleDto: CreateUserRoleDto): Promise<UserRole> {
@@ -49,6 +58,23 @@ export class UserRolesService {
   }
 
   async removeRole(userId: string, roleId: string): Promise<void> {
+    // Verificar si es el último administrador de Authoriza
+    const isAuthorizaAdmin = await this.userRoleRepository.findOne({
+      where: { userId, roleId },
+      relations: ['role']
+    });
+
+    if (isAuthorizaAdmin?.role?.strName === 'adminAuthoriza') {
+      const totalAdmins = await this.userRoleRepository.count({
+        where: { roleId, status: 'ACTIVE' },
+        relations: ['role']
+      });
+
+      if (totalAdmins <= 1) {
+        throw new BadRequestException('No se puede desasignar el último administrador de Authoriza. Debe haber al menos un administrador activo.');
+      }
+    }
+
     return this.remove(userId, roleId);
   }
 
@@ -103,5 +129,89 @@ export class UserRolesService {
     }
 
     return availability;
+  }
+
+  async transferAdminRole(currentAdminId: string, newAdminEmail: string, contractId: string): Promise<{ message: string }> {
+    const currentAdmin = await this.userRepository.findOne({ where: { id: currentAdminId } });
+    if (!currentAdmin) throw new NotFoundException('Usuario actual no encontrado');
+
+    let newAdmin = await this.userRepository.findOne({ where: { strUserName: newAdminEmail } });
+    if (!newAdmin) throw new BadRequestException('El nuevo usuario debe existir previamente');
+
+    const adminRole = await this.rolRepository.findOne({ where: { strName: 'adminAuthoriza' } });
+    const ownerRole = await this.rolRepository.findOne({ where: { strName: 'accountOwner' } });
+    
+    if (!adminRole) throw new NotFoundException('Rol adminAuthoriza no encontrado');
+    if (!ownerRole) throw new NotFoundException('Rol accountOwner no encontrado');
+
+    // Buscar el registro de adminAuthoriza del usuario actual
+    const currentAdminUserRole = await this.userRoleRepository.findOne({
+      where: { userId: currentAdminId, roleId: adminRole.id, contractId }
+    });
+
+    if (!currentAdminUserRole) {
+      throw new NotFoundException('Rol adminAuthoriza no encontrado para el usuario actual');
+    }
+
+    // Actualizar el rol de adminAuthoriza a accountOwner
+    currentAdminUserRole.roleId = ownerRole.id;
+    await this.userRoleRepository.save(currentAdminUserRole);
+
+    // Validar cupos disponibles
+    await this.validateRoleAvailability(contractId, adminRole.id);
+
+    // Asignar adminAuthoriza al nuevo usuario
+    const newUserRole = this.userRoleRepository.create({
+      userId: newAdmin.id,
+      roleId: adminRole.id,
+      contractId,
+      status: 'ACTIVE'
+    });
+    await this.userRoleRepository.save(newUserRole);
+
+    const existingDependency = await this.userDependencyRepository.findOne({
+      where: { principalUserId: currentAdminId, dependentUserId: newAdmin.id }
+    });
+
+    if (!existingDependency) {
+      const dependency = this.userDependencyRepository.create({
+        principalUserId: currentAdminId,
+        dependentUserId: newAdmin.id,
+        status: 'ACTIVE'
+      });
+      await this.userDependencyRepository.save(dependency);
+    }
+
+    return { message: 'Rol transferido exitosamente' };
+  }
+
+  async updateUserToAccountOwner(userId: string, contractId: string): Promise<void> {
+    const accountOwnerRole = await this.rolRepository.findOne({ 
+      where: { strName: 'accountOwner' } 
+    });
+    
+    if (!accountOwnerRole) {
+      throw new NotFoundException('Rol accountOwner no encontrado');
+    }
+
+    // Buscar el registro existente del usuario en user_roles
+    const existingUserRole = await this.userRoleRepository.findOne({
+      where: { userId, contractId }
+    });
+
+    if (existingUserRole) {
+      // Actualizar el roleId existente
+      existingUserRole.roleId = accountOwnerRole.id;
+      await this.userRoleRepository.save(existingUserRole);
+    } else {
+      // Si no existe, crear nuevo registro
+      const newUserRole = this.userRoleRepository.create({
+        userId,
+        roleId: accountOwnerRole.id,
+        contractId,
+        status: 'ACTIVE'
+      });
+      await this.userRoleRepository.save(newUserRole);
+    }
   }
 }

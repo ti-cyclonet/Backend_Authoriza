@@ -38,6 +38,16 @@ export class ContractController {
     return this.contractService.findActive();
   }
 
+  @Get('validate-prefix/:codePrefix')
+  async validateCodePrefix(@Param('codePrefix') codePrefix: string) {
+    try {
+      await this.contractService.validateCodePrefixPublic(codePrefix);
+      return { isAvailable: true };
+    } catch (error) {
+      return { isAvailable: false, message: error.message };
+    }
+  }
+
   @Get('user/:userId')
   findByUser(@Param('userId') userId: string) {
     return this.contractService.findByUser(userId);

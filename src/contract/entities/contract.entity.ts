@@ -73,6 +73,9 @@ export class Contract {
   @Column({ type: 'varchar', length: 3, nullable: true })
   codePrefix?: string;
 
+  @Column({ type: 'varchar', length: 50, default: 'general' })
+  businessSector: string;
+
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 

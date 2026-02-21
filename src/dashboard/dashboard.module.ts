@@ -9,6 +9,7 @@ import { Invoice } from '../invoices/entities/invoice.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { jwtConstants } from '../auth/constants';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
+import { LogsModule } from '../logs/logs.module';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { EntityCodesModule } from '../entity-codes/entity-codes.module';
       secret: jwtConstants.secret,
       signOptions: { expiresIn: '1h' },
     }),
-    EntityCodesModule
+    EntityCodesModule,
+    LogsModule
   ],
   controllers: [DashboardController],
   providers: [DashboardService, RolesGuard],

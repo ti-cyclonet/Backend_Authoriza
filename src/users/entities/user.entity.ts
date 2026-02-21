@@ -34,8 +34,7 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastPasswordChange: Date;
 
-  @Column({
-    type: 'enum',
+  @Column({ type: 'enum',
     enum: [
       'ACTIVE',
       'INACTIVE',
