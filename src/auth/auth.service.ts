@@ -145,7 +145,8 @@ export class AuthService {
     const payload = { 
       sub: user.id, 
       email: user.strUserName,
-      tenantId: tenantId
+      tenantId: tenantId,
+      rol: activeRole.strName
     };
     const token = this.jwtService.sign(payload);
     
@@ -260,7 +261,8 @@ export class AuthService {
       sub: user.id, 
       email: user.strUserName,
       tenantId: tenantId,
-      contractId: contractId
+      contractId: contractId,
+      rol: activeRole.strName
     };
     const token = this.jwtService.sign(payload);
 

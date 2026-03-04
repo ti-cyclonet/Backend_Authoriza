@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request } from '@nestjs/common';
 import { InvoicesService } from './invoices.service';
 import { InvoiceGeneratorService } from './invoice-generator.service';
 import { InvoiceSweepService } from './invoice-sweep.service';
@@ -23,8 +23,8 @@ export class InvoicesController {
 
   @Get()
   @Public()
-  findAll() {
-    return this.invoicesService.findAll();
+  findAll(@Query('tenantId') tenantId?: string) {
+    return this.invoicesService.findAll(tenantId);
   }
 
   @Get(':id')
@@ -85,6 +85,16 @@ export class InvoicesController {
   @Public()
   checkInvoicesInPeriod(@Query('startDate') startDate: string, @Query('endDate') endDate: string) {
     return this.invoicesService.checkInvoicesInPeriod(startDate, endDate);
+  }
+
+  @Get('profit-report')
+  @Public()
+  getProfitReport(
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('contractId') contractId?: string
+  ) {
+    return this.invoicesService.getProfitReport(startDate, endDate, contractId);
   }
 
   @Get('test')

@@ -382,6 +382,22 @@ export default class InitialApplicationsSeed {
               },
             ],
           },
+          {
+            strName: 'adminInvoices',
+            strDescription1: 'Invoice Administrator',
+            strDescription2: 'Access only to invoices',
+            menuOptions: [
+              {
+                strName: 'facturasFactonetInvoices',
+                strDescription: 'Invoices',
+                strUrl: '/invoices',
+                strIcon: 'file-earmark-text',
+                strType: 'main_menu',
+                ingOrder: 1,
+                strSubmenus: [],
+              },
+            ],
+          },
         ],
       },
     ];

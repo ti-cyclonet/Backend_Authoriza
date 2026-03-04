@@ -50,7 +50,46 @@ export class UserRolesService {
     if (dto.contractId) {
       await this.validateRoleAvailability(dto.contractId, dto.roleId);
     }
-    return this.create(dto);
+    
+    const userRole = await this.create(dto);
+    
+    // Si se asigna adminInout de InOut, también asignar adminInout de FactoNet
+    const role = await this.rolRepository.findOne({
+      where: { id: dto.roleId },
+      relations: ['strApplication']
+    });
+    
+    if (role?.strName === 'adminInout' && role?.strApplication?.strName === 'Inout') {
+      // Buscar el rol adminInvoices de FactoNet
+      const factonetAdminInvoicesRole = await this.rolRepository.findOne({
+        where: { strName: 'adminInvoices' },
+        relations: ['strApplication']
+      });
+      
+      if (factonetAdminInvoicesRole && factonetAdminInvoicesRole.strApplication?.strName === 'Factonet') {
+        // Verificar si ya tiene el rol asignado
+        const existingFactonetRole = await this.userRoleRepository.findOne({
+          where: { 
+            userId: dto.userId, 
+            roleId: factonetAdminInvoicesRole.id,
+            contractId: dto.contractId 
+          }
+        });
+        
+        if (!existingFactonetRole) {
+          // Asignar automáticamente el rol adminInvoices de FactoNet
+          const factonetUserRole = this.userRoleRepository.create({
+            userId: dto.userId,
+            roleId: factonetAdminInvoicesRole.id,
+            contractId: dto.contractId,
+            status: 'ACTIVE'
+          });
+          await this.userRoleRepository.save(factonetUserRole);
+        }
+      }
+    }
+    
+    return userRole;
   }
 
   async getUserRoles(userId: string): Promise<UserRole[]> {

@@ -20,11 +20,22 @@ export class InvoicesService {
     return await this.invoiceRepository.save(invoice);
   }
 
-  async findAll(): Promise<Invoice[]> {
-    return await this.invoiceRepository.find({
-      relations: ['user', 'user.basicData', 'user.basicData.legalEntityData', 'contract'],
-      order: { createdAt: 'DESC' }
-    });
+  async findAll(tenantId?: string): Promise<Invoice[]> {
+    const queryBuilder = this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .leftJoinAndSelect('invoice.user', 'user')
+      .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .leftJoinAndSelect('invoice.contract', 'contract')
+      .orderBy('invoice.createdAt', 'DESC');
+
+    if (tenantId) {
+      // Filtrar facturas donde el userId coincida con el tenantId
+      // Esto asegura que solo se muestren facturas del cliente principal
+      queryBuilder.andWhere('invoice.userId = :tenantId', { tenantId });
+    }
+
+    return await queryBuilder.getMany();
   }
 
   async findOne(id: number): Promise<Invoice> {
@@ -77,6 +88,35 @@ export class InvoicesService {
     return {
       hasInvoices: count > 0,
       count
+    };
+  }
+
+  async getProfitReport(startDate: string, endDate: string, contractId?: string) {
+    const query = this.invoiceRepository
+      .createQueryBuilder('invoice')
+      .where('invoice.issueDate BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .andWhere('invoice.status != :status', { status: InvoiceStatus.UNCONFIRMED });
+    
+    if (contractId) {
+      query.andWhere('invoice.contractId = :contractId', { contractId });
+    }
+
+    const invoices = await query.getMany();
+    
+    return {
+      totalInvoiced: invoices.reduce((sum, inv) => sum + Number(inv.value), 0),
+      totalProfit: invoices.reduce((sum, inv) => {
+        const profitMargin = inv.globalParameters?.profit_margin || 0;
+        return sum + Number(profitMargin);
+      }, 0),
+      invoiceCount: invoices.length,
+      details: invoices.map(inv => ({
+        code: inv.code,
+        issueDate: inv.issueDate,
+        value: Number(inv.value),
+        profitMargin: inv.globalParameters?.profit_margin || 0,
+        profitPercentage: inv.percentages?.profit_margin || 0
+      }))
     };
   }
 
