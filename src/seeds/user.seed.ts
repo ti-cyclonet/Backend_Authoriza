@@ -87,7 +87,7 @@ export default class UserSeed {
         strPersonType: 'J',
         strStatus: 'ACTIVE',
         documentTypeId: nitDocumentType?.id,
-        documentNumber: '900515884-4',
+        documentNumber: '900515884-3',
         user,
       });
       await basicRepo.save(basic);

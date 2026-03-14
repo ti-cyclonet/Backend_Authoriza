@@ -342,6 +342,14 @@ export default class InitialApplicationsSeed {
             strDescription2: 'Full access',
             menuOptions: [
               {
+                strName: 'homeFactonet',
+                strDescription: 'Home',
+                strUrl: '/home',
+                strIcon: 'house',
+                strType: 'main_menu',
+                ingOrder: 0,
+              },
+              {
                 id: '07ff9168-58af-4f34-a5a5-fd746fa525d0',
                 strName: 'contratosFactonet',
                 strDescription: 'Contracts',
@@ -387,6 +395,14 @@ export default class InitialApplicationsSeed {
             strDescription1: 'Invoice Administrator',
             strDescription2: 'Access only to invoices',
             menuOptions: [
+              {
+                strName: 'homeFactonetInvoices',
+                strDescription: 'Home',
+                strUrl: '/home',
+                strIcon: 'house',
+                strType: 'main_menu',
+                ingOrder: 0,
+              },
               {
                 strName: 'facturasFactonetInvoices',
                 strDescription: 'Invoices',
