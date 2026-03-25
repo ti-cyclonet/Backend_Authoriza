@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -18,9 +19,12 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { LogsService } from '../logs/logs.service';
 import { LogAction } from '../logs/entities/log.entity';
 import { UserRolesService } from '../user-roles/user-roles.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ContractService {
+  private readonly logger = new Logger(ContractService.name);
+
   constructor(
     @InjectRepository(Contract)
     private readonly contractRepository: Repository<Contract>,
@@ -32,6 +36,7 @@ export class ContractService {
     private readonly cloudinaryService: CloudinaryService,
     private readonly logsService: LogsService,
     private readonly userRolesService: UserRolesService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateContractDto) {
@@ -363,6 +368,22 @@ export class ContractService {
         contract.user.id,
         contract.id
       );
+
+      // Enviar notificación de activación al cliente
+      this.notificationsService.sendByTemplate(
+        'CONTRACT_ACTIVATED',
+        contract.user.strUserName,
+        {
+          customerName: contract.user.basicData?.naturalPersonData
+            ? `${contract.user.basicData.naturalPersonData.firstName} ${contract.user.basicData.naturalPersonData.firstSurname}`
+            : contract.user.basicData?.legalEntityData?.businessName || contract.user.strUserName,
+          contractCode: contract.code,
+          packageName: contract.package?.name || 'N/A',
+          startDate: contract.startDate?.toString() || 'N/A',
+          endDate: contract.endDate?.toString() || 'N/A',
+          year: new Date().getFullYear().toString(),
+        },
+      ).catch(err => this.logger.error(`Notification error: ${err.message}`));
     } else {
       // Si no es ACTIVE, desactivar usuarios
       await this.userRepository.update(

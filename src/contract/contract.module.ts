@@ -9,6 +9,7 @@ import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { LogsModule } from '../logs/logs.module';
 import { UserRolesModule } from '../user-roles/user-roles.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -16,7 +17,8 @@ import { UserRolesModule } from '../user-roles/user-roles.module';
     EntityCodesModule,
     CloudinaryModule,
     LogsModule,
-    UserRolesModule
+    UserRolesModule,
+    NotificationsModule,
   ],
   controllers: [ContractController],
   providers: [ContractService],
