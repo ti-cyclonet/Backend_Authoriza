@@ -5,6 +5,7 @@ import {
   ValidateNested,
   IsIn,
   IsEmail,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateBasicDataDto } from 'src/basic-data/dto/create-basic-data.dto';
@@ -89,6 +90,16 @@ class LegalEntityDto {
   contactPhone: string;
 }
 
+class DocumentTypeDto {
+  @IsString()
+  @IsNotEmpty()
+  strDocumentType: string;
+
+  @IsString()
+  @IsNotEmpty()
+  strDocumentNumber: string;
+}
+
 export class CreateFullUserDto {
   @ValidateNested()
   @Type(() => UserDto)
@@ -99,6 +110,10 @@ export class CreateFullUserDto {
   basicData: CreateBasicDataDto;
 
   @ValidateNested()
+  @Type(() => DocumentTypeDto)
+  documentType: DocumentTypeDto;
+
+  @ValidateNested()
   @Type(() => NaturalPersonDto)
   @IsOptional()
   naturalPersonData?: NaturalPersonDto;
@@ -107,4 +122,12 @@ export class CreateFullUserDto {
   @Type(() => LegalEntityDto)
   @IsOptional()
   legalEntityData?: LegalEntityDto;
+
+  @IsOptional()
+  @IsBoolean()
+  isPrincipal?: boolean;
+
+  @IsOptional()
+  @IsString()
+  strCompanyCode?: string;
 }

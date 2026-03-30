@@ -8,6 +8,7 @@ import { ApplicationsModule } from 'src/applications/applications.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UsersModule } from 'src/users/users.module';
 import { jwtConstants } from './constants';
+import { LogsModule } from '../logs/logs.module';
 @Module({
   imports: [
     UsersModule,
@@ -17,6 +18,7 @@ import { jwtConstants } from './constants';
       signOptions: { expiresIn: '1h' },
     }),
     ApplicationsModule,
+    LogsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard],

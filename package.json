@@ -21,7 +21,9 @@
     "typeorm": "ts-node -r tsconfig-paths/register ./data-source.ts",
     "migration:run": "npx typeorm-ts-node-commonjs migration:run -d ./data-source.ts",
     "migration:generate": "npx typeorm-ts-node-commonjs migration:generate -d ./data-source.ts src/migrations/AutoMigration",
-    "migration:create": "npx typeorm-ts-node-commonjs migration:create src/migrations"
+    "migration:create": "npx typeorm-ts-node-commonjs migration:create src/migrations",
+    "setup:admin": "ts-node -r tsconfig-paths/register src/scripts/setup-initial-admin.ts",
+    "create:owner-role": "ts-node -r tsconfig-paths/register src/scripts/create-account-owner-role.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -31,8 +33,10 @@
     "@nestjs/mapped-types": "^2.0.6",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.20",
+    "@nestjs/schedule": "^4.1.2",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/typeorm": "^10.0.2",
+    "@types/nodemailer": "^7.0.11",
     "axios": "^1.11.0",
     "bcrypt": "^5.1.1",
     "buffer-to-stream": "^1.0.0",
@@ -40,6 +44,7 @@
     "class-validator": "^0.14.1",
     "cloudinary": "^2.5.1",
     "multer": "^2.0.2",
+    "nodemailer": "^8.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.16.3",

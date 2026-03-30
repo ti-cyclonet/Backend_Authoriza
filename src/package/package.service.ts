@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Package } from './entities/package.entity';
@@ -9,6 +9,11 @@ import { Image } from '../images/entities/image.entity';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { ImageService } from 'src/images/image.service';
+import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
+import { Contract } from 'src/contract/entities/contract.entity';
+import { ContractStatus } from 'src/contract/enums/contract-status.enum';
+import { User } from 'src/users/entities/user.entity';
+import { v2 as cloudinary } from 'cloudinary';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -18,10 +23,15 @@ export class PackageService {
     @InjectRepository(Package)
     private readonly packageRepository: Repository<Package>,
     private readonly imageService: ImageService,
+    private readonly entityCodeService: EntityCodeService,
     @InjectRepository(ConfigurationPackage)
     private readonly configurationRepository: Repository<ConfigurationPackage>,
     @InjectRepository(Image)
     private readonly imageRepository: Repository<Image>,
+    @InjectRepository(Contract)
+    private readonly contractRepository: Repository<Contract>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   async create(dto: CreatePackageDto, files: Express.Multer.File[]) {
@@ -34,10 +44,12 @@ export class PackageService {
       }
     }
 
-    // 1) Guardar paquete
+    // 1) Guardar paquete con código generado
+    const code = await this.entityCodeService.generateCode('Package');
     const newPackage = await this.packageRepository.save({
       name: dto.name,
       description: dto.description,
+      code,
     });
 
     // 2) Guardar configuraciones
@@ -82,7 +94,7 @@ export class PackageService {
     }
 
     return {
-      message: 'Paquete creado correctamente',
+      message: 'Package created successfully',
       data: {
         ...newPackage,
         images: imageEntities,
@@ -136,8 +148,67 @@ export class PackageService {
   }
 
   async remove(id: string) {
-    const pkg = await this.findOne(id);
-    return this.packageRepository.remove(pkg);
+    const pkg = await this.packageRepository.findOne({
+      where: { id },
+      relations: ['contracts', 'images']
+    });
+
+    if (!pkg) {
+      throw new BadRequestException('Package not found');
+    }
+
+    // Verificar si tiene contratos activos
+    const activeContracts = await this.contractRepository.count({
+      where: { 
+        package: { id },
+        status: ContractStatus.ACTIVE
+      }
+    });
+
+    if (activeContracts > 0) {
+      throw new ConflictException(
+        `Cannot delete package. It has ${activeContracts} active contract(s). Please terminate all contracts first.`
+      );
+    }
+
+    // Eliminar imágenes de Cloudinary
+    if (pkg.images?.length > 0) {
+      for (const image of pkg.images) {
+        try {
+          await cloudinary.uploader.destroy(image.fileName);
+        } catch (error) {
+          console.warn(`Failed to delete image ${image.fileName}:`, error.message);
+        }
+      }
+    }
+
+    await this.packageRepository.remove(pkg);
+    return { message: 'Package deleted successfully' };
+  }
+
+  async findContractedByUser(userId: string) {
+    const contracts = await this.contractRepository.find({
+      where: { 
+        user: { id: userId }
+      },
+      relations: ['package', 'package.configurations', 'package.configurations.rol']
+    });
+
+    // Eliminar duplicados usando un Map
+    const uniquePackages = new Map();
+    
+    contracts.forEach(contract => {
+      if (contract.package && !uniquePackages.has(contract.package.id)) {
+        uniquePackages.set(contract.package.id, {
+          ...contract.package,
+          contractDate: contract.createdAt,
+          expirationDate: contract.endDate,
+          roles: contract.package.configurations?.map(config => config.rol) || []
+        });
+      }
+    });
+
+    return Array.from(uniquePackages.values());
   }
 
   async checkNameExists(name: string): Promise<boolean> {

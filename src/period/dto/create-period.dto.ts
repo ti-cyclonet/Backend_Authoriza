@@ -1,12 +1,16 @@
-import { IsString, IsDateString } from 'class-validator';
+import { IsString, IsDateString, IsOptional } from 'class-validator';
 
 export class CreatePeriodDto {
   @IsString()
   name: string;
 
   @IsDateString()
-  startDate: Date;
+  startDate: string;
 
   @IsDateString()
-  endDate: Date;
+  endDate: string;
+
+  @IsOptional()
+  @IsString()
+  tenantId?: string;
 }

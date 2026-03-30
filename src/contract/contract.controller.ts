@@ -23,9 +23,64 @@ export class ContractController {
     return this.contractService.create(dto);
   }
 
+  @Post(':id/pdf')
+  async uploadPDF(
+    @Param('id') contractId: string,
+    @Body() body: { pdfBuffer: string }
+  ) {
+    const pdfBuffer = Buffer.from(body.pdfBuffer, 'base64');
+    const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer);
+    return { pdfUrl };
+  }
+
+  @Get('active')
+  findActive() {
+    return this.contractService.findActive();
+  }
+
+  @Get('validate-prefix/:codePrefix')
+  async validateCodePrefix(@Param('codePrefix') codePrefix: string) {
+    try {
+      await this.contractService.validateCodePrefixPublic(codePrefix);
+      return { isAvailable: true };
+    } catch (error) {
+      return { isAvailable: false, message: error.message };
+    }
+  }
+
+  @Get('user/:userId')
+  findByUser(@Param('userId') userId: string) {
+    return this.contractService.findByUser(userId);
+  }
+
+  @Get('tenant/:tenantId')
+  findByTenant(@Param('tenantId') tenantId: string) {
+    return this.contractService.findByTenant(tenantId);
+  }
+
+  @Get('package/:packageId')
+  findByPackage(@Param('packageId') packageId: string) {
+    return this.contractService.findByPackage(packageId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.contractService.findOne(id);
+  }
+
+  @Get()
+  findAll(@Query() paginationDto: PaginationDto) {
+    return this.contractService.findAll(paginationDto);
+  }
+
+  @Patch(':id/activate')
+  activateContract(@Param('id') id: string) {
+    return this.contractService.activateContract(id);
+  }
+
+  @Patch(':id/status')
+  updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
+    return this.contractService.updateStatus(id, body.status);
   }
 
   @Patch(':id')
@@ -36,25 +91,5 @@ export class ContractController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.contractService.remove(id);
-  }
-
-  @Get('user/:userId')
-  findByUser(@Param('userId') userId: string) {
-    return this.contractService.findByUser(userId);
-  }
-
-  @Get('package/:packageId')
-  findByPackage(@Param('packageId') packageId: string) {
-    return this.contractService.findByPackage(packageId);
-  }
-
-  @Get('active')
-  findActive() {
-    return this.contractService.findActive();
-  }
-
-  @Get()
-  findAll(@Query() paginationDto: PaginationDto) {
-    return this.contractService.findAll(paginationDto);
   }
 }

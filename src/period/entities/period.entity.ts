@@ -14,6 +14,12 @@ export class Period {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ nullable: true })
+  name: string;
+
+  @Column({ unique: true, nullable: true })
+  code: string;
+
   @Column({ type: 'timestamp' })
   startDate: Date;
 
@@ -22,6 +28,12 @@ export class Period {
 
   @Column({ type: 'enum', enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE' })
   status: 'ACTIVE' | 'INACTIVE';
+
+  @Column({ nullable: true })
+  parentPeriodId: string;
+
+  @Column({ name: 'tenant_id', nullable: true })
+  tenantId: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -16,6 +16,8 @@ import { Rol } from 'src/roles/entities/rol.entity';
 import { Menuoption } from 'src/menuoptions/entities/menuoption.entity';
 import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
+import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
+import { PeriodService } from 'src/period/period.service';
 @Injectable()
 export class ApplicationsService {
   private readonly logger = new Logger('ApplicationsService');
@@ -35,6 +37,8 @@ export class ApplicationsService {
     private readonly dataSource: DataSource,
 
     private readonly cloudinaryService: CloudinaryService,
+    private readonly entityCodeService: EntityCodeService,
+    private readonly periodService: PeriodService,
   ) {}
 
   async create(
@@ -54,21 +58,25 @@ export class ApplicationsService {
         imageUrl = result.secure_url;
       }
 
-      // Crear la aplicación con la URL de la imagen
+      // Crear la aplicación con la URL de la imagen y código
+      const code = await this.entityCodeService.generateCode('Application');
       const application = this.applicationRepository.create({
         ...applicationDetails,
         strUrlImage: imageUrl,
+        code,
       });
 
       await this.applicationRepository.save(application);
 
       // Crear roles y sus opciones de menú
       for (const rolDto of strRoles) {
+        const rolCode = await this.entityCodeService.generateCode('Rol');
         const rol = this.RolRepository.create({
           strName: rolDto.strName,
           strDescription1: rolDto.strDescription1,
           strDescription2: rolDto.strDescription2,
           strApplication: application,
+          code: rolCode,
         });
 
         await this.RolRepository.save(rol);
@@ -182,6 +190,7 @@ export class ApplicationsService {
 
             return {
               id: rol.id,
+              code: rol.code,
               strName: rol.strName,
               strDescription1: rol.strDescription1,
               strDescription2: rol.strDescription2,
@@ -257,6 +266,7 @@ export class ApplicationsService {
         if (!rolMenuoptions || rolMenuoptions.length === 0) {
           return {
             id: rol.id,
+            code: rol.code,
             strName: rol.strName,
             strDescription1: rol.strDescription1,
             strDescription2: rol.strDescription2,
@@ -271,6 +281,7 @@ export class ApplicationsService {
 
         return {
           id: rol.id,
+          code: rol.code,
           strName: rol.strName,
           strDescription1: rol.strDescription1,
           strDescription2: rol.strDescription2,
@@ -307,7 +318,7 @@ export class ApplicationsService {
     };
   }
 
-  async findByApplicationAndRol(applicationName: string, rolName: string) {
+  async findByApplicationAndRol(applicationName: string, rolName: string, tenantId?: string) {
     const application = await this.applicationRepository.findOne({
       where: { strName: ILike(applicationName) },
       relations: { strRoles: true },
@@ -359,6 +370,7 @@ export class ApplicationsService {
     const rolesWithMenuOptions = [
       {
         id: rol.id,
+        code: rol.code,
         strName: rol.strName,
         strDescription1: rol.strDescription1,
         strDescription2: rol.strDescription2,
@@ -366,9 +378,20 @@ export class ApplicationsService {
       },
     ];
 
+    // Obtener periodo activo según la aplicación
+    let activePeriod = null;
+    if (applicationName.toLowerCase() === 'factonet') {
+      // Para FactoNet: buscar periodo activo con tenantId null (global)
+      activePeriod = await this.periodService.getActivePeriodByTenant(null);
+    } else if (tenantId) {
+      // Para otras aplicaciones: buscar por tenantId específico
+      activePeriod = await this.periodService.getActivePeriodByTenant(tenantId);
+    }
+
     return {
       ...application,
       strRoles: rolesWithMenuOptions,
+      activePeriod,
     };
   }
 
@@ -405,12 +428,14 @@ export class ApplicationsService {
       ? application.strRoles.map(
           (rol: {
             id: string;
+            code?: string;
             strName: string;
             strDescription1: string;
             strDescription2: string;
             menuOptions?: any[];
           }) => ({
             id: rol.id,
+            code: rol.code,
             strName: rol.strName,
             strDescription1: rol.strDescription1,
             strDescription2: rol.strDescription2,
@@ -497,11 +522,13 @@ export class ApplicationsService {
         rol.strDescription1 = rolDto.strDescription1;
         rol.strDescription2 = rolDto.strDescription2;
       } else {
+        const rolCode = await this.entityCodeService.generateCode('Rol');
         rol = this.RolRepository.create({
           strName: rolDto.strName,
           strDescription1: rolDto.strDescription1 ?? null,
           strDescription2: rolDto.strDescription2 ?? null,
           strApplication: app,
+          code: rolCode,
         });
       }
 

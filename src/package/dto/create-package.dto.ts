@@ -41,6 +41,18 @@ export class CreatePackageDto {
   @IsNotEmpty()
   description: string;
 
+  @IsInt()
+  @IsOptional()
+  maxProducts?: number = 50;
+
+  @IsInt()
+  @IsOptional()
+  maxUsers?: number = 1;
+
+  @IsInt()
+  @IsOptional()
+  maxInvoices?: number = 100;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

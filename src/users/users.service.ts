@@ -9,15 +9,20 @@ import { Not, Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateFullUserDto } from './dto/CreateFullUserDto';
 import * as bcrypt from 'bcrypt';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { PaginationDto } from './dto/pagination.dto';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { NaturalPersonData } from 'src/natural-person-data/entities/natural-person-data.entity';
 import { LegalEntityData } from 'src/legal-entity-data/entities/legal-entity-data.entity';
+import { DocumentType } from 'src/document-types/entities/document-type.entity';
 import { UserResponseDto } from './dto/user-response.dto';
 import { plainToInstance } from 'class-transformer';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
+import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
+import { LogsService } from '../logs/logs.service';
+import { LogAction } from '../logs/entities/log.entity';
 
 @Injectable()
 export class UsersService {
@@ -30,20 +35,114 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
+    private readonly entityCodeService: EntityCodeService,
+    private readonly logsService: LogsService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
     const genericPassword = '1234567890';
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(genericPassword, salt);
+    const code = await this.entityCodeService.generateCode('User');
     const user = this.userRepository.create({
       strUserName: dto.strUserName,
       strPassword: hashedPassword,
+      code,
       mustChangePassword: true,
       lastPasswordChange: new Date(),
       strStatus: 'UNCONFIRMED',
     });
-    return this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+    
+    // Log creación de usuario
+    await this.logsService.info(
+      LogAction.USER_CREATED,
+      `User created: ${savedUser.strUserName}`,
+      savedUser.id,
+      null,
+      { userCode: savedUser.code, email: savedUser.strUserName }
+    );
+    
+    return savedUser;
+  }
+
+  async createFullUser(dto: CreateFullUserDto): Promise<User> {
+    console.log('Creating full user with DTO:', JSON.stringify(dto, null, 2));
+    
+    const genericPassword = '1234567890';
+    const salt = await bcrypt.genSalt();
+    const hashedPassword = await bcrypt.hash(genericPassword, salt);
+    const code = await this.entityCodeService.generateCode('User');
+
+    // Crear usuario
+    const user = this.userRepository.create({
+      strUserName: dto.user.strUserName,
+      strPassword: hashedPassword,
+      code,
+      mustChangePassword: true,
+      lastPasswordChange: new Date(),
+      strStatus: dto.user.strStatus,
+    });
+    const savedUser = await this.userRepository.save(user);
+    console.log('User created:', savedUser.id);
+
+    // Buscar el ID del tipo de documento
+    const documentTypeRecord = await this.userRepository.manager.findOne(DocumentType, {
+      where: { documentType: dto.documentType.strDocumentType }
+    });
+
+    if (!documentTypeRecord) {
+      throw new BadRequestException(`Document type ${dto.documentType.strDocumentType} not found`);
+    }
+    console.log('Document type found:', documentTypeRecord.id);
+
+    // Crear datos básicos con referencia al tipo de documento
+    const basicData = this.userRepository.manager.create(BasicData, {
+      strPersonType: dto.basicData.strPersonType,
+      strStatus: dto.basicData.strStatus,
+      documentTypeId: documentTypeRecord.id,
+      documentNumber: dto.documentType.strDocumentNumber,
+      user: savedUser,
+    });
+    const savedBasicData = await this.userRepository.manager.save(basicData);
+    console.log('BasicData created:', savedBasicData.id);
+
+    // Crear datos específicos según tipo de persona
+    if (dto.basicData.strPersonType === 'N' && dto.naturalPersonData) {
+      const naturalPersonData = this.userRepository.manager.create(NaturalPersonData, {
+        ...dto.naturalPersonData,
+        basicData: savedBasicData,
+      });
+      await this.userRepository.manager.save(naturalPersonData);
+    }
+
+    if (dto.basicData.strPersonType === 'J' && dto.legalEntityData) {
+      const legalEntityData = this.userRepository.manager.create(LegalEntityData, {
+        ...dto.legalEntityData,
+        basicData: savedBasicData,
+      });
+      await this.userRepository.manager.save(legalEntityData);
+    }
+
+    // Actualizar usuario con basicData
+    savedUser.basicData = savedBasicData;
+    await this.userRepository.save(savedUser);
+
+    // Log creación de usuario completo
+    await this.logsService.info(
+      LogAction.USER_CREATED,
+      `Full user created: ${savedUser.strUserName}`,
+      savedUser.id,
+      null,
+      { 
+        userCode: savedUser.code, 
+        email: savedUser.strUserName,
+        personType: dto.basicData.strPersonType,
+        documentType: dto.documentType.strDocumentType
+      }
+    );
+
+    return savedUser;
   }
 
   async findAll(
@@ -55,13 +154,20 @@ export class UsersService {
 
     const qb = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.rol', 'rol')
+      .select([
+        'user.id',
+        'user.strUserName', 
+        'user.code',
+        'user.strStatus',
+        'user.dtmCreateDate',
+        'user.dtmLatestUpdateDate',
+        'user.deletedAt'
+      ])
       .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
-      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData');
+      .leftJoinAndSelect('user.contracts', 'contracts');
 
     if (!withDeleted) {
       qb.where('user.deletedAt IS NULL');
@@ -74,8 +180,13 @@ export class UsersService {
     }
 
     const users = await qb.take(limit).skip(offset).getMany();
-    return plainToInstance(UserResponseDto, users, {
-      excludeExtraneousValues: true,
+    
+    return users.map(user => {
+      const dto = plainToInstance(UserResponseDto, user, {
+        excludeExtraneousValues: true,
+      });
+      dto.hasContracts = user.contracts && user.contracts.length > 0;
+      return dto;
     });
   }
 
@@ -83,23 +194,14 @@ export class UsersService {
     userId: string,
     withDeleted: boolean | string = false,
   ): Promise<UserResponseDto[]> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      relations: ['dependentOn'],
-    });
-
-    if (!user) throw new NotFoundException(`User with id ${userId} not found`);
-
+    // Esta funcionalidad necesita ser reimplementada con UserDependency
     const qb = this.userRepository
       .createQueryBuilder('user')
       .withDeleted()
-      .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
-      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
       .where('1=1');
 
     const shouldIncludeDeleted =
@@ -107,12 +209,6 @@ export class UsersService {
 
     if (!shouldIncludeDeleted) {
       qb.andWhere('user.deletedAt IS NULL');
-    }
-
-    if (user.dependentOn) {
-      qb.andWhere('user.id != :excludedId', {
-        excludedId: user.dependentOn.id,
-      });
     }
 
     const users = await qb.getMany();
@@ -125,14 +221,12 @@ export class UsersService {
   async findAllWithoutDependency(withDeleted: boolean): Promise<User[]> {
     const qb = this.userRepository
       .createQueryBuilder('user')
-      .leftJoinAndSelect('user.rol', 'rol')
       .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.documentType', 'documentType')
       .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
       .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
-      .leftJoinAndSelect('user.dependentOn', 'dependentOn')
-      .leftJoinAndSelect('dependentOn.rol', 'dependentOnRol')
-      .leftJoinAndSelect('dependentOn.basicData', 'dependentOnBasicData')
-      .where('user.dependentOnId IS NULL');
+      .leftJoin('user.dependents', 'userDependency')
+      .where('userDependency.id IS NULL');
 
     // manejar eliminados
     if (withDeleted) {
@@ -151,19 +245,21 @@ export class UsersService {
     return !!user;
   }
 
+  async isCompanyCodeTaken(companyCode: string): Promise<boolean> {
+    // El código de empresa ahora está en Contract, no en User
+    return false;
+  }
+
   async findOne(id: string) {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: [
-        'rol',
         'basicData',
+        'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
-        'dependentOn',
-        'dependentOn.rol',
-        'dependentOn.basicData',
       ],
-      withDeleted: true, // 👈 necesario si usas soft delete y quieres incluir eliminados
+      withDeleted: true,
     });
 
     if (!user) {
@@ -180,12 +276,8 @@ export class UsersService {
   }
 
   async assignRole(userId: string, roleId: string) {
-    const user = await this.findOne(userId);
-    const role = await this.rolRepository.findOne({ where: { id: roleId } });
-    if (!role) throw new NotFoundException('Role not found');
-    user.rol = role;
-    user.dtmLatestUpdateDate = new Date();
-    return this.userRepository.save(user);
+    // Esta funcionalidad ahora se maneja a través de UserRole
+    throw new Error('Use UserRole service to assign roles');
   }
 
   async findByEmail(email: string): Promise<UserResponseDto | null> {
@@ -193,13 +285,12 @@ export class UsersService {
       where: { strUserName: email },
       withDeleted: true,
       relations: [
-        'rol',
         'basicData',
+        'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
-        'dependentOn',
-        'dependentOn.rol',
-        'dependentOn.basicData',
+        'userRoles',
+        'userRoles.role',
       ],
     });
     if (!user) return null;
@@ -213,29 +304,44 @@ export class UsersService {
       where: { strUserName: email },
       withDeleted: true,
       relations: [
-        'rol',
         'basicData',
+        'basicData.documentType',
         'basicData.naturalPersonData',
         'basicData.legalEntityData',
-        'dependentOn',
-        'dependentOn.rol',
-        'dependentOn.basicData',
+        'principals',
+        'dependents',
+        'userRoles',
+        'userRoles.role',
+        'userRoles.contract',
+        'userRoles.contract.user',
+        'userRoles.contract.user.basicData',
+        'userRoles.contract.user.basicData.naturalPersonData',
+        'userRoles.contract.user.basicData.legalEntityData',
+        'userRoles.contract.package',
       ],
     });
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
-    const user = await this.findOne(id);
+    console.log(`UsersService.update - ID: ${id}, DTO:`, JSON.stringify(dto, null, 2));
+    
+    const user = await this.userRepository.findOne({
+      where: { id },
+      relations: ['basicData'],
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    console.log('Current user before update:', JSON.stringify(user, null, 2));
 
     if (dto.strUserName) user.strUserName = dto.strUserName;
     if (dto.strStatus) user.strStatus = dto.strStatus;
 
     if (dto.rolId) {
-      const rol = await this.rolRepository.findOne({
-        where: { id: dto.rolId },
-      });
-      if (!rol) throw new NotFoundException('Role not found');
-      user.rol = rol;
+      // Los roles ahora se manejan a través de UserRole
+      console.log('Warning: rolId ignored, use UserRole service instead');
     }
 
     if (dto.basicDataId) {
@@ -246,14 +352,69 @@ export class UsersService {
       user.basicData = basicData;
     }
 
+    // Actualizar campos de documento en BasicData
+    if (dto.basicData && user.basicData) {
+      console.log('Updating basicData with:', dto.basicData);
+      if (dto.basicData.documentTypeId) {
+        user.basicData.documentTypeId = dto.basicData.documentTypeId;
+      }
+      if (dto.basicData.documentNumber) {
+        user.basicData.documentNumber = dto.basicData.documentNumber;
+      }
+      const savedBasicData = await this.userRepository.manager.save(BasicData, user.basicData);
+      console.log('BasicData saved:', savedBasicData);
+    }
+
+    // Actualizar naturalPersonData si existe
+    if (dto.naturalPersonData && user.basicData?.naturalPersonData) {
+      console.log('Updating naturalPersonData with:', dto.naturalPersonData);
+      Object.assign(user.basicData.naturalPersonData, dto.naturalPersonData);
+      const savedNaturalPersonData = await this.userRepository.manager.save(NaturalPersonData, user.basicData.naturalPersonData);
+      console.log('NaturalPersonData saved:', savedNaturalPersonData);
+    }
+
+    // Actualizar legalEntityData si existe
+    if (dto.legalEntityData && user.basicData?.legalEntityData) {
+      console.log('Updating legalEntityData with:', dto.legalEntityData);
+      Object.assign(user.basicData.legalEntityData, dto.legalEntityData);
+      const savedLegalEntityData = await this.userRepository.manager.save(LegalEntityData, user.basicData.legalEntityData);
+      console.log('LegalEntityData saved:', savedLegalEntityData);
+    }
+
     if (dto.dependentOnId) {
-      const dependentUser = await this.findOne(dto.dependentOnId);
-      user.dependentOn = dependentUser;
+      // Las dependencias ahora se manejan a través de UserDependency
+      console.log('Warning: dependentOnId ignored, use UserDependency service instead');
     }
 
     user.dtmLatestUpdateDate = new Date();
 
-    return await this.userRepository.save(user);
+    console.log('User before save:', JSON.stringify(user, null, 2));
+    
+    // Crear una copia del usuario sin basicData para evitar conflictos
+    const userToSave = {
+      id: user.id,
+      strUserName: user.strUserName,
+      code: user.code,
+      strPassword: user.strPassword,
+      mustChangePassword: user.mustChangePassword,
+      lastPasswordChange: user.lastPasswordChange,
+      strStatus: user.strStatus,
+      dtmCreateDate: user.dtmCreateDate,
+      dtmLatestUpdateDate: new Date(), // Forzar nueva fecha
+      deletedAt: user.deletedAt,
+      // dependentOnId y rolId removidos - ahora se manejan con UserDependency y UserRole
+    };
+    
+    console.log('UserToSave:', JSON.stringify(userToSave, null, 2));
+    
+    try {
+      const savedUser = await this.userRepository.save(userToSave);
+      console.log('User saved successfully:', savedUser.id);
+      return savedUser;
+    } catch (error) {
+      console.error('Error saving user:', error);
+      throw error;
+    }
   }
 
   async changePassword(
@@ -301,52 +462,30 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
-      relations: ['dependents'],
     });
 
     if (!user) {
       throw new NotFoundException(`User with ID '${userId}' not found`);
     }
 
-    // Actualizar estado del usuario padre
+    // Actualizar estado del usuario
     user.strStatus = newStatus;
     user.dtmLatestUpdateDate = new Date();
     await this.userRepository.save(user);
 
-    // Actualizar estado de todos los hijos que dependan de este usuario
-    await this.userRepository.update(
-      { dependentOn: { id: userId } },
-      {
-        strStatus: newStatus,
-        dtmLatestUpdateDate: new Date(),
-      },
-    );
+    // TODO: Actualizar dependientes usando UserDependency service
 
     return user;
   }
 
   async removeRole(userId: string): Promise<User> {
-    const user = await this.findOne(userId);
-    user.rol = null;
-    user.dtmLatestUpdateDate = new Date();
-    return this.userRepository.save(user);
+    // Esta funcionalidad ahora se maneja a través de UserRole
+    throw new Error('Use UserRole service to remove roles');
   }
 
   async removeDependency(userId: string): Promise<User> {
-    const user = await this.userRepository.findOne({
-      where: { id: userId },
-      withDeleted: true,
-      relations: ['dependentOn'],
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with ID '${userId}' not found`);
-    }
-
-    user.dependentOn = null;
-    user.dtmLatestUpdateDate = new Date();
-
-    return this.userRepository.save(user);
+    // Esta funcionalidad ahora se maneja a través de UserDependency
+    throw new Error('Use UserDependency service to remove dependencies');
   }
 
   async remove(id: string, force = false): Promise<{ message: string }> {
@@ -356,10 +495,9 @@ export class UsersService {
       throw new NotFoundException(`User with ID '${id}' not found`);
     }
 
-    // Verificar si tiene dependientes
-    const dependents = await this.userRepository.find({
-      where: { dependentOn: { id } },
-    });
+    // Verificar si tiene dependientes usando UserDependency
+    // TODO: Implementar verificación con UserDependency service
+    const dependents: any[] = [];
 
     if (dependents.length > 0 && !force) {
       throw new ConflictException(
@@ -369,11 +507,33 @@ export class UsersService {
 
     if (dependents.length > 0 && force) {
       for (const dep of dependents) {
+        dep.strStatus = 'DELETED';
+        await this.userRepository.save(dep);
         await this.userRepository.softDelete(dep.id);
+        // Log eliminación de dependiente
+        await this.logsService.info(
+          LogAction.USER_DELETED,
+          `Dependent user deleted: ${dep.strUserName}`,
+          dep.id,
+          null,
+          { parentUserId: id, forced: true }
+        );
       }
     }
 
+    // Cambiar estado a DELETED antes de soft delete
+    user.strStatus = 'DELETED';
+    await this.userRepository.save(user);
     await this.userRepository.softDelete(id);
+    
+    // Log eliminación de usuario principal
+    await this.logsService.info(
+      LogAction.USER_DELETED,
+      `User deleted: ${user.strUserName}`,
+      user.id,
+      null,
+      { userCode: user.code, dependentsCount: dependents.length, force }
+    );
 
     return {
       message: `User with ID '${id}' has been soft-deleted${
@@ -394,10 +554,7 @@ export class UsersService {
   }
 
   async restoreDependents(userId: string): Promise<void> {
-    await this.userRepository
-      .createQueryBuilder()
-      .restore()
-      .where('dependentOnId = :userId', { userId })
-      .execute();
+    // Esta funcionalidad necesita ser reimplementada con UserDependency
+    console.log('TODO: Implement with UserDependency service');
   }
 }

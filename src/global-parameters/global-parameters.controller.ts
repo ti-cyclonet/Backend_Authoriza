@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { GlobalParametersService } from './global-parameters.service';
 import { CreateGlobalParameterDto } from './dto/create-global-parameter.dto';
 import { UpdateGlobalParameterDto } from './dto/update-global-parameter.dto';
@@ -7,9 +7,19 @@ import { UpdateGlobalParameterDto } from './dto/update-global-parameter.dto';
 export class GlobalParametersController {
   constructor(private readonly service: GlobalParametersService) {}
 
+  @Get('validate-name')
+  validateName(@Query('name') name: string) {
+    return this.service.validateName(name);
+  }
+
   @Post()
   create(@Body() dto: CreateGlobalParameterDto) {
     return this.service.create(dto);
+  }
+
+  @Get('period/:periodId')
+  findByPeriod(@Param('periodId') periodId: string) {
+    return this.service.findByPeriod(periodId);
   }
 
   @Get()

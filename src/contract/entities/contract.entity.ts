@@ -24,6 +24,9 @@ export class Contract {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ unique: true, nullable: true })
+  code: string;
+
   @ManyToOne(() => User, (user) => user.contracts, {
     eager: true,
     onDelete: 'CASCADE',
@@ -63,6 +66,15 @@ export class Contract {
     default: ContractStatus.PENDING,
   })
   status: ContractStatus;
+
+  @Column({ type: 'text', nullable: true })
+  pdfUrl?: string;
+
+  @Column({ type: 'varchar', length: 3, nullable: true })
+  codePrefix?: string;
+
+  @Column({ type: 'varchar', length: 50, default: 'general' })
+  businessSector: string;
 
   @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;

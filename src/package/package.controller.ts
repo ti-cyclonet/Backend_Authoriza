@@ -66,6 +66,11 @@ export class PackageController {
     return { exists };
   }
 
+  @Get('contracted/:userId')
+  findContractedByUser(@Param('userId') userId: string) {
+    return this.packageService.findContractedByUser(userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.packageService.findOne(id);

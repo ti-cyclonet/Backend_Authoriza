@@ -19,6 +19,15 @@ export class AuthController {
     return this.authService.validateUser(loginDto);
   }
 
+  @ApiOperation({ summary: 'Complete login with selected contract' })
+  @Public()
+  @Post('login/complete')
+  async completeLogin(
+    @Body() body: { email: string; applicationName: string; contractId: string },
+  ) {
+    return this.authService.completeLoginWithContract(body.email, body.applicationName, body.contractId);
+  }
+
   @ApiOperation({ summary: 'Get user profile' })
   @Get('profile')
   getProfile(@Request() req) {

@@ -10,6 +10,8 @@ import { RolMenuoption } from 'src/roles/entities/rol-menuoption.entity';
 import { MenuoptionsModule } from 'src/menuoptions/menuoptions.module';
 import { RolesModule } from 'src/roles/roles.module';
 import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
+import { PeriodModule } from 'src/period/period.module';
 @Module({
   controllers: [ApplicationsController],
   providers: [ApplicationsService],
@@ -17,7 +19,9 @@ import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
     TypeOrmModule.forFeature([Application, Rol, Menuoption, RolMenuoption]),
     MenuoptionsModule,
     RolesModule,
-    CloudinaryModule
+    CloudinaryModule,
+    EntityCodesModule,
+    PeriodModule
   ],
   exports: [ApplicationsService],
 })

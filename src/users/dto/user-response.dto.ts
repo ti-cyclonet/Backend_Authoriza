@@ -7,6 +7,9 @@ export class UserResponseDto {
   id: string;
 
   @Expose()
+  code: string;
+
+  @Expose()
   strUserName: string;
 
   @Expose()
@@ -29,4 +32,7 @@ export class UserResponseDto {
   @Expose()
   @Type(() => UserResponseDto)
   dependentOn?: UserResponseDto;
+
+  @Expose()
+  hasContracts?: boolean;
 }

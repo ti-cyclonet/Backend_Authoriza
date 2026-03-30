@@ -2,18 +2,17 @@ import {
   Entity,
   Column,
   PrimaryGeneratedColumn,
-  ManyToOne,
   OneToOne,
   OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  Index,
   DeleteDateColumn,
 } from 'typeorm';
-import { Rol } from '../../roles/entities/rol.entity';
 import { BasicData } from '../../basic-data/entities/basic-data.entity';
 import { Contract } from '../../contract/entities/contract.entity';
+import { UserDependency } from '../../user-dependencies/entities/user-dependency.entity';
+import { UserRole } from '../../user-roles/entities/user-role.entity';
 
 @Entity()
 export class User {
@@ -22,6 +21,9 @@ export class User {
 
   @Column({ unique: true })
   strUserName: string;
+
+  @Column({ unique: true, nullable: true })
+  code: string;
 
   @Column()
   strPassword: string;
@@ -32,8 +34,7 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastPasswordChange: Date;
 
-  @Column({
-    type: 'enum',
+  @Column({ type: 'enum',
     enum: [
       'ACTIVE',
       'INACTIVE',
@@ -41,6 +42,8 @@ export class User {
       'EXPIRING',
       'SUSPENDED',
       'DELINQUENT',
+      'TEMPORARY',
+      'DELETED',
     ],
     default: 'UNCONFIRMED',
   })
@@ -55,9 +58,6 @@ export class User {
   @DeleteDateColumn({ type: 'timestamp', name: 'deleted_at', nullable: true })
   deletedAt?: Date;
 
-  @ManyToOne(() => Rol, { nullable: true })
-  rol: Rol;
-
   @OneToOne(() => BasicData, (basicData) => basicData.user, {
     cascade: true,
     eager: true,
@@ -66,17 +66,17 @@ export class User {
   @JoinColumn({ name: 'basicDataId' })
   basicData: BasicData;
 
-  // 🔹 relación y FK explícita
-  @ManyToOne(() => User, (user) => user.dependents, { nullable: true })
-  @JoinColumn({ name: 'dependentOnId' })
-  dependentOn: User;
-
-  @Column({ type: 'uuid', nullable: true })
-  dependentOnId: string | null;
-
-  @OneToMany(() => User, (user) => user.dependentOn)
-  dependents: User[];
-
   @OneToMany(() => Contract, (contract) => contract.user)
   contracts: Contract[];
+
+  // Relaciones de dependencias
+  @OneToMany(() => UserDependency, (dependency) => dependency.principalUser)
+  dependents: UserDependency[];
+
+  @OneToMany(() => UserDependency, (dependency) => dependency.dependentUser)
+  principals: UserDependency[];
+
+  // Relaciones de roles
+  @OneToMany(() => UserRole, (userRole) => userRole.user)
+  userRoles: UserRole[];
 }
