@@ -9,13 +9,14 @@ import GlobalParametersSeed from './seeds/global-parameters.seed';
 import InitialApplicationsSeed from './seeds/initial-applications.seed';
 import UserSeed from './seeds/user.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
+import { NotificationsService } from './notifications/notifications.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // 🔹 Habilitar CORS
   app.enableCors({
-    origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202'],
+    origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202', 'http://localhost'],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type, Authorization, x-tenant-id',
     credentials: true,
@@ -61,6 +62,10 @@ async function bootstrap() {
   await initialApplicationsSeed.run(dataSource);
   const userSeed = new UserSeed();
   await userSeed.run(dataSource);
+
+  // Seed de plantillas de email
+  const notificationsService = app.get(NotificationsService);
+  await notificationsService.seedDefaultTemplates();
   
   const port = process.env.PORT ?? 3000;
   await app.listen(port);

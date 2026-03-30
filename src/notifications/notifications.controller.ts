@@ -12,6 +12,7 @@ import {
   CreateEmailTemplateDto,
   UpdateEmailTemplateDto,
   SendEmailDto,
+  ContactFormDto,
 } from './dto/notification.dto';
 
 @Controller('notifications')
@@ -50,6 +51,11 @@ export class NotificationsController {
   @Post('send')
   sendEmail(@Body() dto: SendEmailDto) {
     return this.notificationsService.sendEmail(dto);
+  }
+
+  @Post('contact')
+  sendContactForm(@Body() dto: ContactFormDto) {
+    return this.notificationsService.sendContactForm(dto.name, dto.email, dto.subject, dto.message);
   }
 
   // ── Seed ──
