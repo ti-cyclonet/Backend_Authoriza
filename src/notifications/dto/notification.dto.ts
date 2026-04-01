@@ -39,3 +39,17 @@ export class SendEmailDto {
   @IsOptional()
   variables?: Record<string, string>;
 }
+
+export class ContactFormDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  email: string;
+
+  @IsString()
+  subject: string;
+
+  @IsString()
+  message: string;
+}

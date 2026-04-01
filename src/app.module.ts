@@ -46,6 +46,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
       migrations: [],
       migrationsRun: false,
       autoLoadEntities: true,
+      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
     }),
     AuthModule,
     UsersModule,

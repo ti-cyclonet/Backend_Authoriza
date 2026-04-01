@@ -150,4 +150,37 @@ export class NotificationsService {
       text,
     );
   }
+
+  async sendContactForm(name: string, email: string, subject: string, message: string): Promise<{ success: boolean; message: string }> {
+    const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('SMTP_USER');
+    const to = 'ti.cyclonet@hotmail.com';
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:20px;text-align:center;">
+          <h2 style="color:#fff;margin:0;">Nuevo mensaje de contacto</h2>
+          <p style="color:#bbdefb;margin:5px 0 0;font-size:13px;">CycloNet Landing Page</p>
+        </div>
+        <div style="padding:24px;">
+          <p><strong>Nombre:</strong> ${name}</p>
+          <p><strong>Correo:</strong> ${email}</p>
+          <p><strong>Tema:</strong> ${subject}</p>
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">
+          <p><strong>Mensaje:</strong></p>
+          <p style="background:#f5f5f5;padding:12px;border-radius:6px;">${message}</p>
+        </div>
+        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:12px;color:#888;">
+          Enviado desde el formulario de contacto de cyclonet.com.co
+        </div>
+      </div>`;
+
+    try {
+      await this.transporter.sendMail({ from, to, subject: `[Contacto Web] ${subject}`, html, replyTo: email });
+      this.logger.log(`Contact form email sent from ${email}`);
+      return { success: true, message: 'Email sent successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to send contact form email: ${error.message}`);
+      return { success: false, message: error.message };
+    }
+  }
 }
