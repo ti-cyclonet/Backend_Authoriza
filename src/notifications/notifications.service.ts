@@ -144,6 +144,55 @@ export class NotificationsService {
     this.logger.log('Default email templates seeded');
   }
 
+  async seedContactConfirmationTemplate(): Promise<void> {
+    const exists = await this.templateRepo.findOne({ where: { code: 'CONTACT_CONFIRMATION' } });
+    if (exists) return;
+
+    await this.templateRepo.save(
+      this.templateRepo.create({
+        code: 'CONTACT_CONFIRMATION',
+        subject: '¡Gracias por contactarnos! - CycloNet S.A.S.',
+        htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Soluciones tecnológicas a tu medida</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px;">
+        <h2 style="color:#1a237e;margin:0 0 15px;">¡Gracias por preferirnos!</h2>
+        <p style="color:#333;line-height:1.6;">Hola <strong>{{name}}</strong>,</p>
+        <p style="color:#333;line-height:1.6;">Hemos recibido tu mensaje y queremos agradecerte por ponerte en contacto con nosotros. Tu interés en <strong>CycloNet S.A.S.</strong> es muy importante para nuestro equipo.</p>
+        <table width="100%" style="margin:20px 0;border-collapse:collapse;">
+          <tr><td style="padding:10px 12px;background:#e3f2fd;border-radius:4px 4px 0 0;font-weight:bold;color:#1a237e;">Asunto</td><td style="padding:10px 12px;background:#e3f2fd;border-radius:4px 4px 0 0;">{{subject}}</td></tr>
+          <tr><td style="padding:10px 12px;font-weight:bold;color:#1a237e;">Tu mensaje</td><td style="padding:10px 12px;color:#555;">{{message}}</td></tr>
+        </table>
+        <p style="color:#333;line-height:1.6;">Nuestro equipo revisará tu solicitud y te responderá a la brevedad posible. El tiempo estimado de respuesta es de <strong>24 a 48 horas hábiles</strong>.</p>
+        <p style="color:#333;line-height:1.6;">Mientras tanto, te invitamos a conocer más sobre nuestras soluciones visitando <a href="https://www.cyclonet.com.co" style="color:#0d47a1;text-decoration:none;font-weight:bold;">www.cyclonet.com.co</a></p>
+        <hr style="border:none;border-top:1px solid #e0e0e0;margin:20px 0;">
+        <p style="color:#666;font-size:13px;line-height:1.5;">Si necesitas comunicarte con nosotros de forma inmediata, puedes escribirnos a <a href="mailto:ti.cyclonet@hotmail.com" style="color:#0d47a1;">ti.cyclonet@hotmail.com</a> o llamarnos al <strong>+57 314 414 4986</strong>.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#1a237e;padding:20px;text-align:center;">
+        <p style="color:#bbdefb;margin:0;font-size:12px;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:12px;">Turbaco, Bolívar — Colombia</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+      }),
+    );
+
+    this.logger.log('Contact confirmation template seeded');
+  }
+
   private replaceVariables(text: string, variables: Record<string, string>): string {
     return Object.entries(variables).reduce(
       (result, [key, value]) => result.replace(new RegExp(`{{${key}}}`, 'g'), value),
@@ -164,7 +213,7 @@ export class NotificationsService {
         <div style="padding:24px;">
           <p><strong>Nombre:</strong> ${name}</p>
           <p><strong>Correo:</strong> ${email}</p>
-          <p><strong>Tema:</strong> ${subject}</p>
+          <p><strong>Asunto:</strong> ${subject}</p>
           <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">
           <p><strong>Mensaje:</strong></p>
           <p style="background:#f5f5f5;padding:12px;border-radius:6px;">${message}</p>
@@ -177,10 +226,40 @@ export class NotificationsService {
     try {
       await this.transporter.sendMail({ from, to, subject: `[Contacto Web] ${subject}`, html, replyTo: email });
       this.logger.log(`Contact form email sent from ${email}`);
+
+      // Enviar confirmación al cliente
+      this.sendContactConfirmation(name, email, subject, message).catch((err) =>
+        this.logger.warn(`Failed to send contact confirmation to ${email}: ${err.message}`),
+      );
+
       return { success: true, message: 'Email sent successfully' };
     } catch (error) {
       this.logger.error(`Failed to send contact form email: ${error.message}`);
       return { success: false, message: error.message };
+    }
+  }
+
+  private async sendContactConfirmation(name: string, email: string, subject: string, message: string): Promise<void> {
+    const year = new Date().getFullYear().toString();
+    try {
+      await this.sendEmail({
+        to: email,
+        templateCode: 'CONTACT_CONFIRMATION',
+        variables: { name, subject, message, year },
+      });
+    } catch {
+      // Si la plantilla no existe aún, enviar un correo simple de confirmación
+      const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('SMTP_USER');
+      await this.transporter.sendMail({
+        from,
+        to: email,
+        subject: '¡Gracias por contactarnos! - CycloNet S.A.S.',
+        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:30px;">
+          <h2 style="color:#1a237e;">¡Gracias por preferirnos, ${name}!</h2>
+          <p>Hemos recibido tu mensaje y nuestro equipo te responderá en las próximas 24 a 48 horas hábiles.</p>
+          <p>Atentamente,<br><strong>CycloNet S.A.S.</strong></p>
+        </div>`,
+      });
     }
   }
 }
