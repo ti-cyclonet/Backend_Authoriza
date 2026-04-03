@@ -14,8 +14,7 @@ import { NotificationsService } from './notifications/notifications.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // 🔹 CORS manejado por Nginx en producción, aquí solo para desarrollo local
-  app.enableCors();
+  // CORS manejado exclusivamente por Nginx
   app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
