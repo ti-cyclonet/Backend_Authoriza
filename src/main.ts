@@ -18,8 +18,10 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202', 'http://localhost',
+      'https://cyclonet.com.co', 'https://www.cyclonet.com.co',
       'https://auth.cyclonet.com.co', 'https://billing.cyclonet.com.co', 'https://app.cyclonet.com.co',
       'https://master.d249aa02o69249.amplifyapp.com', 'https://master.dccjshhnh1byc.amplifyapp.com', 'https://master.d31x1n66is2877.amplifyapp.com',
+      'https://master.d2waotasrx21ny.amplifyapp.com',
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type, Authorization, x-tenant-id',
