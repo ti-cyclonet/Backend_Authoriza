@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -23,6 +25,8 @@ import { PaginatedResponse } from 'src/common/dtos/paginated-response';
 import { EntityCodeService } from 'src/entity-codes/services/entity-code.service';
 import { LogsService } from '../logs/logs.service';
 import { LogAction } from '../logs/entities/log.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { ContractService } from '../contract/contract.service';
 
 @Injectable()
 export class UsersService {
@@ -37,6 +41,9 @@ export class UsersService {
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
     private readonly entityCodeService: EntityCodeService,
     private readonly logsService: LogsService,
+    private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => ContractService))
+    private readonly contractService: ContractService,
   ) {}
 
   async create(dto: CreateUserDto): Promise<User> {
@@ -140,6 +147,11 @@ export class UsersService {
         personType: dto.basicData.strPersonType,
         documentType: dto.documentType.strDocumentType
       }
+    );
+
+    // Enviar correo de verificación (no bloquea ni rompe la creación si falla)
+    this.sendVerificationEmail(savedUser.id).catch((err) =>
+      console.warn(`Verification email failed for ${savedUser.strUserName}: ${err.message}`),
     );
 
     return savedUser;
@@ -543,6 +555,69 @@ export class UsersService {
   }
 
   // reestablece usuarios eliminados
+  async sendVerificationEmail(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: [
+        'basicData',
+        'basicData.naturalPersonData',
+        'basicData.legalEntityData',
+      ],
+    });
+    if (!user) throw new NotFoundException('User not found');
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expires = new Date();
+    expires.setHours(expires.getHours() + 24);
+
+    user.verificationCode = code;
+    user.verificationExpires = expires;
+    await this.userRepository.save(user);
+
+    const frontendUrl = process.env.FRONTEND_INOUT_URL || 'http://localhost:4200';
+    const verificationUrl = `${frontendUrl}/verify-email?email=${encodeURIComponent(user.strUserName)}&code=${code}`;
+
+    const customerName = user.basicData?.naturalPersonData
+      ? `${user.basicData.naturalPersonData.firstName} ${user.basicData.naturalPersonData.firstSurname}`
+      : user.basicData?.legalEntityData?.businessName || user.strUserName;
+
+    await this.notificationsService.sendByTemplate('USER_VERIFICATION', user.strUserName, {
+      customerName,
+      verificationUrl,
+      year: new Date().getFullYear().toString(),
+    });
+  }
+
+  async verifyEmail(email: string, code: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({ where: { strUserName: email } });
+    if (!user) throw new NotFoundException('User not found');
+
+    if (user.isVerified) {
+      return { message: 'Email already verified' };
+    }
+
+    if (user.verificationCode !== code) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    if (!user.verificationExpires || new Date() > user.verificationExpires) {
+      throw new BadRequestException('Verification code has expired');
+    }
+
+    user.isVerified = true;
+    user.verificationCode = null;
+    user.verificationExpires = null;
+    user.strStatus = 'CONFIRMED';
+    await this.userRepository.save(user);
+
+    // Si ya tiene contrato con PDF, enviarlo ahora
+    this.contractService.sendContractOnVerification(user.id).catch((err) =>
+      console.warn(`Contract email after verification failed: ${err.message}`),
+    );
+
+    return { message: 'Email verified successfully' };
+  }
+
   async restore(userId: string): Promise<{ message: string }> {
     const result = await this.userRepository.restore(userId);
     if (result.affected === 0) {

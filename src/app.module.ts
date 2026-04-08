@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { UserDependenciesModule } from './user-dependencies/user-dependencies.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -24,6 +25,7 @@ import { SweepModule } from './sweep/sweep.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PotentialUsersModule } from './potential-users/potential-users.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { MailModule } from './mail/mail.module';
 
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 import { CustomerParametersPeriodsModule } from './customer-parameters-periods/customer-parameters-periods.module';
@@ -33,6 +35,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRoot({
       type: 'postgres',
       host: process.env.DB_HOST || 'localhost',
@@ -46,7 +49,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
       migrations: [],
       migrationsRun: false,
       autoLoadEntities: true,
-      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+      ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     }),
     AuthModule,
     UsersModule,
@@ -73,6 +76,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
     CustomerParametersPeriodsModule,
     PotentialUsersModule,
     NotificationsModule,
+    MailModule,
   ],
 })
 export class AppModule {}

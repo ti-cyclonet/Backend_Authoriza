@@ -86,6 +86,22 @@ export class UsersController {
     });
   }
 
+  @Get('verify-email')
+  @ApiOperation({ summary: 'Verify user email with code' })
+  async verifyEmail(
+    @Query('email') email: string,
+    @Query('code') code: string,
+  ) {
+    return this.usersService.verifyEmail(email, code);
+  }
+
+  @Post(':id/send-verification')
+  @ApiOperation({ summary: 'Send verification email to user' })
+  async sendVerification(@Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.sendVerificationEmail(id);
+    return { message: 'Verification email sent' };
+  }
+
   @Get('check-username/:userName')
   @ApiOperation({ summary: 'Check if a username is taken' })
   async checkUsername(@Param('userName') userName: string) {

@@ -34,11 +34,21 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastPasswordChange: Date;
 
+  @Column({ nullable: true })
+  verificationCode: string;
+
+  @Column({ default: false })
+  isVerified: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  verificationExpires: Date;
+
   @Column({ type: 'enum',
     enum: [
       'ACTIVE',
       'INACTIVE',
       'UNCONFIRMED',
+      'CONFIRMED',
       'EXPIRING',
       'SUSPENDED',
       'DELINQUENT',
