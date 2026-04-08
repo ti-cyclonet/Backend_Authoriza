@@ -61,7 +61,9 @@ export class NotificationsController {
   // ── Seed ──
 
   @Post('seed')
-  seedTemplates() {
-    return this.notificationsService.seedDefaultTemplates();
+  async seedTemplates() {
+    await this.notificationsService.seedDefaultTemplates();
+    await this.notificationsService.seedContactConfirmationTemplate();
+    return { message: 'Templates seeded successfully' };
   }
 }
