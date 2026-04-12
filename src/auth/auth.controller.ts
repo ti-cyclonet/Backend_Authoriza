@@ -36,7 +36,7 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Get user profile' })
-  @Post('profile')
+  @Get('profile')
   getProfile(@Request() req) {
     return req.user;
   }
