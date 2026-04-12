@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Request, UseGuards, Get } from '@nestjs/common';
+import { Controller, Post, Body, Request, UseGuards, Get, Query } from '@nestjs/common';
 import { AuthenticatedUser, AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
@@ -17,6 +17,13 @@ export class AuthController {
     @Body() loginDto: LoginDto,
   ): Promise<{ access_token: string; user: AuthenticatedUser } | { status: string; message: string }> {
     return this.authService.validateUser(loginDto);
+  }
+
+  @ApiOperation({ summary: 'Auto login after email verification' })
+  @Public()
+  @Get('login-verified')
+  async loginAfterVerification(@Query('email') email: string) {
+    return this.authService.loginAfterVerification(email);
   }
 
   @ApiOperation({ summary: 'Complete login with selected contract' })

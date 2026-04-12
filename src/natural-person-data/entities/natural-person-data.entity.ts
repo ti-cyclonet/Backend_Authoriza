@@ -24,13 +24,13 @@ export class NaturalPersonData {
   @Column({ nullable: true })
   secondSurname?: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: 'date', nullable: true })
   birthDate: Date;
 
-  @Column()
+  @Column({ nullable: true })
   maritalStatus: string;
 
-  @Column()
+  @Column({ nullable: true })
   sex: string;
 
   @OneToOne(() => BasicData, (basicData) => basicData.naturalPersonData, {
