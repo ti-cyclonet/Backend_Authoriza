@@ -574,8 +574,8 @@ export class UsersService {
     user.verificationExpires = expires;
     await this.userRepository.save(user);
 
-    const frontendUrl = process.env.FRONTEND_INOUT_URL || 'http://localhost:4200';
-    const verificationUrl = `${frontendUrl}/verify-email?email=${encodeURIComponent(user.strUserName)}&code=${code}`;
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3000';
+    const verificationUrl = `${backendUrl}/api/users/verify-email?email=${encodeURIComponent(user.strUserName)}&code=${code}`;
 
     const customerName = user.basicData?.naturalPersonData
       ? `${user.basicData.naturalPersonData.firstName} ${user.basicData.naturalPersonData.firstSurname}`

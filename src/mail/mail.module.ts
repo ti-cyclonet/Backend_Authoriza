@@ -10,16 +10,16 @@ import { MailService } from './mail.service';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
         transport: {
-          host: config.get<string>('MAIL_HOST'),
-          port: +config.get<string>('MAIL_PORT', '465'),
-          secure: config.get<string>('MAIL_SECURE', 'true') === 'true',
+          host: config.get<string>('SMTP_HOST'),
+          port: +config.get<string>('SMTP_PORT', '587'),
+          secure: false,
           auth: {
-            user: config.get<string>('MAIL_USER'),
-            pass: config.get<string>('MAIL_PASSWORD'),
+            user: config.get<string>('SMTP_USER'),
+            pass: config.get<string>('SMTP_PASS'),
           },
         },
         defaults: {
-          from: config.get<string>('MAIL_FROM', '"CycloNet" <notificaciones@cyclonet.com.co>'),
+          from: config.get<string>('SMTP_FROM', '"CycloNet" <notificaciones@cyclonet.com.co>'),
         },
       }),
     }),

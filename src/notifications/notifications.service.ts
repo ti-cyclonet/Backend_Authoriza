@@ -302,17 +302,15 @@ export class NotificationsService {
       });
     } catch {
       // Si la plantilla no existe aún, enviar un correo simple de confirmación
-      const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('SMTP_USER');
-      await this.transporter.sendMail({
-        from,
-        to: email,
-        subject: '¡Gracias por contactarnos! - CycloNet S.A.S.',
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:30px;">
+      await this.mailService.send(
+        email,
+        '¡Gracias por contactarnos! - CycloNet S.A.S.',
+        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:30px;">
           <h2 style="color:#1a237e;">¡Gracias por preferirnos, ${name}!</h2>
           <p>Hemos recibido tu mensaje y nuestro equipo te responderá en las próximas 24 a 48 horas hábiles.</p>
           <p>Atentamente,<br><strong>CycloNet S.A.S.</strong></p>
         </div>`,
-      });
+      );
     }
   }
 }
