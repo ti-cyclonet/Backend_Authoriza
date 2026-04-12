@@ -1,9 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 import { EmailTemplate } from './entities/email-template.entity';
+import { MailService } from '../mail/mail.service';
 import {
   CreateEmailTemplateDto,
   UpdateEmailTemplateDto,
@@ -13,23 +12,12 @@ import {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private transporter: nodemailer.Transporter;
 
   constructor(
     @InjectRepository(EmailTemplate)
     private readonly templateRepo: Repository<EmailTemplate>,
-    private readonly configService: ConfigService,
-  ) {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get('SMTP_HOST'),
-      port: +this.configService.get('SMTP_PORT', '587'),
-      secure: false,
-      auth: {
-        user: this.configService.get('SMTP_USER'),
-        pass: this.configService.get('SMTP_PASS'),
-      },
-    });
-  }
+    private readonly mailService: MailService,
+  ) {}
 
   // ── Plantillas CRUD ──
 
@@ -66,23 +54,13 @@ export class NotificationsService {
     const html = this.replaceVariables(template.htmlBody, dto.variables || {});
     const subject = this.replaceVariables(template.subject, dto.variables || {});
 
-    const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('SMTP_USER');
-    const overrideTo = this.configService.get<string>('SMTP_OVERRIDE_TO');
-    const recipient = overrideTo || dto.to;
-
-    try {
-      await this.transporter.sendMail({ from, to: recipient, subject, html });
-      this.logger.log(`Email sent to ${recipient}${overrideTo ? ` (original: ${dto.to})` : ''} [template: ${dto.templateCode}]`);
-      return { success: true, message: 'Email sent successfully' };
-    } catch (error) {
-      this.logger.error(`Failed to send email to ${recipient}: ${error.message}`);
-      return { success: false, message: error.message };
-    }
+    const success = await this.mailService.send(dto.to, subject, html);
+    return {
+      success,
+      message: success ? 'Email sent successfully' : 'Failed to send email',
+    };
   }
 
-  /**
-   * Envío directo usado internamente (ej: al activar contrato)
-   */
   async sendByTemplate(
     templateCode: string,
     to: string,
@@ -90,21 +68,20 @@ export class NotificationsService {
   ): Promise<void> {
     const result = await this.sendEmail({ to, templateCode, variables });
     if (!result.success) {
-      this.logger.warn(`Notification "${templateCode}" to ${to} failed: ${result.message}`);
+      this.logger.warn(`Notification "${templateCode}" to ${to} failed`);
     }
   }
 
   // ── Seed de plantillas iniciales ──
 
   async seedDefaultTemplates(): Promise<void> {
-    const exists = await this.templateRepo.findOne({ where: { code: 'CONTRACT_ACTIVATED' } });
-    if (exists) return;
-
-    await this.templateRepo.save(
-      this.templateRepo.create({
-        code: 'CONTRACT_ACTIVATED',
-        subject: '¡Tu contrato {{contractCode}} ha sido activado! - CycloNet S.A.S.',
-        htmlBody: `<!DOCTYPE html>
+    const contractTpl = await this.templateRepo.findOne({ where: { code: 'CONTRACT_ACTIVATED' } });
+    if (!contractTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'CONTRACT_ACTIVATED',
+          subject: '¡Tu contrato {{contractCode}} ha sido activado! - CycloNet S.A.S.',
+          htmlBody: `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
@@ -121,12 +98,11 @@ export class NotificationsService {
         <p style="color:#333;line-height:1.6;">Estimado(a) <strong>{{customerName}}</strong>,</p>
         <p style="color:#333;line-height:1.6;">Nos complace informarle que su contrato <strong>{{contractCode}}</strong> ha sido <span style="color:#2e7d32;font-weight:bold;">activado exitosamente</span>.</p>
         <table width="100%" style="margin:20px 0;border-collapse:collapse;">
-          <tr><td style="padding:8px 12px;background:#e3f2fd;border-radius:4px 4px 0 0;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;background:#e3f2fd;border-radius:4px 4px 0 0;">{{packageName}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#e3f2fd;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;background:#e3f2fd;">{{packageName}}</td></tr>
           <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Fecha de inicio</td><td style="padding:8px 12px;">{{startDate}}</td></tr>
           <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#1a237e;">Fecha de fin</td><td style="padding:8px 12px;background:#f5f5f5;">{{endDate}}</td></tr>
         </table>
         <p style="color:#333;line-height:1.6;">Ya puede hacer uso de todos los servicios contratados con <strong>CycloNet S.A.S.</strong></p>
-        <p style="color:#333;line-height:1.6;">Si tiene alguna pregunta, no dude en contactarnos.</p>
       </td>
     </tr>
     <tr>
@@ -138,10 +114,99 @@ export class NotificationsService {
   </table>
 </body>
 </html>`,
-      }),
-    );
+        }),
+      );
+      this.logger.log('CONTRACT_ACTIVATED template seeded');
+    }
 
-    this.logger.log('Default email templates seeded');
+    const contractReadyTpl = await this.templateRepo.findOne({ where: { code: 'CONTRACT_READY' } });
+    if (!contractReadyTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'CONTRACT_READY',
+          subject: 'Tu contrato {{contractCode}} está listo para revisión - CycloNet S.A.S.',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Soluciones tecnológicas a tu medida</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px;">
+        <h2 style="color:#1a237e;margin:0 0 15px;">Tu contrato está listo</h2>
+        <p style="color:#333;line-height:1.6;">Estimado(a) <strong>{{customerName}}</strong>,</p>
+        <p style="color:#333;line-height:1.6;">Tu contrato <strong>{{contractCode}}</strong> ha sido preparado y está disponible para tu revisión.</p>
+        <table width="100%" style="margin:20px 0;border-collapse:collapse;">
+          <tr><td style="padding:8px 12px;background:#e3f2fd;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;background:#e3f2fd;">{{packageName}}</td></tr>
+        </table>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{{pdfUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#1e88e5);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ver contrato</a>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;margin:0;">Por favor revisa el contrato. Tu cuenta será activada una vez el administrador complete el proceso.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#1a237e;padding:20px;text-align:center;">
+        <p style="color:#bbdefb;margin:0;font-size:12px;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:12px;">www.cyclonet.com.co</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('CONTRACT_READY template seeded');
+    }
+
+    const verifyTpl = await this.templateRepo.findOne({ where: { code: 'USER_VERIFICATION' } });
+    if (!verifyTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'USER_VERIFICATION',
+          subject: 'Confirma tu correo electrónico - InOut by CycloNet',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#0d47a1,#e65100);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
+        <h1 style="margin:8px 0 4px;font-size:32px;font-weight:800;letter-spacing:2px;"><span style="color:#64b5f6;">In</span><span style="color:#ffb74d;">Out</span></h1>
+        <p style="color:rgba(255,255,255,0.85);margin:0;font-size:13px;">Sistema de gestión de inventario y ventas</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:36px 32px;">
+        <h2 style="color:#0d47a1;margin:0 0 16px;font-size:20px;">Confirma tu correo electrónico</h2>
+        <p style="color:#333;line-height:1.7;margin:0 0 12px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#333;line-height:1.7;margin:0 0 24px;">Tu correo electrónico ha sido registrado en <strong>CycloNet S.A.S.</strong> para acceder a la aplicación <strong><span style="color:#1565c0;">In</span><span style="color:#e65100;">Out</span></strong>. Para activar tu cuenta y comenzar a gestionar tu inventario, haz clic en el botón:</p>
+        <div style="text-align:center;margin:32px 0;">
+          <a href="{{verificationUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#e65100);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Verificar mi correo</a>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;margin:0 0 8px;">Este enlace es válido por <strong>24 horas</strong>.</p>
+        <p style="color:#aaa;font-size:12px;text-align:center;margin:0;">Si no solicitaste este registro, puedes ignorar este mensaje.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#0d47a1;padding:20px 32px;">
+        <p style="color:#bbdefb;margin:0;font-size:12px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+        <p style="color:#bbdefb;margin:6px 0 0;font-size:12px;text-align:center;">www.cyclonet.com.co</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('USER_VERIFICATION template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {
@@ -201,7 +266,6 @@ export class NotificationsService {
   }
 
   async sendContactForm(name: string, email: string, subject: string, message: string): Promise<{ success: boolean; message: string }> {
-    const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('SMTP_USER');
     const to = 'ti.cyclonet@hotmail.com';
 
     const html = `
@@ -223,20 +287,9 @@ export class NotificationsService {
         </div>
       </div>`;
 
-    try {
-      await this.transporter.sendMail({ from, to, subject: `[Contacto Web] ${subject}`, html, replyTo: email });
-      this.logger.log(`Contact form email sent from ${email}`);
-
-      // Enviar confirmación al cliente
-      this.sendContactConfirmation(name, email, subject, message).catch((err) =>
-        this.logger.warn(`Failed to send contact confirmation to ${email}: ${err.message}`),
-      );
-
-      return { success: true, message: 'Email sent successfully' };
-    } catch (error) {
-      this.logger.error(`Failed to send contact form email: ${error.message}`);
-      return { success: false, message: error.message };
-    }
+    const success = await this.mailService.send(to, `[Contacto Web] ${subject}`, html);
+    if (success) this.logger.log(`Contact form email sent from ${email}`);
+    return { success, message: success ? 'Email sent successfully' : 'Failed to send email' };
   }
 
   private async sendContactConfirmation(name: string, email: string, subject: string, message: string): Promise<void> {
@@ -249,17 +302,15 @@ export class NotificationsService {
       });
     } catch {
       // Si la plantilla no existe aún, enviar un correo simple de confirmación
-      const from = this.configService.get<string>('SMTP_FROM') || this.configService.get<string>('SMTP_USER');
-      await this.transporter.sendMail({
-        from,
-        to: email,
-        subject: '¡Gracias por contactarnos! - CycloNet S.A.S.',
-        html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:30px;">
+      await this.mailService.send(
+        email,
+        '¡Gracias por contactarnos! - CycloNet S.A.S.',
+        `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:30px;">
           <h2 style="color:#1a237e;">¡Gracias por preferirnos, ${name}!</h2>
           <p>Hemos recibido tu mensaje y nuestro equipo te responderá en las próximas 24 a 48 horas hábiles.</p>
           <p>Atentamente,<br><strong>CycloNet S.A.S.</strong></p>
         </div>`,
-      });
+      );
     }
   }
 }

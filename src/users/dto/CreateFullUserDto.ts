@@ -62,14 +62,17 @@ class NaturalPersonDto {
   @IsString()
   secondSurname?: string;
 
+  @IsOptional()
   @IsString()
-  birthDate: string;
+  birthDate?: string;
 
+  @IsOptional()
   @IsString()
-  maritalStatus: string;
+  maritalStatus?: string;
 
+  @IsOptional()
   @IsString()
-  sex: string;
+  sex?: string;
 }
 
 class LegalEntityDto {

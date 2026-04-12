@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { UserDependenciesModule } from './user-dependencies/user-dependencies.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -24,6 +25,7 @@ import { SweepModule } from './sweep/sweep.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PotentialUsersModule } from './potential-users/potential-users.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { MailModule } from './mail/mail.module';
 
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 import { CustomerParametersPeriodsModule } from './customer-parameters-periods/customer-parameters-periods.module';
@@ -33,20 +35,22 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '5432'),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'authoriza',
-      synchronize: true,
-      logging: true,
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
-      migrations: [],
-      migrationsRun: false,
-      autoLoadEntities: true,
-      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+    ScheduleModule.forRoot(),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres' as const,
+        host: config.get<string>('DB_HOST', 'localhost'),
+        port: parseInt(config.get<string>('DB_PORT', '5432')),
+        username: config.get<string>('DB_USERNAME', 'postgres'),
+        password: config.get<string>('DB_PASSWORD', ''),
+        database: config.get<string>('DB_NAME', 'authoriza'),
+        synchronize: true,
+        logging: true,
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        autoLoadEntities: true,
+        ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
+      }),
     }),
     AuthModule,
     UsersModule,
@@ -73,6 +77,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
     CustomerParametersPeriodsModule,
     PotentialUsersModule,
     NotificationsModule,
+    MailModule,
   ],
 })
 export class AppModule {}

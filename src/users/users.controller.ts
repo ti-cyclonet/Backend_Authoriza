@@ -8,6 +8,7 @@ import {
   Patch,
   Put,
   Request,
+  Res,
   ParseUUIDPipe,
   UsePipes,
   ValidationPipe,
@@ -17,6 +18,7 @@ import {
   DefaultValuePipe,
   ParseIntPipe,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -39,6 +41,7 @@ import { NaturalPersonDataService } from 'src/natural-person-data/natural-person
 import { LegalEntityDataService } from 'src/legal-entity-data/legal-entity-data.service';
 import { IndependentUsersDto } from 'src/common/dtos/independent-user.dto';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
+import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Users')
 @Controller('users')
@@ -84,6 +87,63 @@ export class UsersController {
     return plainToInstance(UserResponseDto, users, {
       excludeExtraneousValues: true,
     });
+  }
+
+  @Public()
+  @Get('verify-email')
+  @ApiOperation({ summary: 'Verify user email with code' })
+  async verifyEmail(
+    @Query('email') email: string,
+    @Query('code') code: string,
+    @Res() res: Response,
+  ) {
+    let title: string;
+    let message: string;
+    let icon: string;
+    let color: string;
+
+    try {
+      await this.usersService.verifyEmail(email, code);
+      title = '¡Verificación exitosa!';
+      message = 'Tu correo electrónico ha sido verificado correctamente. Se ha creado tu usuario en la suite <strong>CycloNet</strong> para usar la aplicación <strong><span style="color:#1565c0;">In</span><span style="color:#e65100;">Out</span></strong>.';
+      icon = '✅';
+      color = '#2e7d32';
+    } catch (err) {
+      title = 'Verificación fallida';
+      message = err.message || 'No se pudo verificar tu correo electrónico.';
+      icon = '❌';
+      color = '#c62828';
+    }
+
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(`<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>${title}</title></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;">
+  <div style="background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1);max-width:500px;width:90%;text-align:center;overflow:hidden;">
+    <div style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;">
+      <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:160px;" />
+    </div>
+    <div style="padding:40px 30px;">
+      <div style="font-size:64px;margin-bottom:16px;">${icon}</div>
+      <h1 style="color:${color};margin:0 0 16px;font-size:24px;">${title}</h1>
+      <p style="color:#333;line-height:1.7;font-size:15px;">${message}</p>
+      <hr style="border:none;border-top:1px solid #e0e0e0;margin:24px 0;">
+      <p style="color:#888;font-size:14px;">Cierre esta ventana para finalizar.</p>
+    </div>
+    <div style="background:#1a237e;padding:16px;">
+      <p style="color:#bbdefb;margin:0;font-size:12px;">&copy; ${new Date().getFullYear()} CycloNet S.A.S. — Todos los derechos reservados</p>
+    </div>
+  </div>
+</body>
+</html>`);
+  }
+
+  @Post(':id/send-verification')
+  @ApiOperation({ summary: 'Send verification email to user' })
+  async sendVerification(@Param('id', ParseUUIDPipe) id: string) {
+    await this.usersService.sendVerificationEmail(id);
+    return { message: 'Verification email sent' };
   }
 
   @Get('check-username/:userName')

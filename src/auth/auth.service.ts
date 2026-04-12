@@ -208,6 +208,34 @@ export class AuthService {
     };
   }
 
+  async loginAfterVerification(email: string): Promise<{ access_token: string; user: AuthenticatedUser }> {
+    const user = await this.usersService.findEntityByEmail(email);
+    if (!user) throw new UnauthorizedException('User not found');
+    if (!user.isVerified) throw new UnauthorizedException('Email not verified');
+    if (user.strStatus !== 'CONFIRMED') throw new UnauthorizedException('User is not in CONFIRMED status');
+
+    const payload = {
+      sub: user.id,
+      email: user.strUserName,
+      tenantId: user.id,
+      rol: 'unconfirmed',
+    };
+    const token = this.jwtService.sign(payload, { expiresIn: '10m' });
+
+    const userData: AuthenticatedUser = {
+      id: user.id,
+      email: user.strUserName,
+      image: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.strUserName),
+      name: user.strUserName,
+      rol: 'unconfirmed',
+      rolDescription: '',
+      firstName: user.basicData?.naturalPersonData?.firstName || '',
+      businessName: user.basicData?.legalEntityData?.businessName || '',
+    };
+
+    return { access_token: token, user: userData };
+  }
+
   async completeLoginWithContract(
     email: string,
     applicationName: string,
