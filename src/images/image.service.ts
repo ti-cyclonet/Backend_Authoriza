@@ -8,6 +8,8 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class ImageService {
+  private folderPrefix: string;
+
   constructor(
     @InjectRepository(Image)
     private imageRepository: Repository<Image>,
@@ -18,6 +20,11 @@ export class ImageService {
       api_key: this.configService.get<string>('CLOUDINARY_API_KEY'),
       api_secret: this.configService.get<string>('CLOUDINARY_API_SECRET'),
     });
+    this.folderPrefix = this.configService.get<string>('CLOUDINARY_FOLDER_PREFIX') || '';
+  }
+
+  private prefixFolder(folder: string): string {
+    return this.folderPrefix ? `${this.folderPrefix}/${folder}` : folder;
   }
 
   async uploadBuffer(
@@ -26,7 +33,7 @@ export class ImageService {
   ): Promise<{ public_id: string; secure_url: string }> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder },
+        { folder: this.prefixFolder(folder) },
         (error, result) => {
           if (error) return reject(error);
           resolve({
@@ -42,7 +49,7 @@ export class ImageService {
   async uploadToCloudinary(file: Express.Multer.File) {
     return new Promise((resolve, reject) => {
       cloudinary.uploader
-        .upload_stream({ folder: 'packages' }, (error, result) => {
+        .upload_stream({ folder: this.prefixFolder('packages') }, (error, result) => {
           if (error) return reject(error);
           resolve(result);
         })
@@ -50,12 +57,9 @@ export class ImageService {
     });
   }
 
-  /**
-   * Sube una imagen en base64 y retorna la URL y publicId
-   */
   async uploadBase64(base64DataUrl: string, folder = 'packages') {
     const result = await cloudinary.uploader.upload(base64DataUrl, {
-      folder,
+      folder: this.prefixFolder(folder),
       resource_type: 'image',
     });
 
