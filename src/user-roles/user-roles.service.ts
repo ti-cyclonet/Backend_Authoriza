@@ -114,6 +114,26 @@ export class UserRolesService {
       }
     }
 
+    // Si se desasigna adminInout de InOut, también desasignar adminInvoices de Factonet
+    const role = await this.rolRepository.findOne({
+      where: { id: roleId },
+      relations: ['strApplication']
+    });
+
+    if (role?.strName === 'adminInout' && role?.strApplication?.strName === 'Inout') {
+      const factonetAdminInvoicesRole = await this.rolRepository.findOne({
+        where: { strName: 'adminInvoices' },
+        relations: ['strApplication']
+      });
+
+      if (factonetAdminInvoicesRole && factonetAdminInvoicesRole.strApplication?.strName === 'Factonet') {
+        await this.userRoleRepository.delete({
+          userId,
+          roleId: factonetAdminInvoicesRole.id
+        });
+      }
+    }
+
     return this.remove(userId, roleId);
   }
 
