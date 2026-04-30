@@ -13,6 +13,7 @@ import { ContractService } from './contract.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('contracts')
 export class ContractController {
@@ -51,6 +52,12 @@ export class ContractController {
   @Get('user/:userId')
   findByUser(@Param('userId') userId: string) {
     return this.contractService.findByUser(userId);
+  }
+
+  @Public()
+  @Get('tenant/:tenantId/limits')
+  findTenantLimits(@Param('tenantId') tenantId: string) {
+    return this.contractService.findTenantLimits(tenantId);
   }
 
   @Get('tenant/:tenantId')

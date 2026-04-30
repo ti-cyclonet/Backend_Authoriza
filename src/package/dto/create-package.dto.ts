@@ -9,6 +9,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CreateUsageLimitVariableDto } from '../../usage-limit-variables/dto/create-usage-limit-variable.dto';
 
 export class RoleConfigDto {
   @IsUUID()
@@ -62,4 +63,10 @@ export class CreatePackageDto {
   @IsOptional()
   @IsArray()
   images?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateUsageLimitVariableDto)
+  usageLimitVariables?: CreateUsageLimitVariableDto[];
 }
