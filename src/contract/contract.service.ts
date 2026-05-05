@@ -418,6 +418,43 @@ export class ContractService {
     }
   }
 
+  async findTenantLimits(tenantId: string) {
+    // Reuse findByTenant logic to resolve the active contract for the tenant
+    const dependency = await this.contractRepository.manager
+      .createQueryBuilder()
+      .select('ud.principalUserId')
+      .from('user_dependencies', 'ud')
+      .where('ud.dependentUserId = :tenantId', { tenantId })
+      .andWhere('ud.status = :status', { status: 'ACTIVE' })
+      .getRawOne();
+
+    const userId = dependency?.principalUserId || tenantId;
+
+    const contract = await this.contractRepository.findOne({
+      where: { user: { id: userId } },
+      relations: ['package', 'package.usageLimitVariables'],
+    });
+
+    if (!contract) {
+      throw new NotFoundException(
+        `No se encontró un contrato activo para el tenant '${tenantId}'`,
+      );
+    }
+
+    const limits = (contract.package?.usageLimitVariables ?? []).map((v) => ({
+      variableName: v.variableName,
+      displayName: v.displayName,
+      maxValue: v.maxValue,
+      targetApplication: v.targetApplication,
+    }));
+
+    return {
+      contractId: contract.id,
+      packageName: contract.package?.name ?? '',
+      limits,
+    };
+  }
+
   async validateCodePrefixPublic(codePrefix: string): Promise<void> {
     const existingContract = await this.contractRepository
       .createQueryBuilder('contract')

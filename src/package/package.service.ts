@@ -13,6 +13,8 @@ import { EntityCodeService } from 'src/entity-codes/services/entity-code.service
 import { Contract } from 'src/contract/entities/contract.entity';
 import { ContractStatus } from 'src/contract/enums/contract-status.enum';
 import { User } from 'src/users/entities/user.entity';
+import { UsageLimitVariablesService } from 'src/usage-limit-variables/usage-limit-variables.service';
+import { CreateUsageLimitVariableDto } from 'src/usage-limit-variables/dto/create-usage-limit-variable.dto';
 import { v2 as cloudinary } from 'cloudinary';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -32,7 +34,61 @@ export class PackageService {
     private readonly contractRepository: Repository<Contract>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly usageLimitVariablesService: UsageLimitVariablesService,
   ) {}
+
+  /**
+   * Parses usageLimitVariables from DTO (may come as JSON string in FormData)
+   * and validates no duplicate variableNames and no negative maxValues.
+   */
+  private parseAndValidateUsageLimitVariables(
+    raw: CreateUsageLimitVariableDto[] | string | undefined,
+  ): CreateUsageLimitVariableDto[] | undefined {
+    if (raw === undefined || raw === null) {
+      return undefined;
+    }
+
+    let variables: CreateUsageLimitVariableDto[];
+
+    // If it comes as a JSON string (FormData), parse it
+    if (typeof raw === 'string') {
+      try {
+        variables = JSON.parse(raw);
+      } catch {
+        throw new BadRequestException('Invalid JSON in usageLimitVariables');
+      }
+    } else {
+      variables = raw;
+    }
+
+    if (!Array.isArray(variables)) {
+      throw new BadRequestException('usageLimitVariables must be an array');
+    }
+
+    if (variables.length === 0) {
+      return variables;
+    }
+
+    // Validate no negative maxValues
+    for (const variable of variables) {
+      if (variable.maxValue < 0) {
+        throw new BadRequestException(
+          `El valor máximo de la variable '${variable.variableName}' debe ser un entero no negativo`,
+        );
+      }
+    }
+
+    // Validate no duplicate variableNames
+    const names = variables.map((v) => v.variableName);
+    const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
+    if (duplicates.length > 0) {
+      throw new BadRequestException(
+        `La variable '${duplicates[0]}' está duplicada en este paquete`,
+      );
+    }
+
+    return variables;
+  }
 
   async create(dto: CreatePackageDto, files: Express.Multer.File[]) {
     // Si viene como string en FormData, convertirlo a array
@@ -43,6 +99,11 @@ export class PackageService {
         throw new BadRequestException('Invalid JSON in configurations');
       }
     }
+
+    // Parse and validate usageLimitVariables (may come as JSON string in FormData)
+    const usageLimitVariables = this.parseAndValidateUsageLimitVariables(
+      dto.usageLimitVariables as any,
+    );
 
     // 1) Guardar paquete con código generado
     const code = await this.entityCodeService.generateCode('Package');
@@ -93,11 +154,21 @@ export class PackageService {
       await this.imageRepository.save(imageEntities);
     }
 
+    // 4) Persistir usageLimitVariables
+    let savedVariables = [];
+    if (usageLimitVariables && usageLimitVariables.length > 0) {
+      savedVariables = await this.usageLimitVariablesService.createForPackage(
+        newPackage.id,
+        usageLimitVariables,
+      );
+    }
+
     return {
       message: 'Package created successfully',
       data: {
         ...newPackage,
         images: imageEntities,
+        usageLimitVariables: savedVariables,
       },
     };
   }
@@ -112,7 +183,8 @@ export class PackageService {
         'configurations',
         'configurations.rol',
         'configurations.package',
-        'images'
+        'images',
+        'usageLimitVariables',
       ],
     });
   }
@@ -120,15 +192,18 @@ export class PackageService {
   findOne(id: string) {
     return this.packageRepository.findOne({
       where: { id },
-      relations: ['configurations', 'configurations.rol'],
+      relations: ['configurations', 'configurations.rol', 'usageLimitVariables'],
     });
   }
 
   async update(id: string, updatePackageDto: UpdatePackageDto) {
-    const { images, ...packageData } = updatePackageDto;
+    const { images, usageLimitVariables: rawVariables, ...packageData } = updatePackageDto;
 
-    // 1) Actualizar solo datos del paquete
-    await this.packageRepository.update(id, packageData);
+    // 1) Actualizar solo datos del paquete (exclude nested relations)
+    const { configurations, ...scalarPackageData } = packageData;
+    if (Object.keys(scalarPackageData).length > 0) {
+      await this.packageRepository.update(id, scalarPackageData);
+    }
 
     // 2) Manejar imágenes si vienen
     if (images && images.length > 0) {
@@ -142,6 +217,14 @@ export class PackageService {
         ),
       );
       await this.imageRepository.save(imageEntities);
+    }
+
+    // 3) Reemplazar usageLimitVariables si vienen (delete + insert)
+    const parsedVariables = this.parseAndValidateUsageLimitVariables(
+      rawVariables as any,
+    );
+    if (parsedVariables !== undefined) {
+      await this.usageLimitVariablesService.replaceForPackage(id, parsedVariables);
     }
 
     return this.findOne(id);

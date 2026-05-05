@@ -29,6 +29,7 @@ import { MailModule } from './mail/mail.module';
 
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
 import { CustomerParametersPeriodsModule } from './customer-parameters-periods/customer-parameters-periods.module';
+import { UsageLimitVariablesModule } from './usage-limit-variables/usage-limit-variables.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { CustomerParametersPeriodsModule } from './customer-parameters-periods/c
     PotentialUsersModule,
     NotificationsModule,
     MailModule,
+    UsageLimitVariablesModule,
   ],
 })
 export class AppModule {}

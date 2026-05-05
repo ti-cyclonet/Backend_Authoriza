@@ -9,12 +9,14 @@ import { ImageModule } from 'src/images/image.module';
 import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
 import { Contract } from 'src/contract/entities/contract.entity';
 import { User } from 'src/users/entities/user.entity';
+import { UsageLimitVariablesModule } from 'src/usage-limit-variables/usage-limit-variables.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Package, ConfigurationPackage, Image, Contract, User]),
     ImageModule,
-    EntityCodesModule
+    EntityCodesModule,
+    UsageLimitVariablesModule,
   ],
   controllers: [PackageController],
   providers: [PackageService],

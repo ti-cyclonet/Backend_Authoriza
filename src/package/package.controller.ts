@@ -50,6 +50,7 @@ export class PackageController {
       name: body.name,
       description: body.description,
       configurations,
+      usageLimitVariables: body.usageLimitVariables,
     };
 
     return this.packageService.create(createPackageDto, files);

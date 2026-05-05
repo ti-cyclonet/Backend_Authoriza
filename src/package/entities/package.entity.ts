@@ -2,6 +2,7 @@ import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
 import { ConfigurationPackage } from '../../configuration-package/entities/configuration-package.entity';
 import { Image } from '../../images/entities/image.entity';
 import { Contract } from '../../contract/entities/contract.entity';
+import { UsageLimitVariable } from '../../usage-limit-variables/entities/usage-limit-variable.entity';
 
 @Entity()
 export class Package {
@@ -34,4 +35,10 @@ export class Package {
 
   @OneToMany(() => Contract, (contract) => contract.package)
   contracts: Contract[];
+
+  @OneToMany(() => UsageLimitVariable, (ulv) => ulv.package, {
+    cascade: true,
+    eager: true,
+  })
+  usageLimitVariables: UsageLimitVariable[];
 }
