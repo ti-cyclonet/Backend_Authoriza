@@ -110,6 +110,7 @@ export class PackageService {
     const newPackage = await this.packageRepository.save({
       name: dto.name,
       description: dto.description,
+      price: dto.price || 0,
       code,
     });
 
