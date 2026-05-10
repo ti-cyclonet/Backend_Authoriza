@@ -42,6 +42,10 @@ export class CreatePackageDto {
   @IsNotEmpty()
   description: string;
 
+  @IsNumber()
+  @IsOptional()
+  price?: number = 0;
+
   @IsInt()
   @IsOptional()
   maxProducts?: number = 50;

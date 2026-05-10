@@ -18,6 +18,9 @@ export class Package {
   @Column({ nullable: true })
   description?: string;
 
+  @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
+  price: number;
+
   @Column({ type: 'int', default: 50 })
   maxProducts: number;
 
