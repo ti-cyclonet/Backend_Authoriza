@@ -340,6 +340,7 @@ export class UsersService {
     const user = await this.userRepository.findOne({
       where: { id },
       relations: ['basicData'],
+      withDeleted: true,
     });
 
     if (!user) {
@@ -349,7 +350,13 @@ export class UsersService {
     console.log('Current user before update:', JSON.stringify(user, null, 2));
 
     if (dto.strUserName) user.strUserName = dto.strUserName;
-    if (dto.strStatus) user.strStatus = dto.strStatus;
+    if (dto.strStatus) {
+      user.strStatus = dto.strStatus;
+      // Si se cambia a un estado diferente de DELETED, restaurar el usuario (limpiar deletedAt)
+      if (dto.strStatus !== 'DELETED' && user.deletedAt) {
+        user.deletedAt = null as any;
+      }
+    }
 
     if (dto.rolId) {
       // Los roles ahora se manejan a través de UserRole
