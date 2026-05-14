@@ -108,17 +108,26 @@ export class ContractService {
       (contract as any).package = pkg;
     }
 
-    if (dto.mode === PaymentMode.MONTHLY && !dto.payday) {
-      throw new BadRequestException('Payday is required for MONTHLY mode');
-    }
+    // Determine the effective mode: use dto.mode if provided, otherwise keep the existing contract mode
+    const effectiveMode = dto.mode ?? contract.mode;
 
-    if (dto.mode !== PaymentMode.MONTHLY && dto.payday) {
-      throw new BadRequestException('Payday only applies for MONTHLY mode');
+    if (dto.mode !== undefined || dto.payday !== undefined) {
+      if (effectiveMode === PaymentMode.MONTHLY && !dto.payday && !contract.payday) {
+        throw new BadRequestException('Payday is required for MONTHLY mode');
+      }
+
+      if (effectiveMode !== PaymentMode.MONTHLY && (dto.payday !== undefined && dto.payday !== null)) {
+        throw new BadRequestException('Payday only applies for MONTHLY mode');
+      }
     }
 
     if (dto.endDate && new Date(dto.endDate) <= new Date(dto.startDate)) {
       throw new BadRequestException('endDate must be greater than startDate');
     }
+
+    // Si el estado cambia, delegar a updateStatus para cascadear a dependientes
+    const newStatus = dto.status ?? contract.status;
+    const statusChanged = dto.status && dto.status !== contract.status;
 
     Object.assign(contract, {
       value: dto.value ?? contract.value,
@@ -126,15 +135,48 @@ export class ContractService {
       payday: dto.payday ?? contract.payday,
       startDate: dto.startDate ?? contract.startDate,
       endDate: dto.endDate ?? contract.endDate,
-      status: dto.status ?? contract.status,
+      status: statusChanged ? contract.status : newStatus, // No cambiar aquí si va a cascadear
     });
 
-    return this.contractRepository.save(contract);
+    const savedContract = await this.contractRepository.save(contract);
+
+    // Si el estado cambió, usar updateStatus para activar/desactivar dependientes
+    if (statusChanged) {
+      return this.updateStatus(id, dto.status);
+    }
+
+    return savedContract;
   }
 
   async remove(id: string) {
-    const contract = await this.contractRepository.findOne({ where: { id } });
+    const contract = await this.contractRepository.findOne({
+      where: { id },
+      relations: ['user'],
+    });
     if (!contract) throw new NotFoundException(`Contract with id ${id} not found`);
+
+    // Desactivar usuario principal y dependientes antes de eliminar
+    if (contract.user) {
+      await this.userRepository.update({ id: contract.user.id }, { strStatus: 'INACTIVE' });
+
+      await this.userRepository
+        .createQueryBuilder()
+        .update(User)
+        .set({ strStatus: 'INACTIVE' })
+        .where(
+          'id IN (SELECT "dependentUserId" FROM user_dependencies WHERE "principalUserId" = :principalId AND status = :status)',
+          { principalId: contract.user.id, status: 'ACTIVE' },
+        )
+        .execute();
+
+      await this.logsService.info(
+        LogAction.USER_DEACTIVATED,
+        `User ${contract.user.strUserName} and dependents deactivated due to contract deletion`,
+        contract.user.id,
+        contract.id,
+      );
+    }
+
     contract.status = ContractStatus.DELETED;
     await this.contractRepository.save(contract);
     return this.contractRepository.softDelete(id);
@@ -238,9 +280,15 @@ export class ContractService {
       throw new BadRequestException('Contract is already active');
     }
 
-    if (!contract.user?.isVerified) {
+    const userIsConfirmed =
+      contract.user?.isVerified ||
+      contract.user?.strStatus === 'CONFIRMED' ||
+      contract.user?.strStatus === 'ACTIVE' ||
+      contract.user?.strStatus === 'INACTIVE';
+
+    if (!userIsConfirmed) {
       throw new ForbiddenException(
-        'No se puede activar el contrato. El correo del usuario no ha sido verificado.',
+        'No se puede activar el contrato. El usuario no ha sido confirmado.',
       );
     }
 
@@ -270,9 +318,15 @@ export class ContractService {
     const contract = await this.findOne(id);
 
     if (status === ContractStatus.ACTIVE) {
-      if (!contract.user?.isVerified) {
+      const userIsConfirmed =
+        contract.user?.isVerified ||
+        contract.user?.strStatus === 'CONFIRMED' ||
+        contract.user?.strStatus === 'ACTIVE' ||
+        contract.user?.strStatus === 'INACTIVE';
+
+      if (!userIsConfirmed) {
         throw new ForbiddenException(
-          'No se puede activar el contrato. El correo del usuario no ha sido verificado.',
+          'No se puede activar el contrato. El usuario no ha sido confirmado.',
         );
       }
 
