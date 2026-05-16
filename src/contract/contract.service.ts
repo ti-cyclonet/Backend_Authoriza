@@ -140,12 +140,48 @@ export class ContractService {
 
     const savedContract = await this.contractRepository.save(contract);
 
+    // Si el paquete cambió, invalidar cache de límites en las aplicaciones cliente
+    if (dto.packageId) {
+      this.invalidateClientCaches(contract.user?.id).catch((err) =>
+        this.logger.warn(`Error invalidating client caches: ${err.message}`),
+      );
+    }
+
     // Si el estado cambió, usar updateStatus para activar/desactivar dependientes
     if (statusChanged) {
       return this.updateStatus(id, dto.status);
     }
 
     return savedContract;
+  }
+
+  /**
+   * Notify client applications (InOut, etc.) to invalidate their limits cache
+   * when a contract's package changes.
+   */
+  private async invalidateClientCaches(userId: string): Promise<void> {
+    if (!userId) return;
+
+    const inoutApiUrl = process.env.INOUT_API_URL || 'http://localhost:3001';
+    
+    try {
+      // Get the user's basicDataId which is used as tenantId in InOut
+      const user = await this.userRepository.findOne({
+        where: { id: userId },
+        relations: ['basicData'],
+      });
+
+      const tenantId = user?.basicData?.id || userId;
+
+      await fetch(`${inoutApiUrl}/api/usage-status/invalidate-cache/${tenantId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      this.logger.log(`Cache invalidated for tenant ${tenantId} in InOut`);
+    } catch (error) {
+      this.logger.warn(`Could not invalidate InOut cache: ${error.message}`);
+    }
   }
 
   async remove(id: string) {
