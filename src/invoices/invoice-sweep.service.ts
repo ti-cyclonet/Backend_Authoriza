@@ -24,12 +24,18 @@ export class InvoiceSweepService {
     
     const activeContracts = await this.contractRepository.find({
       where: { status: ContractStatus.ACTIVE },
-      relations: ['user']
+      relations: ['user', 'package']
     });
 
     const generated: string[] = [];
     
     for (const contract of activeContracts) {
+      // Solo generar facturas para paquetes facturables
+      if (contract.package && contract.package.isBillable === false) {
+        this.logger.log(`Sweep: Skipping contract ${contract.id} - package "${contract.package.name}" is not billable`);
+        continue;
+      }
+
       if (await this.shouldGenerateInvoice(contract)) {
         try {
           await this.invoiceGeneratorService.generateInvoiceForContract(contract.id);

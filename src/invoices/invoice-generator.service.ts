@@ -36,6 +36,12 @@ export class InvoiceGeneratorService {
     });
 
     for (const contract of activeContracts) {
+      // Solo generar facturas para paquetes facturables
+      if (contract.package && contract.package.isBillable === false) {
+        this.logger.log(`Skipping contract ${contract.id}: package "${contract.package.name}" is not billable`);
+        continue;
+      }
+
       await this.processContract(contract);
     }
 
@@ -229,6 +235,11 @@ export class InvoiceGeneratorService {
 
     if (contract.status !== ContractStatus.ACTIVE) {
       throw new Error(`Contract ${contractId} is not active`);
+    }
+
+    // No generar facturas para paquetes no facturables
+    if (contract.package && contract.package.isBillable === false) {
+      throw new Error(`Contract ${contractId} has a non-billable package ("${contract.package.name}"). No invoice will be generated.`);
     }
 
     // Verificar si ya existe factura para el período actual
