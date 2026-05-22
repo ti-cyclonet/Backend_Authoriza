@@ -21,14 +21,8 @@ export class Package {
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   price: number;
 
-  @Column({ type: 'int', default: 50 })
-  maxProducts: number;
-
-  @Column({ type: 'int', default: 1 })
-  maxUsers: number;
-
-  @Column({ type: 'int', default: 100 })
-  maxInvoices: number;
+  @Column({ type: 'boolean', default: true })
+  isBillable: boolean;
 
   @OneToMany(() => ConfigurationPackage, (config) => config.package)
   configurations: ConfigurationPackage[];

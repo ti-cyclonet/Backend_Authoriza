@@ -541,6 +541,7 @@ export class ContractService {
     return {
       contractId: contract.id,
       packageName: contract.package?.name ?? '',
+      isBillable: contract.package?.isBillable ?? true,
       limits,
     };
   }
