@@ -42,6 +42,7 @@ import { LegalEntityDataService } from 'src/legal-entity-data/legal-entity-data.
 import { IndependentUsersDto } from 'src/common/dtos/independent-user.dto';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
 import { Public } from '../auth/decorators/public.decorator';
+import { UserRolesService } from '../user-roles/user-roles.service';
 
 @ApiTags('Users')
 @Controller('users')
@@ -51,6 +52,7 @@ export class UsersController {
     private readonly basicDataService: BasicDataService,
     private readonly naturalPersonService: NaturalPersonDataService,
     private readonly legalEntityService: LegalEntityDataService,
+    private readonly userRolesService: UserRolesService,
   ) {}
 
   @Post()
@@ -208,9 +210,14 @@ export class UsersController {
 
   @Post(':id/assign-role')
   @ApiOperation({ summary: 'Assign a role to a user' })
-  @ApiBody({ schema: { example: { roleId: 'uuid-of-role' } } })
-  assignRole(@Param('id') id: string, @Body() body: { roleId: string }) {
-    return this.usersService.assignRole(id, body.roleId);
+  @ApiBody({ schema: { example: { roleId: 'uuid-of-role', contractId: 'uuid-of-contract' } } })
+  assignRole(@Param('id') id: string, @Body() body: { roleId: string; contractId?: string }) {
+    return this.userRolesService.assignRole({
+      userId: id,
+      roleId: body.roleId,
+      contractId: body.contractId,
+      status: 'ACTIVE',
+    });
   }
 
   @Post(':id/change-password')

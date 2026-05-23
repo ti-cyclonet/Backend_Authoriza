@@ -41,11 +41,37 @@ export class UserRolesService {
     });
   }
 
-  async remove(userId: string, roleId: string): Promise<void> {
-    await this.userRoleRepository.delete({ userId, roleId });
+  async remove(userId: string, roleId: string, contractId?: string): Promise<void> {
+    if (contractId) {
+      await this.userRoleRepository.delete({ userId, roleId, contractId });
+    } else {
+      await this.userRoleRepository.delete({ userId, roleId });
+    }
   }
 
   async assignRole(dto: CreateUserRoleDto): Promise<UserRole> {
+    // Verificar si ya existe un registro (activo o inactivo) para esta combinación
+    const existingCondition: any = { userId: dto.userId, roleId: dto.roleId };
+    if (dto.contractId) {
+      existingCondition.contractId = dto.contractId;
+    }
+
+    const existing = await this.userRoleRepository.findOne({
+      where: existingCondition,
+    });
+
+    if (existing) {
+      // Si ya existe pero está INACTIVE, reactivarlo en lugar de crear uno nuevo
+      if (existing.status === 'INACTIVE') {
+        existing.status = 'ACTIVE';
+        return this.userRoleRepository.save(existing);
+      }
+      // Si ya existe y está ACTIVE, no duplicar
+      if (existing.status === 'ACTIVE') {
+        throw new BadRequestException('El usuario ya tiene este rol asignado en este contrato');
+      }
+    }
+
     // Si viene contractId, validar cupos disponibles
     if (dto.contractId) {
       await this.validateRoleAvailability(dto.contractId, dto.roleId);
@@ -96,7 +122,7 @@ export class UserRolesService {
     return this.findByUser(userId);
   }
 
-  async removeRole(userId: string, roleId: string): Promise<void> {
+  async removeRole(userId: string, roleId: string, contractId?: string): Promise<void> {
     // Verificar si es el último administrador de Authoriza
     const isAuthorizaAdmin = await this.userRoleRepository.findOne({
       where: { userId, roleId },
@@ -127,20 +153,75 @@ export class UserRolesService {
       });
 
       if (factonetAdminInvoicesRole && factonetAdminInvoicesRole.strApplication?.strName === 'Factonet') {
-        await this.userRoleRepository.delete({
-          userId,
-          roleId: factonetAdminInvoicesRole.id
-        });
+        if (contractId) {
+          await this.userRoleRepository.delete({
+            userId,
+            roleId: factonetAdminInvoicesRole.id,
+            contractId
+          });
+        } else {
+          await this.userRoleRepository.delete({
+            userId,
+            roleId: factonetAdminInvoicesRole.id
+          });
+        }
       }
     }
 
-    return this.remove(userId, roleId);
+    return this.remove(userId, roleId, contractId);
   }
 
   async getAssignedCountByContractAndRole(contractId: string, roleId: string): Promise<number> {
-    return this.userRoleRepository.count({
-      where: { contractId, roleId, status: 'ACTIVE' }
-    });
+    // Excluir al accountOwner del conteo, ya que no se gestiona desde la UI de dependientes
+    const accountOwnerRole = await this.rolRepository.findOne({ where: { strName: 'accountOwner' } });
+    
+    const qb = this.userRoleRepository.createQueryBuilder('ur')
+      .where('ur.contractId = :contractId', { contractId })
+      .andWhere('ur.roleId = :roleId', { roleId })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' });
+
+    // Si el rol que estamos contando NO es accountOwner, excluir usuarios que tengan accountOwner en este contrato
+    if (accountOwnerRole) {
+      qb.andWhere('ur.userId NOT IN ' +
+        qb.subQuery()
+          .select('sub.userId')
+          .from('user_roles', 'sub')
+          .where('sub.contractId = :contractId', { contractId })
+          .andWhere('sub.roleId = :ownerRoleId', { ownerRoleId: accountOwnerRole.id })
+          .andWhere('sub.status = :status', { status: 'ACTIVE' })
+          .getQuery()
+      );
+    }
+
+    return qb.getCount();
+  }
+
+  async getAssignedUsersByContractAndRole(contractId: string, roleId: string): Promise<UserRole[]> {
+    const accountOwnerRole = await this.rolRepository.findOne({ where: { strName: 'accountOwner' } });
+
+    const qb = this.userRoleRepository.createQueryBuilder('ur')
+      .leftJoinAndSelect('ur.user', 'user')
+      .leftJoinAndSelect('user.basicData', 'basicData')
+      .leftJoinAndSelect('basicData.naturalPersonData', 'naturalPersonData')
+      .leftJoinAndSelect('basicData.legalEntityData', 'legalEntityData')
+      .where('ur.contractId = :contractId', { contractId })
+      .andWhere('ur.roleId = :roleId', { roleId })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' });
+
+    // Excluir accountOwner
+    if (accountOwnerRole) {
+      qb.andWhere('ur.userId NOT IN ' +
+        qb.subQuery()
+          .select('sub.userId')
+          .from('user_roles', 'sub')
+          .where('sub.contractId = :contractId', { contractId })
+          .andWhere('sub.roleId = :ownerRoleId', { ownerRoleId: accountOwnerRole.id })
+          .andWhere('sub.status = :status', { status: 'ACTIVE' })
+          .getQuery()
+      );
+    }
+
+    return qb.getMany();
   }
 
   async validateRoleAvailability(contractId: string, roleId: string): Promise<void> {

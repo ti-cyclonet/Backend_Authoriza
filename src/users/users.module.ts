@@ -13,6 +13,7 @@ import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
 import { LogsModule } from '../logs/logs.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ContractModule } from '../contract/contract.module';
+import { UserRolesModule } from '../user-roles/user-roles.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { ContractModule } from '../contract/contract.module';
     LogsModule,
     NotificationsModule,
     forwardRef(() => ContractModule),
+    forwardRef(() => UserRolesModule),
   ],
   controllers: [UsersController],
   providers: [UsersService, UserCleanupService],
