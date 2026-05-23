@@ -46,17 +46,8 @@ export class CreatePackageDto {
   @IsOptional()
   price?: number = 0;
 
-  @IsInt()
   @IsOptional()
-  maxProducts?: number = 50;
-
-  @IsInt()
-  @IsOptional()
-  maxUsers?: number = 1;
-
-  @IsInt()
-  @IsOptional()
-  maxInvoices?: number = 100;
+  isBillable?: boolean = true;
 
   @IsOptional()
   @IsArray()

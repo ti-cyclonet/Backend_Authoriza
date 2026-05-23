@@ -49,6 +49,8 @@ export class PackageController {
     const createPackageDto: CreatePackageDto = {
       name: body.name,
       description: body.description,
+      price: body.price ? parseFloat(body.price) : 0,
+      isBillable: body.isBillable === 'true' || body.isBillable === true,
       configurations,
       usageLimitVariables: body.usageLimitVariables,
     };

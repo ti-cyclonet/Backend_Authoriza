@@ -111,6 +111,7 @@ export class PackageService {
       name: dto.name,
       description: dto.description,
       price: dto.price || 0,
+      isBillable: dto.isBillable !== false,
       code,
     });
 
