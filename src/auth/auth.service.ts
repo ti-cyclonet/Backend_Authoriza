@@ -37,6 +37,8 @@ export class AuthService {
     };
     contract?: {
       codePrefix: string;
+      clientName?: string | null;
+      packageName?: string | null;
     };
     contracts?: Array<{
       contractId: string;
@@ -203,7 +205,13 @@ export class AuthService {
       access_token: token,
       user: userWithoutSensitiveData,
       contract: {
-        codePrefix: codePrefix
+        codePrefix: codePrefix,
+        clientName: uniqueContracts.size === 1 
+          ? Array.from(uniqueContracts.values())[0].clientName 
+          : null,
+        packageName: uniqueContracts.size === 1 
+          ? Array.from(uniqueContracts.values())[0].packageName 
+          : null,
       }
     };
   }
@@ -248,6 +256,8 @@ export class AuthService {
     };
     contract?: {
       codePrefix: string;
+      clientName?: string | null;
+      packageName?: string | null;
     };
   }> {
     // Buscar el usuario
@@ -336,7 +346,11 @@ export class AuthService {
       access_token: token,
       user: userWithoutSensitiveData,
       contract: {
-        codePrefix: codePrefix
+        codePrefix: codePrefix,
+        clientName: userRoleForContract.contract?.user?.basicData?.strPersonType === 'N'
+          ? `${userRoleForContract.contract.user.basicData.naturalPersonData?.firstName || ''} ${userRoleForContract.contract.user.basicData.naturalPersonData?.firstSurname || ''}`.trim()
+          : userRoleForContract.contract?.user?.basicData?.legalEntityData?.businessName || null,
+        packageName: userRoleForContract.contract?.package?.name || null,
       }
     };
   }
