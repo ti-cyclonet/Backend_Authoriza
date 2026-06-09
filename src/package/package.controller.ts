@@ -77,7 +77,7 @@ export class PackageController {
   }
 
   @Public()
-  @Get('public/landing')
+  @Get('landing')
   findForLanding(@Query('application') application?: string) {
     return this.packageService.findForLanding(application);
   }
