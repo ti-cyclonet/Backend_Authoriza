@@ -22,7 +22,7 @@ async function bootstrap() {
     });
   } else {
     app.enableCors({
-      origin: ['https://www.cyclonet.com.co', 'https://cyclonet.com.co'],
+      origin: ['https://www.cyclonet.com.co', 'https://cyclonet.com.co', 'https://api.cyclonet.com.co'],
       credentials: true,
     });
   }
