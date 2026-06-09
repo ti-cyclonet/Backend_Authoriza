@@ -20,6 +20,11 @@ async function bootstrap() {
       origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202', 'http://localhost:4203', 'http://localhost', 'http://localhost:80'],
       credentials: true,
     });
+  } else {
+    app.enableCors({
+      origin: ['https://www.cyclonet.com.co', 'https://cyclonet.com.co'],
+      credentials: true,
+    });
   }
   app.setGlobalPrefix('api');
 
