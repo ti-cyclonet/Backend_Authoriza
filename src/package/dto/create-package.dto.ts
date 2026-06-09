@@ -49,6 +49,29 @@ export class CreatePackageDto {
   @IsOptional()
   isBillable?: boolean = true;
 
+  // Landing page fields
+  @IsOptional()
+  showInLanding?: boolean = false;
+
+  @IsString()
+  @IsOptional()
+  displayName?: string;
+
+  @IsInt()
+  @IsOptional()
+  displayOrder?: number = 0;
+
+  @IsOptional()
+  isHighlighted?: boolean = false;
+
+  @IsString()
+  @IsOptional()
+  ctaLabel?: string = 'Elegir Plan';
+
+  @IsString()
+  @IsOptional()
+  ctaType?: string = 'register';
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

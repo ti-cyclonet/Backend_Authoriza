@@ -17,6 +17,7 @@ import { UpdatePackageDto } from './dto/update-package.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { Public } from '../auth/decorators/public.decorator';
 
 @Controller('packages')
 export class PackageController {
@@ -51,6 +52,12 @@ export class PackageController {
       description: body.description,
       price: body.price ? parseFloat(body.price) : 0,
       isBillable: body.isBillable === 'true' || body.isBillable === true,
+      showInLanding: body.showInLanding === 'true' || body.showInLanding === true,
+      displayName: body.displayName || null,
+      displayOrder: body.displayOrder ? parseInt(body.displayOrder) : 0,
+      isHighlighted: body.isHighlighted === 'true' || body.isHighlighted === true,
+      ctaLabel: body.ctaLabel || 'Elegir Plan',
+      ctaType: body.ctaType || 'register',
       configurations,
       usageLimitVariables: body.usageLimitVariables,
     };
@@ -67,6 +74,12 @@ export class PackageController {
   async checkName(@Query('name') name: string) {
     const exists = await this.packageService.checkNameExists(name);
     return { exists };
+  }
+
+  @Public()
+  @Get('public/landing')
+  findForLanding(@Query('application') application?: string) {
+    return this.packageService.findForLanding(application);
   }
 
   @Get('contracted/:userId')

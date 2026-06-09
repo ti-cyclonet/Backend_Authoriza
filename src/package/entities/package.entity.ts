@@ -24,6 +24,25 @@ export class Package {
   @Column({ type: 'boolean', default: true })
   isBillable: boolean;
 
+  // Landing page fields
+  @Column({ type: 'boolean', default: false })
+  showInLanding: boolean;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  displayName?: string;
+
+  @Column({ type: 'int', default: 0 })
+  displayOrder: number;
+
+  @Column({ type: 'boolean', default: false })
+  isHighlighted: boolean;
+
+  @Column({ type: 'varchar', length: 50, nullable: true, default: 'Elegir Plan' })
+  ctaLabel?: string;
+
+  @Column({ type: 'varchar', length: 20, nullable: true, default: 'register' })
+  ctaType?: string;
+
   @OneToMany(() => ConfigurationPackage, (config) => config.package)
   configurations: ConfigurationPackage[];
 

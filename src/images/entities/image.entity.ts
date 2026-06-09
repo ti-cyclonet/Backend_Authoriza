@@ -15,4 +15,7 @@ export class Image {
   @ManyToOne(() => Package, (pkg) => pkg.images, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'packageId' })
   package: Package;
+
+  @Column({ nullable: true })
+  packageId: string;
 }
