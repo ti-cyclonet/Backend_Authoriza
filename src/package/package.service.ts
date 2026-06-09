@@ -112,6 +112,12 @@ export class PackageService {
       description: dto.description,
       price: dto.price || 0,
       isBillable: dto.isBillable !== false,
+      showInLanding: dto.showInLanding || false,
+      displayName: dto.displayName || null,
+      displayOrder: dto.displayOrder || 0,
+      isHighlighted: dto.isHighlighted || false,
+      ctaLabel: dto.ctaLabel || 'Elegir Plan',
+      ctaType: dto.ctaType || 'register',
       code,
     });
 
@@ -176,7 +182,7 @@ export class PackageService {
   }
 
   async findAll(paginationDto: PaginationDto) {
-    const { limit = 10, offset = 0 } = paginationDto;
+    const { limit = 100, offset = 0 } = paginationDto;
 
     return this.packageRepository.find({
       take: limit,
@@ -194,7 +200,7 @@ export class PackageService {
   findOne(id: string) {
     return this.packageRepository.findOne({
       where: { id },
-      relations: ['configurations', 'configurations.rol', 'usageLimitVariables'],
+      relations: ['configurations', 'configurations.rol', 'usageLimitVariables', 'images'],
     });
   }
 
@@ -304,5 +310,49 @@ export class PackageService {
     });
 
     return !!existing;
+  }
+
+  /**
+   * Returns packages visible in the landing page.
+   * Public endpoint — no authentication required.
+   * Optionally filters by targetApplication from usageLimitVariables.
+   */
+  async findForLanding(application?: string) {
+    const packages = await this.packageRepository.find({
+      where: { showInLanding: true },
+      relations: ['usageLimitVariables', 'images'],
+      order: { displayOrder: 'ASC' },
+    });
+
+    return packages.map(pkg => {
+      // Generar features automáticamente desde usageLimitVariables
+      const variables = (pkg.usageLimitVariables || [])
+        .filter(v => !application || v.targetApplication.toLowerCase() === application.toLowerCase());
+
+      const features = variables
+        .map(v => {
+          // Variable de días de uso: formato especial
+          if (v.variableName === 'nDiasUso') {
+            if (v.maxValue === 0) return null; // No mostrar si es 0
+            return `Disponible por ${v.maxValue} días`;
+          }
+          if (v.maxValue === 0) return `${v.displayName}: Ilimitado`;
+          return `${v.maxValue} ${v.displayName}`;
+        })
+        .filter(f => f !== null);
+
+      return {
+        displayName: pkg.displayName || pkg.name,
+        name: pkg.name,
+        description: pkg.description,
+        price: Number(pkg.price),
+        isHighlighted: pkg.isHighlighted,
+        displayOrder: pkg.displayOrder,
+        features,
+        ctaLabel: pkg.ctaLabel || 'Elegir Plan',
+        ctaType: pkg.ctaType || 'register',
+        images: pkg.images?.map(img => img.url) || [],
+      };
+    });
   }
 }
