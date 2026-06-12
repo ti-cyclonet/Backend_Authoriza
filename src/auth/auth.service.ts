@@ -216,6 +216,11 @@ export class AuthService {
     };
   }
 
+  async checkEmailExists(email: string): Promise<boolean> {
+    const user = await this.usersService.findEntityByEmail(email);
+    return !!user;
+  }
+
   async loginAfterVerification(email: string): Promise<{ access_token: string; user: AuthenticatedUser }> {
     const user = await this.usersService.findEntityByEmail(email);
     if (!user) throw new UnauthorizedException('User not found');

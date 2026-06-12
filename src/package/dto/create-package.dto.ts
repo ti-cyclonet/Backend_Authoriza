@@ -20,6 +20,10 @@ export class RoleConfigDto {
 
   @IsNumber()
   price: number;
+
+  @IsString()
+  @IsOptional()
+  roleName?: string;
 }
 
 class CreateConfigurationDto {

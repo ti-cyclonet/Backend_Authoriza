@@ -235,6 +235,30 @@ export class PackageService {
       await this.usageLimitVariablesService.replaceForPackage(id, parsedVariables);
     }
 
+    // 4) Reemplazar configurations si vienen (delete + insert)
+    if (configurations && Array.isArray(configurations) && configurations.length > 0) {
+      // Eliminar configuraciones existentes
+      await this.configurationRepository.delete({ package: { id } });
+
+      // Crear nuevas configuraciones
+      const newConfigurations = await Promise.all(
+        configurations.map(async (config) => {
+          const rol = await this.configurationRepository.manager.findOne(Rol, {
+            where: { id: config.rolId },
+          });
+          if (!rol) throw new BadRequestException(`Rol not found with id: ${config.rolId}`);
+
+          return this.configurationRepository.create({
+            price: config.price,
+            totalAccount: config.totalAccount,
+            package: { id } as any,
+            rol: rol,
+          });
+        }),
+      );
+      await this.configurationRepository.save(newConfigurations);
+    }
+
     return this.findOne(id);
   }
 
@@ -342,6 +366,7 @@ export class PackageService {
         .filter(f => f !== null);
 
       return {
+        packageId: pkg.id,
         displayName: pkg.displayName || pkg.name,
         name: pkg.name,
         description: pkg.description,
