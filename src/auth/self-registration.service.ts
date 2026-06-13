@@ -133,6 +133,10 @@ export class SelfRegistrationService {
 
       // 4.4 Create dependent user
       const dependentCode = await this.entityCodeService.generateCode('User');
+      const depVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const depVerificationExpires = new Date();
+      depVerificationExpires.setHours(depVerificationExpires.getHours() + 24);
+
       const dependentUser = manager.create(User, {
         strUserName: dto.dependent.email,
         strPassword: hashedPassword,
@@ -141,6 +145,8 @@ export class SelfRegistrationService {
         isVerified: false,
         mustChangePassword: true,
         lastPasswordChange: new Date(),
+        verificationCode: depVerificationCode,
+        verificationExpires: depVerificationExpires,
       });
       const savedDependent = await manager.save(dependentUser);
 
@@ -176,6 +182,10 @@ export class SelfRegistrationService {
         endDate.setDate(endDate.getDate() + nDiasUso.maxValue);
       }
 
+      // Generate codePrefix from principal name
+      const principalName = dto.principal.businessName || dto.principal.firstName || dto.principal.email;
+      const codePrefix = await this.generateUniqueCodePrefix(principalName, manager);
+
       const contract = manager.create(Contract, {
         code: contractCode,
         user: { id: savedPrincipal.id } as any,
@@ -186,7 +196,8 @@ export class SelfRegistrationService {
         startDate: today,
         endDate,
         status: ContractStatus.PENDING,
-        businessSector: 'general',
+        codePrefix,
+        businessSector: dto.businessSector || 'general',
       });
       const savedContract = await manager.save(contract);
 
@@ -220,13 +231,15 @@ export class SelfRegistrationService {
       };
     });
 
-    // 5. Send verification email (outside transaction)
+    // 5. Send verification emails (outside transaction)
+    const apiBaseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000/api';
+    const year = new Date().getFullYear().toString();
+
+    // 5.1 Email to principal
     try {
       const customerName =
         dto.principal.firstName || dto.principal.businessName || 'Usuario';
-      const year = new Date().getFullYear().toString();
-      const baseUrl = process.env.SELF_URL || 'http://localhost:3000';
-      const verificationUrl = `${baseUrl}/api/auth/verify-registration?email=${encodeURIComponent(dto.principal.email)}&code=${result.principalUser.verificationCode}`;
+      const verificationUrl = `${apiBaseUrl}/auth/verify-registration?email=${encodeURIComponent(dto.principal.email)}&code=${result.principalUser.verificationCode}`;
 
       await this.notificationsService.sendByTemplate(
         'USER_VERIFICATION',
@@ -234,12 +247,26 @@ export class SelfRegistrationService {
         { customerName, verificationUrl, year },
       );
     } catch (err) {
-      this.logger.warn(`Failed to send verification email: ${err.message}`);
+      this.logger.warn(`Failed to send verification email to principal: ${err.message}`);
+    }
+
+    // 5.2 Email to dependent
+    try {
+      const depName = dto.dependent.firstName || 'Operador';
+      const depVerificationUrl = `${apiBaseUrl}/auth/verify-registration?email=${encodeURIComponent(dto.dependent.email)}&code=${result.dependentUser.verificationCode}`;
+
+      await this.notificationsService.sendByTemplate(
+        'USER_VERIFICATION',
+        dto.dependent.email,
+        { customerName: depName, verificationUrl: depVerificationUrl, year },
+      );
+    } catch (err) {
+      this.logger.warn(`Failed to send verification email to dependent: ${err.message}`);
     }
 
     return {
       success: true,
-      message: 'Registro exitoso. Revisa tu correo para confirmar.',
+      message: 'Registro exitoso. Ambos correos deben ser confirmados para activar el contrato.',
       verificationRequired: true,
       data: {
         principalUserId: result.principalUser.id,
@@ -263,22 +290,52 @@ export class SelfRegistrationService {
       throw new BadRequestException('Código expirado. Solicita uno nuevo.');
 
     const result = await this.dataSource.transaction(async (manager) => {
-      // Verify principal user
+      // Mark this user as verified
       user.isVerified = true;
       user.verificationCode = null;
       user.verificationExpires = null;
-      user.strStatus = 'ACTIVE';
+      user.strStatus = 'CONFIRMED';
       await manager.save(user);
 
-      // Find contract
-      const contract = await manager.findOne(Contract, {
+      // Determine if this user is a principal or dependent
+      // Check if there's a contract where this user is the principal
+      let contract = await manager.findOne(Contract, {
         where: { user: { id: user.id } },
         relations: ['package', 'package.usageLimitVariables'],
       });
 
+      let isPrincipal = !!contract;
+      let principalUserId = user.id;
+
+      // If not a principal, check if this user is a dependent
+      if (!contract) {
+        const dependency = await manager.findOne(UserDependency, {
+          where: { dependentUserId: user.id, status: 'ACTIVE' },
+        });
+        if (dependency) {
+          principalUserId = dependency.principalUserId;
+          contract = await manager.findOne(Contract, {
+            where: { user: { id: principalUserId } },
+            relations: ['package', 'package.usageLimitVariables'],
+          });
+        }
+      }
+
       if (!contract) throw new NotFoundException('Contrato no encontrado');
 
-      // Determine if free package (auto-activate)
+      // Check if BOTH users are verified
+      const dependency = await manager.findOne(UserDependency, {
+        where: { principalUserId, status: 'ACTIVE' },
+      });
+
+      const principalUser = await manager.findOne(User, { where: { id: principalUserId } });
+      const dependentUser = dependency
+        ? await manager.findOne(User, { where: { id: dependency.dependentUserId } })
+        : null;
+
+      const bothVerified = principalUser?.isVerified && dependentUser?.isVerified;
+
+      // Determine if free package
       const nDiasUso = contract.package?.usageLimitVariables?.find(
         (v) => v.variableName === 'nDiasUso',
       );
@@ -286,7 +343,9 @@ export class SelfRegistrationService {
         Number(contract.package?.price) === 0 ||
         (nDiasUso && nDiasUso.maxValue > 0);
 
-      if (isFree) {
+      let contractActivated = false;
+
+      if (isFree && bothVerified) {
         // Activate contract
         contract.status = ContractStatus.ACTIVE;
         if (nDiasUso && nDiasUso.maxValue > 0) {
@@ -297,22 +356,18 @@ export class SelfRegistrationService {
         }
         await manager.save(contract);
 
-        // Activate dependent and assign role
-        const dependency = await manager.findOne(UserDependency, {
-          where: { principalUserId: user.id, status: 'ACTIVE' },
-        });
+        // Activate both users
+        if (principalUser) {
+          principalUser.strStatus = 'ACTIVE';
+          await manager.save(principalUser);
+        }
+        if (dependentUser) {
+          dependentUser.strStatus = 'ACTIVE';
+          await manager.save(dependentUser);
+        }
 
+        // Assign adminInout role to dependent
         if (dependency) {
-          const depUser = await manager.findOne(User, {
-            where: { id: dependency.dependentUserId },
-          });
-          if (depUser) {
-            depUser.strStatus = 'ACTIVE';
-            depUser.isVerified = true;
-            await manager.save(depUser);
-          }
-
-          // Assign adminInout role
           const adminInoutRole = await manager.findOne(Rol, {
             where: { strName: 'adminInout' },
           });
@@ -336,23 +391,40 @@ export class SelfRegistrationService {
             }
           }
         }
+
+        contractActivated = true;
       }
 
-      return { contract, isFree };
+      return { contract, isFree, contractActivated, bothVerified };
     });
+
+    if (result.contractActivated) {
+      return {
+        success: true,
+        message: '¡Registro completado! Ya puedes iniciar sesión.',
+        contractActivated: true,
+        loginUrl: process.env.INOUT_LOGIN_URL || 'http://localhost:4201/login',
+        data: {
+          contractCode: result.contract.code,
+          packageName: result.contract.package?.name || '',
+          startDate: result.contract.startDate ? String(result.contract.startDate) : null,
+          endDate: result.contract.endDate ? String(result.contract.endDate) : null,
+        },
+      };
+    }
 
     return {
       success: true,
-      message: result.isFree
-        ? '¡Registro completado! Ya puedes iniciar sesión.'
-        : 'Email verificado. Tu contrato será activado por un administrador.',
-      contractActivated: result.isFree,
-      loginUrl: 'https://inout.cyclonet.com.co',
+      message: result.bothVerified
+        ? 'Email verificado. Tu contrato será activado por un administrador.'
+        : 'Email verificado. Falta que el otro usuario confirme su correo para activar el contrato.',
+      contractActivated: false,
+      loginUrl: process.env.INOUT_LOGIN_URL || 'http://localhost:4201/login',
       data: {
         contractCode: result.contract.code,
         packageName: result.contract.package?.name || '',
-        startDate: result.contract.startDate?.toISOString(),
-        endDate: result.contract.endDate?.toISOString() || null,
+        startDate: result.contract.startDate ? String(result.contract.startDate) : null,
+        endDate: result.contract.endDate ? String(result.contract.endDate) : null,
       },
     };
   }
@@ -374,8 +446,8 @@ export class SelfRegistrationService {
 
     try {
       const year = new Date().getFullYear().toString();
-      const baseUrl = process.env.SELF_URL || 'http://localhost:3000';
-      const verificationUrl = `${baseUrl}/api/auth/verify-registration?email=${encodeURIComponent(email)}&code=${newCode}`;
+      const apiBaseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000/api';
+      const verificationUrl = `${apiBaseUrl}/auth/verify-registration?email=${encodeURIComponent(email)}&code=${newCode}`;
       await this.notificationsService.sendByTemplate(
         'USER_VERIFICATION',
         email,
@@ -386,6 +458,88 @@ export class SelfRegistrationService {
     }
 
     return { message: 'Código reenviado exitosamente.' };
+  }
+
+  /**
+   * Generates a unique 3-letter code prefix from the principal's name.
+   * Extracts consonants from the name, then tries combinations until finding an available one.
+   */
+  private async generateUniqueCodePrefix(name: string, manager: any): Promise<string> {
+    // Clean name: uppercase, only letters
+    const cleanName = name.toUpperCase().replace(/[^A-Z]/g, '');
+    
+    if (cleanName.length < 3) {
+      // If name is too short, pad with random letters
+      const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      let padded = cleanName;
+      while (padded.length < 3) {
+        padded += alphabet[Math.floor(Math.random() * 26)];
+      }
+      return await this.findAvailablePrefix(padded.substring(0, 3), manager);
+    }
+
+    // Strategy 1: First 3 consonants from the name
+    const consonants = cleanName.replace(/[AEIOU]/g, '');
+    if (consonants.length >= 3) {
+      const prefix = consonants.substring(0, 3);
+      const isAvailable = await this.isPrefixAvailable(prefix, manager);
+      if (isAvailable) return prefix;
+    }
+
+    // Strategy 2: First letter + 2 consonants
+    const prefix2 = cleanName[0] + consonants.substring(0, 2);
+    if (prefix2.length === 3) {
+      const isAvailable = await this.isPrefixAvailable(prefix2, manager);
+      if (isAvailable) return prefix2;
+    }
+
+    // Strategy 3: First 3 letters of the name
+    const prefix3 = cleanName.substring(0, 3);
+    const isAvailable3 = await this.isPrefixAvailable(prefix3, manager);
+    if (isAvailable3) return prefix3;
+
+    // Strategy 4: Try random combinations from name letters
+    return await this.findAvailablePrefix(cleanName, manager);
+  }
+
+  private async findAvailablePrefix(source: string, manager: any): Promise<string> {
+    const letters = source.toUpperCase().replace(/[^A-Z]/g, '');
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    
+    // Try up to 50 combinations
+    for (let attempt = 0; attempt < 50; attempt++) {
+      let prefix = '';
+      if (attempt < letters.length - 2) {
+        // Use sequential 3-char windows from the source
+        prefix = letters.substring(attempt, attempt + 3);
+      } else {
+        // Generate random from source letters + alphabet
+        const pool = letters + alphabet;
+        for (let i = 0; i < 3; i++) {
+          prefix += pool[Math.floor(Math.random() * pool.length)];
+        }
+      }
+
+      if (prefix.length === 3) {
+        const isAvailable = await this.isPrefixAvailable(prefix, manager);
+        if (isAvailable) return prefix;
+      }
+    }
+
+    // Fallback: random 3 letters
+    let fallback = '';
+    for (let i = 0; i < 3; i++) {
+      fallback += alphabet[Math.floor(Math.random() * 26)];
+    }
+    return fallback;
+  }
+
+  private async isPrefixAvailable(prefix: string, manager: any): Promise<boolean> {
+    const existing = await manager
+      .createQueryBuilder(Contract, 'contract')
+      .where('contract.codePrefix = :prefix', { prefix })
+      .getOne();
+    return !existing;
   }
 
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {

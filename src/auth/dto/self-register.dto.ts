@@ -57,6 +57,10 @@ export class SelfRegisterDto {
   @IsNotEmpty()
   packageId: string;
 
+  @IsString()
+  @IsOptional()
+  businessSector?: string;
+
   @IsNotEmpty()
   principal: SelfRegisterPrincipalDto;
 
