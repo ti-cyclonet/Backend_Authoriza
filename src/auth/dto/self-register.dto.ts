@@ -1,4 +1,5 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsIn, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class SelfRegisterPrincipalDto {
   @IsEmail()
@@ -50,6 +51,8 @@ export class SelfRegisterDependentDto {
   @IsString() @IsOptional() documentNumber?: string;
   @IsString() @IsOptional() phone?: string;
   @IsString() @IsOptional() birthdate?: string;
+  @IsString() @IsOptional() gender?: string;
+  @IsString() @IsOptional() civilStatus?: string;
 }
 
 export class SelfRegisterDto {
@@ -62,9 +65,13 @@ export class SelfRegisterDto {
   businessSector?: string;
 
   @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => SelfRegisterPrincipalDto)
   principal: SelfRegisterPrincipalDto;
 
   @IsNotEmpty()
+  @ValidateNested()
+  @Type(() => SelfRegisterDependentDto)
   dependent: SelfRegisterDependentDto;
 }
 

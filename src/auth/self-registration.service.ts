@@ -106,6 +106,9 @@ export class SelfRegistrationService {
       });
       const savedBasicData = await manager.save(basicData);
 
+      // Update principal user with basicData reference
+      savedPrincipal.basicData = savedBasicData;
+      await manager.save(savedPrincipal);
       // 4.3 Create person-specific data
       if (dto.principal.personType === 'N') {
         const naturalData = manager.create(NaturalPersonData, {
@@ -160,12 +163,18 @@ export class SelfRegistrationService {
       });
       const savedDepBasicData = await manager.save(depBasicData);
 
+      // Update dependent user with basicData reference
+      savedDependent.basicData = savedDepBasicData;
+      await manager.save(savedDependent);
+
       const depNaturalData = manager.create(NaturalPersonData, {
         firstName: dto.dependent.firstName,
         secondName: dto.dependent.secondName || null,
         firstSurname: dto.dependent.firstSurname,
         secondSurname: dto.dependent.secondSurname || null,
         birthDate: dto.dependent.birthdate ? new Date(dto.dependent.birthdate) : null,
+        sex: dto.dependent.gender || null,
+        maritalStatus: dto.dependent.civilStatus || null,
         basicData: savedDepBasicData,
       });
       await manager.save(depNaturalData);
