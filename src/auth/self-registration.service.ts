@@ -551,6 +551,83 @@ export class SelfRegistrationService {
     return !existing;
   }
 
+  async upgradePlan(email: string, password: string, packageId: string) {
+    // 1. Find user and validate password
+    const user = await this.userRepository.findOne({
+      where: { strUserName: email },
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const isPasswordValid = await bcrypt.compare(password, user.strPassword);
+    if (!isPasswordValid) throw new BadRequestException('Contraseña incorrecta');
+
+    // 2. Validate package exists
+    const pkg = await this.packageRepository.findOne({
+      where: { id: packageId },
+      relations: ['usageLimitVariables'],
+    });
+    if (!pkg) throw new BadRequestException('Paquete no encontrado');
+
+    // 3. Find user's active contract
+    const contract = await this.contractRepository.findOne({
+      where: { user: { id: user.id } },
+      relations: ['package'],
+    });
+
+    if (!contract) {
+      // If user is a dependent, find via principal
+      const dependency = await this.userDependencyRepository.findOne({
+        where: { dependentUserId: user.id, status: 'ACTIVE' },
+      });
+      if (dependency) {
+        const principalContract = await this.contractRepository.findOne({
+          where: { user: { id: dependency.principalUserId } },
+          relations: ['package'],
+        });
+        if (principalContract) {
+          return this.executeUpgrade(principalContract, pkg, packageId);
+        }
+      }
+      throw new NotFoundException('No se encontró un contrato activo');
+    }
+
+    return this.executeUpgrade(contract, pkg, packageId);
+  }
+
+  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string) {
+    // Update the contract's package
+    contract.package = { id: packageId } as any;
+    contract.value = pkg.price || 0;
+
+    // Reset dates: starts today, lasts 1 year
+    contract.startDate = new Date();
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + 1);
+    contract.endDate = endDate;
+
+    // If package is billable, set contract to PENDING (admin activates via FactoNet)
+    const isBillable = (pkg as any).isBillable !== false;
+    if (isBillable) {
+      contract.status = ContractStatus.PENDING;
+    }
+
+    await this.contractRepository.save(contract);
+
+    // Invalidate InOut cache
+    try {
+      const inoutApiUrl = process.env.INOUT_API_URL || 'http://localhost:3001';
+      await fetch(`${inoutApiUrl}/api/usage-status/invalidate-cache/${contract.user?.id || ''}`, { method: 'POST' });
+    } catch (e) {
+      this.logger.warn('Could not invalidate InOut cache');
+    }
+
+    const message = isBillable
+      ? `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`
+      : `Plan cambiado a "${pkg.name}" exitosamente.`;
+
+    return { success: true, message };
+  }
+
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {
     const { name, email, phone, subject, message } = data;
 
