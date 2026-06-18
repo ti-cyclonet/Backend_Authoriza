@@ -154,4 +154,11 @@ export class AuthController {
   async contactForm(@Body() body: { name: string; email: string; phone?: string; subject?: string; message: string }) {
     return this.selfRegistrationService.sendContactEmail(body);
   }
+
+  @ApiOperation({ summary: 'Upgrade plan for existing user' })
+  @Public()
+  @Post('upgrade-plan')
+  async upgradePlan(@Body() body: { email: string; password: string; packageId: string }) {
+    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId);
+  }
 }
