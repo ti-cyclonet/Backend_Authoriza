@@ -207,6 +207,47 @@ export class NotificationsService {
       );
       this.logger.log('USER_VERIFICATION template seeded');
     }
+
+    const invoiceIssuedTpl = await this.templateRepo.findOne({ where: { code: 'INVOICE_ISSUED' } });
+    if (!invoiceIssuedTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'INVOICE_ISSUED',
+          subject: 'Factura {{invoiceCode}} disponible - FactoNet by CycloNet',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Sistema de Facturación</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px;">
+        <h2 style="color:#1a237e;margin:0 0 15px;">Nueva factura disponible</h2>
+        <p style="color:#333;line-height:1.6;">Estimado(a) <strong>{{customerName}}</strong>,</p>
+        <p style="color:#333;line-height:1.6;">La factura <strong>{{invoiceCode}}</strong> ya está disponible en la plataforma FactoNet para su autogestión.</p>
+        <p style="color:#333;line-height:1.6;">Puede consultar los detalles, realizar el pago y descargar su factura en formato PDF accediendo a la plataforma.</p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{{factonetUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#1e88e5);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ir a FactoNet</a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#1a237e;padding:20px;text-align:center;">
+        <p style="color:#bbdefb;margin:0;font-size:12px;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('INVOICE_ISSUED template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {
