@@ -18,7 +18,6 @@ export class InvoiceSweepService {
     private invoiceRepository: Repository<Invoice>,
     private invoiceGeneratorService: InvoiceGeneratorService,
   ) {}
-// GENERAR FACTURAS
   async sweepAndGenerateInvoices(): Promise<{ generated: number; contracts: string[] }> {
     this.logger.log('Starting invoice sweep...');
     
