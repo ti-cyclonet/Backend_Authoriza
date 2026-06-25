@@ -295,7 +295,7 @@ export class ContractService {
       await this.cloudinaryService.deletePDFByUrl(contract.pdfUrl);
     }
 
-    const fileName = `contract_${contract.code || contractId}`;
+    const fileName = `contract_${contract.code || contractId}.pdf`;
     const uploadResult = await this.cloudinaryService.uploadPDF(pdfBuffer, fileName);
     await this.savePdfUrl(contractId, uploadResult.secure_url);
 
