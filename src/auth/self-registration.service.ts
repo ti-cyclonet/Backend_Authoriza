@@ -22,6 +22,8 @@ import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { PaymentMode } from '../contract/enums/payment-mode.enum';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LogsService } from '../logs/logs.service';
+import { LogAction } from '../logs/entities/log.entity';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
 
 @Injectable()
@@ -40,6 +42,7 @@ export class SelfRegistrationService {
     private dataSource: DataSource,
     private entityCodeService: EntityCodeService,
     private notificationsService: NotificationsService,
+    private logsService: LogsService,
   ) {}
 
   async register(dto: SelfRegisterDto) {
@@ -199,7 +202,7 @@ export class SelfRegistrationService {
         code: contractCode,
         user: { id: savedPrincipal.id } as any,
         package: { id: dto.packageId } as any,
-        value: pkg.price || 0,
+        value: (pkg.price || 0) * 12,
         mode: PaymentMode.MONTHLY,
         payday: 1,
         startDate: today,
@@ -611,7 +614,10 @@ export class SelfRegistrationService {
     });
     if (!pkg) throw new BadRequestException('Paquete no encontrado');
 
-    // 3. Find user's active contract
+    // 3. Validate not downgrading from paid to free
+    const newPackageIsFree = Number(pkg.price) === 0 || (pkg as any).isBillable === false;
+
+    // 4. Find user's active contract
     const contract = await this.contractRepository.findOne({
       where: { user: { id: user.id } },
       relations: ['package'],
@@ -628,37 +634,51 @@ export class SelfRegistrationService {
           relations: ['package'],
         });
         if (principalContract) {
+          const currentIsPaid = Number(principalContract.package?.price) > 0 && (principalContract.package as any)?.isBillable !== false;
+          if (currentIsPaid && newPackageIsFree) {
+            throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
+          }
           return this.executeUpgrade(principalContract, pkg, packageId);
         }
       }
       throw new NotFoundException('No se encontró un contrato activo');
     }
 
+    const currentIsPaid = Number(contract.package?.price) > 0 && (contract.package as any)?.isBillable !== false;
+    if (currentIsPaid && newPackageIsFree) {
+      throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
+    }
+
     return this.executeUpgrade(contract, pkg, packageId);
   }
 
   private async executeUpgrade(contract: Contract, pkg: Package, packageId: string) {
-    // Update the contract's package
+    // Update the EXISTING contract with new package terms
+    // The contract code, tenantId, and codePrefix remain the same
     contract.package = { id: packageId } as any;
-    contract.value = pkg.price || 0;
-
-    // Reset dates: starts today, lasts 1 year
+    contract.value = (pkg.price || 0) * 12;
     contract.startDate = new Date();
-    const endDate = new Date();
-    endDate.setFullYear(endDate.getFullYear() + 1);
-    contract.endDate = endDate;
-
-    // If package is billable, set contract to PENDING and deactivate users
-    const isBillable = (pkg as any).isBillable !== false;
-    if (isBillable) {
-      contract.status = ContractStatus.PENDING;
-    }
+    contract.endDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d; })();
+    contract.status = ContractStatus.PENDING;
+    // Reset PDF and signing — contract must be re-generated, re-issued, and re-signed
+    contract.pdfUrl = null;
+    contract.issuedAt = null;
+    contract.signedAt = null;
 
     await this.contractRepository.save(contract);
 
-    // If pending, deactivate principal and dependents
+    // Log the plan upgrade
+    await this.logsService.info(
+      LogAction.CONTRACT_UPGRADED,
+      `Contract ${contract.code} upgraded to package "${pkg.name}" (price: ${pkg.price})`,
+      contract.user?.id,
+      contract.id,
+      { previousPackage: contract.package?.name, newPackage: pkg.name, newPrice: pkg.price },
+    );
+
+    // If package is billable, deactivate principal and dependents until admin activates
+    const isBillable = (pkg as any).isBillable !== false;
     if (isBillable) {
-      // Find principal user
       const principalUser = await this.userRepository.findOne({
         where: { id: contract.user?.id },
       });
@@ -667,7 +687,6 @@ export class SelfRegistrationService {
         await this.userRepository.save(principalUser);
       }
 
-      // Find and deactivate dependents
       const dependencies = await this.userDependencyRepository.find({
         where: { principalUserId: contract.user?.id, status: 'ACTIVE' },
       });
