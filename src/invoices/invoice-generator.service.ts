@@ -203,21 +203,22 @@ export class InvoiceGeneratorService {
   private async calculateInvoiceValueWithParams(contract: Contract, periodStart: Date, periodEnd: Date): Promise<{ calculatedValue: number; globalParams: GlobalParametersForInvoices[] }> {
     this.logger.log(`Calculando valor para contrato ${contract.id}, período: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`);
     
-    // contract.value stores the monthly price from the package
-    // For monthly mode: invoice = contract.value (monthly price)
-    // For semiannual mode: invoice = contract.value * 6
-    // For annual mode: invoice = contract.value * 12
+    // contract.value stores the TOTAL annual contract value (e.g., 75000/month * 12 = 900000)
+    // For monthly invoices: value / 12
+    // For semiannual invoices: value / 2
+    // For annual invoices: value (full amount)
     let baseValue = Number(contract.value);
 
     switch (contract.mode) {
       case PaymentMode.MONTHLY:
-        // Value is already the monthly price, no adjustment needed
+        baseValue = baseValue / 12;
         break;
       case PaymentMode.SEMIANNUAL:
-        baseValue = baseValue * 6;
+        baseValue = baseValue / 2;
         break;
       case PaymentMode.ANNUAL:
-        baseValue = baseValue * 12;
+        // Full annual value, no adjustment
+        break;
         break;
     }
 

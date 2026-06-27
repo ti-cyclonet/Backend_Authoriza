@@ -34,6 +34,16 @@ export class ContractController {
     return { pdfUrl };
   }
 
+  @Patch(':id/sign')
+  async signContract(@Param('id') contractId: string) {
+    return this.contractService.signContract(contractId);
+  }
+
+  @Patch(':id/issue')
+  async issueContract(@Param('id') contractId: string) {
+    return this.contractService.issueContract(contractId);
+  }
+
   @Get('active')
   findActive() {
     return this.contractService.findActive();

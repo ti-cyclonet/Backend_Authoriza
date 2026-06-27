@@ -70,6 +70,12 @@ export class Contract {
   @Column({ type: 'text', nullable: true })
   pdfUrl?: string;
 
+  @Column({ type: 'timestamp', nullable: true })
+  issuedAt?: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  signedAt?: Date;
+
   @Column({ type: 'varchar', length: 3, nullable: true })
   codePrefix?: string;
 

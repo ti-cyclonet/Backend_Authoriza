@@ -297,7 +297,11 @@ export class ContractService {
 
     const fileName = `contract_${contract.code || contractId}.pdf`;
     const uploadResult = await this.cloudinaryService.uploadPDF(pdfBuffer, fileName);
-    await this.savePdfUrl(contractId, uploadResult.secure_url);
+    
+    // Mark as issued when PDF is generated
+    contract.pdfUrl = uploadResult.secure_url;
+    contract.issuedAt = new Date();
+    await this.contractRepository.save(contract);
 
     // Si el usuario ya verificó su correo, enviar el contrato inmediatamente
     if (contract.user?.isVerified) {
@@ -307,6 +311,41 @@ export class ContractService {
     }
 
     return uploadResult.secure_url;
+  }
+
+  async issueContract(contractId: string): Promise<Contract> {
+    const contract = await this.findOne(contractId);
+
+    if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
+      throw new BadRequestException(
+        'Cannot issue contract. The contract PDF must be generated first.',
+      );
+    }
+
+    contract.issuedAt = new Date();
+    const savedContract = await this.contractRepository.save(contract);
+
+    // Send contract to client via email
+    if (contract.user?.strUserName && contract.pdfUrl) {
+      this.sendContractEmail(contract, contract.pdfUrl).catch((err) =>
+        this.logger.error(`Error sending issued contract email: ${err.message}`),
+      );
+    }
+
+    return savedContract;
+  }
+
+  async signContract(contractId: string): Promise<Contract> {
+    const contract = await this.findOne(contractId);
+
+    if (!contract.pdfUrl || !contract.issuedAt) {
+      throw new BadRequestException(
+        'Cannot sign contract. The contract PDF must be generated first.',
+      );
+    }
+
+    contract.signedAt = new Date();
+    return this.contractRepository.save(contract);
   }
 
   async activateContract(id: string): Promise<Contract> {
@@ -347,6 +386,18 @@ export class ContractService {
       );
     }
 
+    if (!contract.issuedAt) {
+      throw new BadRequestException(
+        'No se puede activar el contrato. El contrato debe estar emitido antes de activarlo.',
+      );
+    }
+
+    if (!contract.signedAt) {
+      throw new BadRequestException(
+        'No se puede activar el contrato. El contrato debe estar firmado antes de activarlo.',
+      );
+    }
+
     return this.updateStatus(id, ContractStatus.ACTIVE);
   }
 
@@ -384,12 +435,25 @@ export class ContractService {
           'Cannot activate contract. Contract PDF must be generated before activation.',
         );
       }
+
+      if (!contract.issuedAt) {
+        throw new BadRequestException(
+          'Cannot activate contract. The contract must be issued (PDF generated) first.',
+        );
+      }
+
+      if (!contract.signedAt) {
+        throw new BadRequestException(
+          'Cannot activate contract. The contract must be signed before activation.',
+        );
+      }
     }
 
     contract.status = status as ContractStatus;
     const savedContract = await this.contractRepository.save(contract);
 
     if (status === ContractStatus.ACTIVE) {
+      // Activate principal user and dependents
       await this.userRepository.update({ id: contract.user.id }, { strStatus: 'ACTIVE' });
 
       await this.userRepository
