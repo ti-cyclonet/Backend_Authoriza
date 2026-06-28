@@ -74,6 +74,12 @@ export class ContractService {
 
     const savedContract = await this.contractRepository.save(entity);
     await this.userRolesService.updateUserToAccountOwner(dto.userId, savedContract.id);
+    
+    // Notify adminFactonet users about the new contract
+    this.notifyAdminFactonet(savedContract, user, pkg).catch(err =>
+      this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
+    );
+
     return savedContract;
   }
 
@@ -619,5 +625,53 @@ export class ContractService {
     if (existingContract) {
       throw new BadRequestException(`El prefijo '${codePrefix}' ya fue utilizado por otro cliente`);
     }
+  }
+
+  /**
+   * Notifies all users with 'adminFactonet' role that a new contract needs management.
+   */
+  async notifyAdminFactonet(contract: Contract, user: User, pkg: Package): Promise<void> {
+    // Find all users with adminFactonet role
+    const adminUsers = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .getMany();
+
+    if (adminUsers.length === 0) {
+      this.logger.warn('No adminFactonet users found to notify about new contract');
+      return;
+    }
+
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
+    const year = new Date().getFullYear().toString();
+    const customerName = user.basicData?.legalEntityData?.businessName
+      || (user.basicData?.naturalPersonData ? `${user.basicData.naturalPersonData.firstName} ${user.basicData.naturalPersonData.firstSurname}` : user.strUserName);
+    const monthlyValue = `$${Number(pkg.price || 0).toLocaleString('es-CO')}`;
+
+    for (const admin of adminUsers) {
+      try {
+        await this.notificationsService.sendByTemplate('NEW_CONTRACT_ADMIN', admin.strUserName, {
+          customerName: customerName || 'N/A',
+          customerEmail: user.strUserName,
+          documentNumber: user.basicData?.documentNumber || 'N/A',
+          packageName: pkg.name || 'N/A',
+          monthlyValue,
+          contractCode: contract.code,
+          mode: contract.mode || 'MONTHLY',
+          startDate: contract.startDate ? new Date(contract.startDate).toLocaleDateString('es-CO') : 'N/A',
+          endDate: contract.endDate ? new Date(contract.endDate).toLocaleDateString('es-CO') : 'Indefinido',
+          status: contract.status || 'PENDING',
+          factonetUrl,
+          year,
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to notify admin ${admin.strUserName}: ${err.message}`);
+      }
+    }
+
+    this.logger.log(`Notified ${adminUsers.length} adminFactonet user(s) about contract ${contract.code}`);
   }
 }

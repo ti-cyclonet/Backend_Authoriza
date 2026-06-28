@@ -248,6 +248,66 @@ export class NotificationsService {
       );
       this.logger.log('INVOICE_ISSUED template seeded');
     }
+
+    // Template for admin notification when a new contract is created
+    const newContractAdminTpl = await this.templateRepo.findOne({ where: { code: 'NEW_CONTRACT_ADMIN' } });
+    if (!newContractAdminTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'NEW_CONTRACT_ADMIN',
+          subject: 'Nuevo contrato {{contractCode}} pendiente de gestión - CycloNet',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Gestión de Contratos</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px;">
+        <h2 style="color:#1a237e;margin:0 0 15px;">Nuevo contrato para gestión</h2>
+        <p style="color:#333;line-height:1.6;">Se ha generado un nuevo contrato que requiere tu gestión:</p>
+        <table width="100%" style="margin:20px 0;border-collapse:collapse;border:1px solid #e0e0e0;border-radius:6px;">
+          <tr><td colspan="2" style="padding:10px 12px;background:#1a237e;color:#fff;font-weight:bold;">Datos del Cliente</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;width:40%;">Cliente</td><td style="padding:8px 12px;">{{customerName}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#1a237e;">Email</td><td style="padding:8px 12px;background:#f5f5f5;">{{customerEmail}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Documento</td><td style="padding:8px 12px;">{{documentNumber}}</td></tr>
+          <tr><td colspan="2" style="padding:10px 12px;background:#1a237e;color:#fff;font-weight:bold;">Paquete Contratado</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;">{{packageName}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#1a237e;">Valor mensual</td><td style="padding:8px 12px;background:#f5f5f5;">{{monthlyValue}}</td></tr>
+          <tr><td colspan="2" style="padding:10px 12px;background:#1a237e;color:#fff;font-weight:bold;">Contrato</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Código</td><td style="padding:8px 12px;">{{contractCode}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#1a237e;">Modalidad</td><td style="padding:8px 12px;background:#f5f5f5;">{{mode}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Fecha inicio</td><td style="padding:8px 12px;">{{startDate}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#1a237e;">Fecha fin</td><td style="padding:8px 12px;background:#f5f5f5;">{{endDate}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Estado</td><td style="padding:8px 12px;"><span style="background:#ffc107;color:#000;padding:3px 10px;border-radius:4px;font-weight:bold;">{{status}}</span></td></tr>
+        </table>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{{factonetUrl}}" style="display:inline-block;background-color:#1565c0;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;mso-padding-alt:0;text-align:center;">
+            <!--[if mso]><i style="mso-font-width:300%;mso-text-raise:30pt;" hidden>&emsp;</i><span style="mso-text-raise:15pt;"><![endif]-->
+            Ir a FactoNet
+            <!--[if mso]></span><i style="mso-font-width:300%;" hidden>&emsp;&#8203;</i><![endif]-->
+          </a>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;">Ingresa a FactoNet para generar el PDF, emitir y activar el contrato.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#1a237e;padding:20px;text-align:center;">
+        <p style="color:#bbdefb;margin:0;font-size:12px;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('NEW_CONTRACT_ADMIN template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {
