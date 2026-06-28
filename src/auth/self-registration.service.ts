@@ -276,6 +276,11 @@ export class SelfRegistrationService {
       this.logger.warn(`Failed to send verification email to dependent: ${err.message}`);
     }
 
+    // 5.3 Notify adminFactonet users about the new contract
+    this.notifyAdminFactonetUsers(result.contract, dto, pkg).catch(err =>
+      this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
+    );
+
     return {
       success: true,
       message: 'Registro exitoso. Ambos correos deben ser confirmados para activar el contrato.',
@@ -711,7 +716,113 @@ export class SelfRegistrationService {
       ? `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`
       : `Plan cambiado a "${pkg.name}" exitosamente.`;
 
+    // Notify adminFactonet about the plan upgrade
+    this.notifyAdminFactonetUpgrade(contract, pkg).catch(err =>
+      this.logger.warn(`Failed to notify adminFactonet about upgrade: ${err.message}`)
+    );
+
     return { success: true, message };
+  }
+
+  private async notifyAdminFactonetUpgrade(contract: Contract, pkg: Package): Promise<void> {
+    // Find all adminFactonet users and their dependents
+    const principalAdmins = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .getMany();
+
+    const allRecipients: string[] = [];
+    for (const admin of principalAdmins) {
+      allRecipients.push(admin.strUserName);
+      const deps = await this.userRepository
+        .createQueryBuilder('user')
+        .innerJoin('user_dependencies', 'ud', 'ud."dependentUserId" = user.id')
+        .where('ud."principalUserId" = :principalId', { principalId: admin.id })
+        .andWhere('ud.status = :status', { status: 'ACTIVE' })
+        .getMany();
+      deps.forEach(d => allRecipients.push(d.strUserName));
+    }
+
+    const uniqueRecipients = [...new Set(allRecipients)];
+    if (uniqueRecipients.length === 0) return;
+
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
+    const year = new Date().getFullYear().toString();
+
+    // Load user with relations for customer name
+    const user = await this.userRepository.findOne({
+      where: { id: contract.user?.id },
+      relations: ['basicData', 'basicData.legalEntityData', 'basicData.naturalPersonData'],
+    });
+    const customerName = user?.basicData?.legalEntityData?.businessName
+      || (user?.basicData?.naturalPersonData ? `${user.basicData.naturalPersonData.firstName} ${user.basicData.naturalPersonData.firstSurname}` : user?.strUserName || 'N/A');
+    const monthlyValue = `$${Number(pkg.price || 0).toLocaleString('es-CO')}`;
+
+    for (const email of uniqueRecipients) {
+      try {
+        await this.notificationsService.sendByTemplate('NEW_CONTRACT_ADMIN', email, {
+          customerName,
+          customerEmail: user?.strUserName || 'N/A',
+          documentNumber: user?.basicData?.documentNumber || 'N/A',
+          packageName: pkg.name || 'N/A',
+          monthlyValue,
+          contractCode: contract.code,
+          mode: contract.mode || 'MONTHLY',
+          startDate: contract.startDate ? new Date(contract.startDate).toLocaleDateString('es-CO') : 'N/A',
+          endDate: contract.endDate ? new Date(contract.endDate).toLocaleDateString('es-CO') : 'Indefinido',
+          status: 'PENDING',
+          factonetUrl,
+          year,
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to notify admin ${email}: ${err.message}`);
+      }
+    }
+    this.logger.log(`Notified ${uniqueRecipients.length} adminFactonet user(s) about contract upgrade ${contract.code}`);
+  }
+
+  private async notifyAdminFactonetUsers(contract: any, dto: SelfRegisterDto, pkg: Package): Promise<void> {
+    // Find all adminFactonet users
+    const adminUsers = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .getMany();
+
+    if (adminUsers.length === 0) return;
+
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'https://billing.cyclonet.com.co/login';
+    const year = new Date().getFullYear().toString();
+    const customerName = dto.principal.businessName || `${dto.principal.firstName || ''} ${dto.principal.firstSurname || ''}`.trim();
+    const monthlyValue = `$${Number(pkg.price || 0).toLocaleString('es-CO')}`;
+
+    for (const admin of adminUsers) {
+      try {
+        await this.notificationsService.sendByTemplate('NEW_CONTRACT_ADMIN', admin.strUserName, {
+          customerName: customerName || 'N/A',
+          customerEmail: dto.principal.email,
+          documentNumber: dto.principal.documentNumber || 'N/A',
+          packageName: pkg.name || 'N/A',
+          monthlyValue,
+          contractCode: contract.code,
+          mode: 'MONTHLY',
+          startDate: contract.startDate ? new Date(contract.startDate).toLocaleDateString('es-CO') : 'N/A',
+          endDate: contract.endDate ? new Date(contract.endDate).toLocaleDateString('es-CO') : 'Indefinido',
+          status: 'PENDING',
+          factonetUrl,
+          year,
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to notify admin ${admin.strUserName}: ${err.message}`);
+      }
+    }
+
+    this.logger.log(`Notified ${adminUsers.length} adminFactonet user(s) about new contract ${contract.code}`);
   }
 
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {

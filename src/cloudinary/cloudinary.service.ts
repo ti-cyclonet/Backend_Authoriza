@@ -40,7 +40,7 @@ export class CloudinaryService {
         { 
           folder: folder,
           resource_type: 'raw',
-          public_id: `${folder}/${fileName}`,
+          public_id: fileName,
           use_filename: true,
           unique_filename: false
         },
