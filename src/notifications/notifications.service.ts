@@ -308,6 +308,59 @@ export class NotificationsService {
       );
       this.logger.log('NEW_CONTRACT_ADMIN template seeded');
     }
+
+    // Template for admin notification when a free contract is auto-activated
+    const freeContractTpl = await this.templateRepo.findOne({ where: { code: 'FREE_CONTRACT_ACTIVATED' } });
+    if (!freeContractTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'FREE_CONTRACT_ACTIVATED',
+          subject: 'Nuevo contrato FREE activado: {{contractCode}} - CycloNet',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#2e7d32,#43a047);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <p style="color:#c8e6c9;margin:5px 0 0;font-size:14px;">Gestión de Contratos</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px;">
+        <h2 style="color:#2e7d32;margin:0 0 15px;">Nuevo contrato FREE activado</h2>
+        <p style="color:#333;line-height:1.6;">Se ha activado automáticamente un nuevo contrato de plan gratuito:</p>
+        <table width="100%" style="margin:20px 0;border-collapse:collapse;border:1px solid #e0e0e0;border-radius:6px;">
+          <tr><td colspan="2" style="padding:10px 12px;background:#2e7d32;color:#fff;font-weight:bold;">Datos del Cliente</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#2e7d32;width:40%;">Cliente</td><td style="padding:8px 12px;">{{customerName}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#2e7d32;">Email</td><td style="padding:8px 12px;background:#f5f5f5;">{{customerEmail}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#2e7d32;">Documento</td><td style="padding:8px 12px;">{{documentNumber}}</td></tr>
+          <tr><td colspan="2" style="padding:10px 12px;background:#2e7d32;color:#fff;font-weight:bold;">Contrato</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#2e7d32;">Código</td><td style="padding:8px 12px;">{{contractCode}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#2e7d32;">Paquete</td><td style="padding:8px 12px;background:#f5f5f5;">{{packageName}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#2e7d32;">Fecha inicio</td><td style="padding:8px 12px;">{{startDate}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#f5f5f5;font-weight:bold;color:#2e7d32;">Fecha fin</td><td style="padding:8px 12px;background:#f5f5f5;">{{endDate}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#2e7d32;">Estado</td><td style="padding:8px 12px;"><span style="background:#4caf50;color:#fff;padding:3px 10px;border-radius:4px;font-weight:bold;">ACTIVE</span></td></tr>
+        </table>
+        <p style="color:#555;line-height:1.6;">Este contrato fue activado automáticamente tras la verificación de correo de ambos usuarios. No requiere gestión adicional.</p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{{factonetUrl}}" style="display:inline-block;background-color:#2e7d32;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ver en FactoNet</a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#2e7d32;padding:20px;text-align:center;">
+        <p style="color:#c8e6c9;margin:0;font-size:12px;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('FREE_CONTRACT_ACTIVATED template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {

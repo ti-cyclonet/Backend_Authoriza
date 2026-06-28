@@ -277,9 +277,14 @@ export class SelfRegistrationService {
     }
 
     // 5.3 Notify adminFactonet users about the new contract
-    this.notifyAdminFactonetUsers(result.contract, dto, pkg).catch(err =>
-      this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
-    );
+    // For paid packages: notify immediately (contract needs admin management)
+    // For free packages: notify after both emails verified (contract auto-activates)
+    const isBillablePackage = (pkg as any).isBillable !== false && Number(pkg.price) > 0;
+    if (isBillablePackage) {
+      this.notifyAdminFactonetUsers(result.contract, dto, pkg).catch(err =>
+        this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
+      );
+    }
 
     return {
       success: true,
@@ -459,6 +464,11 @@ export class SelfRegistrationService {
     });
 
     if (result.contractActivated) {
+      // Notify adminFactonet about the activated free contract
+      this.notifyAdminFreeContractActivated(result.contract).catch(err =>
+        this.logger.warn(`Failed to notify adminFactonet about free contract: ${err.message}`)
+      );
+
       return {
         success: true,
         message: '¡Registro completado! Ya puedes iniciar sesión.',
@@ -722,6 +732,62 @@ export class SelfRegistrationService {
     );
 
     return { success: true, message };
+  }
+
+  private async notifyAdminFreeContractActivated(contract: Contract): Promise<void> {
+    // Find all adminFactonet users and their dependents
+    const principalAdmins = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .getMany();
+
+    const allRecipients: string[] = [];
+    for (const admin of principalAdmins) {
+      allRecipients.push(admin.strUserName);
+      const deps = await this.userRepository
+        .createQueryBuilder('user')
+        .innerJoin('user_dependencies', 'ud', 'ud."dependentUserId" = user.id')
+        .where('ud."principalUserId" = :principalId', { principalId: admin.id })
+        .andWhere('ud.status = :status', { status: 'ACTIVE' })
+        .getMany();
+      deps.forEach(d => allRecipients.push(d.strUserName));
+    }
+
+    const uniqueRecipients = [...new Set(allRecipients)];
+    if (uniqueRecipients.length === 0) return;
+
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
+    const year = new Date().getFullYear().toString();
+
+    // Load user with relations
+    const user = await this.userRepository.findOne({
+      where: { id: contract.user?.id },
+      relations: ['basicData', 'basicData.legalEntityData', 'basicData.naturalPersonData'],
+    });
+    const customerName = user?.basicData?.legalEntityData?.businessName
+      || (user?.basicData?.naturalPersonData ? `${user.basicData.naturalPersonData.firstName} ${user.basicData.naturalPersonData.firstSurname}` : user?.strUserName || 'N/A');
+
+    for (const email of uniqueRecipients) {
+      try {
+        await this.notificationsService.sendByTemplate('FREE_CONTRACT_ACTIVATED', email, {
+          customerName,
+          customerEmail: user?.strUserName || 'N/A',
+          documentNumber: user?.basicData?.documentNumber || 'N/A',
+          packageName: contract.package?.name || 'N/A',
+          contractCode: contract.code,
+          startDate: contract.startDate ? new Date(contract.startDate).toLocaleDateString('es-CO') : 'N/A',
+          endDate: contract.endDate ? new Date(contract.endDate).toLocaleDateString('es-CO') : 'Indefinido',
+          factonetUrl,
+          year,
+        });
+      } catch (err) {
+        this.logger.warn(`Failed to notify admin ${email} about free contract: ${err.message}`);
+      }
+    }
+    this.logger.log(`Notified ${uniqueRecipients.length} adminFactonet user(s) about free contract activation ${contract.code}`);
   }
 
   private async notifyAdminFactonetUpgrade(contract: Contract, pkg: Package): Promise<void> {
