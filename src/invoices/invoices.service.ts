@@ -8,6 +8,7 @@ import { EntityCodeService } from '../entity-codes/services/entity-code.service'
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 import { User } from '../users/entities/user.entity';
+import { GlobalParametersForInvoices } from '../global-parameters-invoices/entities/global-parameters-for-invoices.entity';
 
 @Injectable()
 export class InvoicesService {
@@ -20,6 +21,8 @@ export class InvoicesService {
     private userDependencyRepository: Repository<UserDependency>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(GlobalParametersForInvoices)
+    private globalParametersForInvoicesRepository: Repository<GlobalParametersForInvoices>,
     private entityCodeService: EntityCodeService,
     private notificationsService: NotificationsService,
   ) {}
@@ -30,7 +33,7 @@ export class InvoicesService {
     return await this.invoiceRepository.save(invoice);
   }
 
-  async findAll(tenantId?: string): Promise<Invoice[]> {
+  async findAll(tenantId?: string): Promise<any[]> {
     const queryBuilder = this.invoiceRepository
       .createQueryBuilder('invoice')
       .leftJoinAndSelect('invoice.user', 'user')
@@ -41,8 +44,6 @@ export class InvoicesService {
       .orderBy('invoice.createdAt', 'DESC');
 
     if (tenantId) {
-      // Resolve the principal user for this tenant
-      // The tenantId might be the principal itself OR the principal of a dependent
       this.logger.log(`Finding invoices for tenantId: ${tenantId}`);
       
       const dependency = await this.userDependencyRepository.findOne({
@@ -51,11 +52,109 @@ export class InvoicesService {
       const principalId = dependency ? dependency.principalUserId : tenantId;
       this.logger.log(`Resolved principalId: ${principalId} (dependency found: ${!!dependency})`);
 
-      // Find invoices where the invoice belongs to the principal user
       queryBuilder.andWhere('invoice.userId = :principalId', { principalId });
     }
 
-    return await queryBuilder.getMany();
+    const invoices = await queryBuilder.getMany();
+
+    // Calculate dynamic late_fee_penalty for unpaid invoices
+    const lateFeeConfig = await this.getLateFeeConfig();
+    
+    if (!lateFeeConfig) {
+      return invoices;
+    }
+
+    return invoices.map(invoice => this.applyLateFee(invoice, lateFeeConfig));
+  }
+
+  /**
+   * Gets the active late_fee_penalty configuration if it exists and showInDocs is true
+   */
+  private async getLateFeeConfig(): Promise<{ percentage: number; showInDocs: boolean } | null> {
+    const today = new Date();
+    
+    const lateFeeParam = await this.globalParametersForInvoicesRepository
+      .createQueryBuilder('gpfi')
+      .leftJoinAndSelect('gpfi.globalParameterPeriod', 'gpp')
+      .leftJoinAndSelect('gpp.globalParameter', 'gp')
+      .leftJoinAndSelect('gpp.period', 'p')
+      .where('gp.code = :code', { code: 'late_fee_penalty' })
+      .andWhere('gpp.status = :status', { status: 'ACTIVE' })
+      .andWhere('p.startDate <= :today', { today })
+      .andWhere('p.endDate >= :today', { today })
+      .getOne();
+
+    if (!lateFeeParam) {
+      return null;
+    }
+
+    return {
+      percentage: parseFloat(lateFeeParam.globalParameterPeriod.value),
+      showInDocs: lateFeeParam.showInDocs,
+    };
+  }
+
+  /**
+   * Calculates and applies late fee penalty to an invoice dynamically.
+   * Late fee applies only if:
+   * - Invoice status is NOT Paid
+   * - More than 7 days have passed since the contract's payday of the invoice period
+   * Formula: invoiceValue * (percentage/100) * overdueDays (days after grace period of 7)
+   */
+  private applyLateFee(invoice: Invoice, lateFeeConfig: { percentage: number; showInDocs: boolean }): any {
+    const GRACE_PERIOD_DAYS = 7;
+
+    // Only apply to unpaid invoices
+    if (invoice.status === InvoiceStatus.PAID) {
+      return invoice;
+    }
+
+    // Need the contract's payday to calculate overdue days
+    const payday = invoice.contract?.payday || 1;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to midnight
+
+    // Determine the payday date for this invoice's billing period
+    // Use periodStart to identify the month, then set payday
+    const periodStart = invoice.periodStart ? new Date(invoice.periodStart + 'T12:00:00') : null;
+    if (!periodStart) {
+      return invoice;
+    }
+
+    // The payday for this period is in the same month as periodStart
+    const payDate = new Date(periodStart.getFullYear(), periodStart.getMonth(), payday);
+    payDate.setHours(0, 0, 0, 0);
+
+    // Calculate days since payday
+    const diffTime = today.getTime() - payDate.getTime();
+    const daysSincePayday = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // Only apply if more than grace period days have passed
+    if (daysSincePayday <= GRACE_PERIOD_DAYS) {
+      return invoice;
+    }
+
+    const overdueDays = daysSincePayday - GRACE_PERIOD_DAYS;
+    const dailyPenalty = Number(invoice.value) * (lateFeeConfig.percentage / 100);
+    const totalPenalty = Math.round(dailyPenalty * overdueDays * 100) / 100;
+
+    // Merge into globalParameters, operationTypes, percentages
+    const globalParameters = { ...(invoice.globalParameters || {}) };
+    const operationTypes = { ...(invoice.operationTypes || {}) };
+    const percentages = { ...(invoice.percentages || {}) };
+
+    if (lateFeeConfig.showInDocs) {
+      globalParameters['late_fee_penalty'] = totalPenalty;
+      operationTypes['late_fee_penalty'] = 'add';
+      percentages['late_fee_penalty'] = lateFeeConfig.percentage;
+    }
+
+    return {
+      ...invoice,
+      globalParameters,
+      operationTypes,
+      percentages,
+    };
   }
 
   async findOne(id: number): Promise<Invoice> {

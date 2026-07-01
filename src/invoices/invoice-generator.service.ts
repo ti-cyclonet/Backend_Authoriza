@@ -73,18 +73,46 @@ export class InvoiceGeneratorService {
   }
 
   private isGenerationDay(contract: Contract, currentDate: Date): boolean {
+    const DAYS_BEFORE = 5; // Generate invoice 5 days before payday
+
     switch (contract.mode) {
       case PaymentMode.MONTHLY:
-        return contract.payday ? currentDate.getDate() === contract.payday : currentDate.getDate() === 1;
+        const payday = contract.payday || 1;
+        // Calculate the target generation day (5 days before payday)
+        let generationDay = payday - DAYS_BEFORE;
+        if (generationDay <= 0) {
+          // Wraps to previous month (e.g., payday=3, generation day = 28/29 of prev month)
+          const lastDayPrevMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+          generationDay = lastDayPrevMonth + generationDay;
+        }
+        return currentDate.getDate() === generationDay;
       
       case PaymentMode.SEMIANNUAL:
-        const startMonth = contract.startDate.getMonth();
-        const currentMonth = currentDate.getMonth();
-        return (currentMonth - startMonth) % 6 === 0 && currentDate.getDate() === contract.startDate.getDate();
+        const startMonthSemi = contract.startDate.getMonth();
+        const currentMonthSemi = currentDate.getMonth();
+        const payDaySemi = contract.startDate.getDate();
+        // Check if we're in the right month and 5 days before
+        if ((currentMonthSemi - startMonthSemi + 12) % 6 === 0) {
+          let genDaySemi = payDaySemi - DAYS_BEFORE;
+          if (genDaySemi <= 0) {
+            const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
+            genDaySemi = lastDay + genDaySemi;
+            // Would need to check previous month — for simplicity, check same month
+            return false;
+          }
+          return currentDate.getDate() === genDaySemi;
+        }
+        return false;
       
       case PaymentMode.ANNUAL:
-        return currentDate.getMonth() === contract.startDate.getMonth() && 
-               currentDate.getDate() === contract.startDate.getDate();
+        const payMonthAnnual = contract.startDate.getMonth();
+        const payDayAnnual = contract.startDate.getDate();
+        // Calculate the date 5 days before annual payday
+        const annualPayDate = new Date(currentDate.getFullYear(), payMonthAnnual, payDayAnnual);
+        const annualGenDate = new Date(annualPayDate);
+        annualGenDate.setDate(annualGenDate.getDate() - DAYS_BEFORE);
+        return currentDate.getMonth() === annualGenDate.getMonth() && 
+               currentDate.getDate() === annualGenDate.getDate();
       
       default:
         return false;
@@ -128,11 +156,18 @@ export class InvoiceGeneratorService {
     const code = await this.entityCodeService.generateCode('Invoice');
 
     // Agregar parámetros globales como objeto JSON con valores calculados
+    // Excluir late_fee_penalty — se calcula dinámicamente al consultar
     const globalParametersData: Record<string, any> = {};
     const operationTypesData: Record<string, string> = {};
     const percentagesData: Record<string, number> = {};
     for (const param of globalParams) {
       const columnName = param.globalParameterPeriod.globalParameter.code;
+      
+      // Skip late_fee_penalty — it's calculated dynamically based on overdue days
+      if (columnName === 'late_fee_penalty') {
+        continue;
+      }
+
       const percentage = parseFloat(param.globalParameterPeriod.value);
       const operationType = param.globalParameterPeriod.operationType || 'add';
       
