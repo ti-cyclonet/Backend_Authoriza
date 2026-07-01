@@ -23,8 +23,10 @@ export class InvoicesController {
 
   @Get()
   @Public()
-  findAll(@Query('tenantId') tenantId?: string) {
-    return this.invoicesService.findAll(tenantId);
+  async findAll(@Query('tenantId') tenantId?: string) {
+    const result = await this.invoicesService.findAll(tenantId);
+    console.log(`[InvoicesController] findAll returning ${result.length} invoices for tenantId: ${tenantId}`);
+    return result;
   }
 
   @Get(':id')

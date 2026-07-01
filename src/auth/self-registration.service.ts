@@ -337,12 +337,24 @@ export class SelfRegistrationService {
         where: { principalUserId, status: 'ACTIVE' },
       });
 
-      const principalUser = await manager.findOne(User, { where: { id: principalUserId } });
-      const dependentUser = dependency
-        ? await manager.findOne(User, { where: { id: dependency.dependentUserId } })
-        : null;
+      let principalVerified = false;
+      let dependentVerified = false;
 
-      const bothVerified = principalUser?.isVerified && dependentUser?.isVerified;
+      if (principalUserId === user.id) {
+        // Current user is the principal
+        principalVerified = true; // Just verified above
+        if (dependency) {
+          const depUser = await manager.findOne(User, { where: { id: dependency.dependentUserId } });
+          dependentVerified = !!depUser?.isVerified;
+        }
+      } else {
+        // Current user is the dependent
+        dependentVerified = true; // Just verified above
+        const princUser = await manager.findOne(User, { where: { id: principalUserId } });
+        principalVerified = !!princUser?.isVerified;
+      }
+
+      const bothVerified = principalVerified && dependentVerified;
 
       // Determine if free package
       const nDiasUso = contract.package?.usageLimitVariables?.find(
@@ -354,28 +366,9 @@ export class SelfRegistrationService {
 
       let contractActivated = false;
 
-      if (isFree && bothVerified) {
-        // Activate contract
-        contract.status = ContractStatus.ACTIVE;
-        if (nDiasUso && nDiasUso.maxValue > 0) {
-          contract.startDate = new Date();
-          const end = new Date();
-          end.setDate(end.getDate() + nDiasUso.maxValue);
-          contract.endDate = end;
-        }
-        await manager.save(contract);
-
-        // Activate both users
-        if (principalUser) {
-          principalUser.strStatus = 'ACTIVE';
-          await manager.save(principalUser);
-        }
-        if (dependentUser) {
-          dependentUser.strStatus = 'ACTIVE';
-          await manager.save(dependentUser);
-        }
-
-        // Assign adminInout role to dependent
+      // When both verified: assign roles (always) and activate contract (if free)
+      if (bothVerified) {
+        // Assign adminInout + adminInvoices roles to dependent
         if (dependency) {
           const adminInoutRole = await manager.findOne(Rol, {
             where: { strName: 'adminInout' },
@@ -399,9 +392,59 @@ export class SelfRegistrationService {
               );
             }
           }
+
+          // Also assign adminInvoices role from Factonet
+          const adminInvoicesRole = await manager.findOne(Rol, {
+            where: { strName: 'adminInvoices' },
+          });
+          if (adminInvoicesRole) {
+            const existingFactonetRole = await manager.findOne(UserRole, {
+              where: {
+                userId: dependency.dependentUserId,
+                roleId: adminInvoicesRole.id,
+                contractId: contract.id,
+              },
+            });
+            if (!existingFactonetRole) {
+              await manager.save(
+                manager.create(UserRole, {
+                  userId: dependency.dependentUserId,
+                  roleId: adminInvoicesRole.id,
+                  contractId: contract.id,
+                  status: 'ACTIVE',
+                }),
+              );
+            }
+          }
         }
 
-        contractActivated = true;
+        // Activate contract only if free package
+        if (isFree) {
+          contract.status = ContractStatus.ACTIVE;
+          if (nDiasUso && nDiasUso.maxValue > 0) {
+            contract.startDate = new Date();
+            const end = new Date();
+            end.setDate(end.getDate() + nDiasUso.maxValue);
+            contract.endDate = end;
+          }
+          await manager.save(contract);
+
+          // Activate both users
+          const princUser = await manager.findOne(User, { where: { id: principalUserId } });
+          if (princUser) {
+            princUser.strStatus = 'ACTIVE';
+            await manager.save(princUser);
+          }
+          if (dependency) {
+            const depUser = await manager.findOne(User, { where: { id: dependency.dependentUserId } });
+            if (depUser) {
+              depUser.strStatus = 'ACTIVE';
+              await manager.save(depUser);
+            }
+          }
+
+          contractActivated = true;
+        }
       }
 
       return { contract, isFree, contractActivated, bothVerified };
@@ -605,13 +648,37 @@ export class SelfRegistrationService {
     endDate.setFullYear(endDate.getFullYear() + 1);
     contract.endDate = endDate;
 
-    // If package is billable, set contract to PENDING (admin activates via FactoNet)
+    // If package is billable, set contract to PENDING and deactivate users
     const isBillable = (pkg as any).isBillable !== false;
     if (isBillable) {
       contract.status = ContractStatus.PENDING;
     }
 
     await this.contractRepository.save(contract);
+
+    // If pending, deactivate principal and dependents
+    if (isBillable) {
+      // Find principal user
+      const principalUser = await this.userRepository.findOne({
+        where: { id: contract.user?.id },
+      });
+      if (principalUser) {
+        principalUser.strStatus = 'INACTIVE';
+        await this.userRepository.save(principalUser);
+      }
+
+      // Find and deactivate dependents
+      const dependencies = await this.userDependencyRepository.find({
+        where: { principalUserId: contract.user?.id, status: 'ACTIVE' },
+      });
+      for (const dep of dependencies) {
+        const depUser = await this.userRepository.findOne({ where: { id: dep.dependentUserId } });
+        if (depUser) {
+          depUser.strStatus = 'INACTIVE';
+          await this.userRepository.save(depUser);
+        }
+      }
+    }
 
     // Invalidate InOut cache
     try {

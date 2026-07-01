@@ -168,20 +168,29 @@ export class InvoiceGeneratorService {
   private async calculateInvoiceValueWithParams(contract: Contract, periodStart: Date, periodEnd: Date): Promise<{ calculatedValue: number; globalParams: GlobalParametersForInvoices[] }> {
     this.logger.log(`Calculando valor para contrato ${contract.id}, período: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`);
     
+    // contract.value stores the monthly price from the package
+    // For monthly mode: invoice = contract.value (monthly price)
+    // For semiannual mode: invoice = contract.value * 6
+    // For annual mode: invoice = contract.value * 12
     let baseValue = Number(contract.value);
 
-    // Si es mensual, dividir entre 12
-    if (contract.mode === PaymentMode.MONTHLY) {
-      baseValue = baseValue / 12;
+    switch (contract.mode) {
+      case PaymentMode.MONTHLY:
+        // Value is already the monthly price, no adjustment needed
+        break;
+      case PaymentMode.SEMIANNUAL:
+        baseValue = baseValue * 6;
+        break;
+      case PaymentMode.ANNUAL:
+        baseValue = baseValue * 12;
+        break;
     }
 
-    this.logger.log(`Valor base calculado: ${baseValue}`);
+    this.logger.log(`Valor base calculado: ${baseValue} (mode: ${contract.mode}, contract.value: ${contract.value})`);
 
     // Obtener parámetros globales configurados para facturas que estén vigentes
-    const globalParams = await this.getGlobalParametersForInvoices(new Date()); // Usar fecha actual
+    const globalParams = await this.getGlobalParametersForInvoices(new Date());
     
-    // El valor base es el valor calculado (value)
-    // Los parámetros globales se calculan sobre este valor base pero no se suman
     const finalValue = baseValue;
 
     this.logger.log(`Valor final: ${finalValue}, Parámetros aplicados: ${globalParams.length}`);

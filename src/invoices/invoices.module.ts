@@ -10,9 +10,16 @@ import { Contract } from '../contract/entities/contract.entity';
 import { GlobalParametersPeriods } from '../global-parameters-periods/entities/global-parameters-periods.entity';
 import { GlobalParametersForInvoices } from '../global-parameters-invoices/entities/global-parameters-for-invoices.entity';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
+import { User } from '../users/entities/user.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Invoice, Contract, GlobalParametersPeriods, GlobalParametersForInvoices]), EntityCodesModule],
+  imports: [
+    TypeOrmModule.forFeature([Invoice, Contract, GlobalParametersPeriods, GlobalParametersForInvoices, UserDependency, User]),
+    EntityCodesModule,
+    NotificationsModule,
+  ],
   controllers: [InvoicesController, PublicInvoicesController],
   providers: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService],
   exports: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService]
