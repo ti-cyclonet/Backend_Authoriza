@@ -8,6 +8,10 @@ CLOUDINARY_CLOUD_NAME=dn8ki4idz
 CLOUDINARY_API_KEY=411461764687417
 CLOUDINARY_API_SECRET=GHJhWnvSFSwogFTQmrF6qmbWZiw
 
+# Prefijo para carpetas en Cloudinary (dev, staging, prod)
+# Permite separar archivos por entorno. Ej: dev/contracts/, prod/packages/
+CLOUDINARY_FOLDER_PREFIX=dev
+
 NODE_ENV=development
 PORT=3000
 
