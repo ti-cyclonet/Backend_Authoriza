@@ -1,23 +1,34 @@
 import { Injectable } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
+import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
 
 @Injectable()
 export class CloudinaryService {
+  private folderPrefix: string;
+
+  constructor(private configService: ConfigService) {
+    this.folderPrefix = this.configService.get<string>('CLOUDINARY_FOLDER_PREFIX') || '';
+  }
+
+  private prefixFolder(folder: string): string {
+    const cleanFolder = folder.replace(/^\//, '');
+    return this.folderPrefix ? `${this.folderPrefix}/${cleanFolder}` : cleanFolder;
+  }
+
   async uploadImage(
     file: Express.Multer.File,
     folder: string = '',
   ): Promise<UploadApiResponse> {
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder },
+        { folder: this.prefixFolder(folder) },
         (error, result) => {
           if (error) return reject(error);
           resolve(result);
         },
       );
 
-      // Convertir el buffer del archivo en un stream legible
       const readable = new Readable();
       readable.push(file.buffer);
       readable.push(null);
@@ -32,13 +43,13 @@ export class CloudinaryService {
     fileName: string,
     folder: string = 'contracts'
   ): Promise<UploadApiResponse> {
-    console.log(`Uploading PDF: ${fileName} to folder: ${folder}`);
+    console.log(`Uploading PDF: ${fileName} to folder: ${this.prefixFolder(folder)}`);
     console.log(`PDF buffer size: ${pdfBuffer.length} bytes`);
     
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         { 
-          folder: folder,
+          folder: this.prefixFolder(folder),
           resource_type: 'raw',
           public_id: fileName,
           use_filename: true,
@@ -76,16 +87,16 @@ export class CloudinaryService {
   }
 
   private extractPublicId(url: string): string | null {
-    const match = url.match(
-      /\/applications\/([^/.]+)\.(jpg|png|jpeg|gif|webp)/,
-    );
-    return match ? `applications/${match[1]}` : null;
+    const prefix = this.folderPrefix ? `${this.folderPrefix}/` : '';
+    const pattern = new RegExp(`\\/${prefix.replace(/\//g, '\\/')}?applications\\/([^/.]+)\\.(jpg|png|jpeg|gif|webp)`);
+    const match = url.match(pattern);
+    return match ? `${prefix}applications/${match[1]}` : null;
   }
 
   private extractPDFPublicId(url: string): string | null {
-    const match = url.match(
-      /\/contracts\/([^/.]+)\.pdf/,
-    );
-    return match ? `contracts/${match[1]}` : null;
+    const prefix = this.folderPrefix ? `${this.folderPrefix}/` : '';
+    const pattern = new RegExp(`\\/${prefix.replace(/\//g, '\\/')}?contracts\\/([^/.]+)\\.pdf`);
+    const match = url.match(pattern);
+    return match ? `${prefix}contracts/${match[1]}` : null;
   }
 }

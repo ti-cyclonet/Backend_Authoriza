@@ -30,7 +30,7 @@ export default class InitialApplicationsSeed {
         strName: 'Authoriza',
         strDescription: 'Control Access for Cyclonet Applications',
         strUrlImage:
-          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1755136261/Authoriza-logo_qxdabx.png',
+          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1783558299/Authoriza-logo_uayzga.png',
         strSlug: 'authoriza app',
         strTags: ['control access', 'security', 'users'],
         roles: [
@@ -151,7 +151,7 @@ export default class InitialApplicationsSeed {
         strName: 'Inout',
         strDescription: 'Gestión de Inventario y Manufactura',
         strUrlImage:
-          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1755134161/logos-applications/rejxz5x2vlaqkycvwn23.png',
+          '',
         strSlug: 'inout app',
         strTags: ['inventory', 'manufacturing', 'materials', 'products'],
         roles: [
@@ -332,7 +332,7 @@ export default class InitialApplicationsSeed {
         strDescription:
           'Invoice and payment management for Cyclonet Applications',
         strUrlImage:
-          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1763930796/logos-applications/eviplcxfodjcezc6zjkn.png',
+          '',
         strSlug: 'factonet app',
         strTags: ['invoice', 'security', 'payment'],
         roles: [
