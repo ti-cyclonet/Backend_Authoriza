@@ -612,6 +612,8 @@ export class ContractService {
       contractId: contract.id,
       packageName: contract.package?.name ?? '',
       isBillable: contract.package?.isBillable ?? true,
+      startDate: contract.startDate ?? null,
+      endDate: contract.endDate ?? null,
       limits,
     };
   }
