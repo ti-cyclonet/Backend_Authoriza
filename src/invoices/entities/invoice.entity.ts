@@ -74,6 +74,19 @@ export class Invoice {
   @Column({ type: 'jsonb', nullable: true })
   percentages?: Record<string, number>;
 
+  // Payment registration fields
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  paidAmount?: number;
+
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  lateFeeAmount?: number;
+
+  @Column({ type: 'int', nullable: true })
+  lateFeeDays?: number;
+
+  @Column({ type: 'decimal', precision: 6, scale: 4, nullable: true })
+  lateFeePercentage?: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

@@ -104,8 +104,17 @@ export class InvoicesService {
   private applyLateFee(invoice: Invoice, lateFeeConfig: { percentage: number; showInDocs: boolean }): any {
     const GRACE_PERIOD_DAYS = 7;
 
-    // Only apply to unpaid invoices
+    // For paid invoices, use frozen values if available
     if (invoice.status === InvoiceStatus.PAID) {
+      if (invoice.lateFeeAmount && invoice.lateFeeAmount > 0) {
+        const globalParameters = { ...(invoice.globalParameters || {}) };
+        const operationTypes = { ...(invoice.operationTypes || {}) };
+        const percentages = { ...(invoice.percentages || {}) };
+        globalParameters['late_fee_penalty'] = invoice.lateFeeAmount;
+        operationTypes['late_fee_penalty'] = 'add';
+        percentages['late_fee_penalty'] = invoice.lateFeePercentage || lateFeeConfig.percentage;
+        return { ...invoice, globalParameters, operationTypes, percentages };
+      }
       return invoice;
     }
 
@@ -188,6 +197,77 @@ export class InvoicesService {
 
   async update(id: number, updateInvoiceDto: UpdateInvoiceDto): Promise<Invoice> {
     await this.invoiceRepository.update(id, updateInvoiceDto);
+    return await this.findOne(id);
+  }
+
+  /**
+   * Register a payment for an invoice.
+   * Freezes the late fee penalty at the moment of payment and marks invoice as Paid.
+   */
+  async registerPayment(id: number, paymentDate: string, paidAmount: number): Promise<Invoice> {
+    const invoice = await this.invoiceRepository.findOne({
+      where: { id },
+      relations: ['user', 'contract'],
+    });
+
+    if (!invoice) {
+      throw new NotFoundException(`Invoice with ID ${id} not found`);
+    }
+
+    // Calculate and freeze the late fee at this moment
+    const lateFeeConfig = await this.getLateFeeConfig();
+    let lateFeeAmount = 0;
+    let lateFeeDays = 0;
+    let lateFeePercentage = 0;
+
+    if (lateFeeConfig && invoice.status !== InvoiceStatus.PAID) {
+      const GRACE_PERIOD_DAYS = 7;
+      const payday = invoice.contract?.payday || 1;
+      const payDateMoment = new Date(paymentDate);
+      payDateMoment.setHours(0, 0, 0, 0);
+
+      const periodStart = invoice.periodStart ? new Date(invoice.periodStart + 'T12:00:00') : null;
+      if (periodStart) {
+        const dueDate = new Date(periodStart.getFullYear(), periodStart.getMonth(), payday);
+        dueDate.setHours(0, 0, 0, 0);
+
+        const diffTime = payDateMoment.getTime() - dueDate.getTime();
+        const daysSincePayday = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (daysSincePayday > GRACE_PERIOD_DAYS) {
+          lateFeeDays = daysSincePayday - GRACE_PERIOD_DAYS;
+          const dailyPenalty = Number(invoice.value) * (lateFeeConfig.percentage / 100);
+          lateFeeAmount = Math.round(dailyPenalty * lateFeeDays * 100) / 100;
+          lateFeePercentage = lateFeeConfig.percentage;
+        }
+      }
+    }
+
+    // Persist the frozen late fee and payment data
+    const globalParameters = { ...(invoice.globalParameters || {}) };
+    const operationTypes = { ...(invoice.operationTypes || {}) };
+    const percentages = { ...(invoice.percentages || {}) };
+
+    if (lateFeeAmount > 0) {
+      globalParameters['late_fee_penalty'] = lateFeeAmount;
+      operationTypes['late_fee_penalty'] = 'add';
+      percentages['late_fee_penalty'] = lateFeePercentage;
+    }
+
+    await this.invoiceRepository.update(id, {
+      status: InvoiceStatus.PAID,
+      paymentDate: new Date(paymentDate),
+      paidAmount,
+      lateFeeAmount: lateFeeAmount || null,
+      lateFeeDays: lateFeeDays || null,
+      lateFeePercentage: lateFeePercentage || null,
+      globalParameters,
+      operationTypes,
+      percentages,
+    });
+
+    this.logger.log(`Payment registered for invoice ${id}: paid=${paidAmount}, lateFee=${lateFeeAmount}, days=${lateFeeDays}`);
+
     return await this.findOne(id);
   }
 
