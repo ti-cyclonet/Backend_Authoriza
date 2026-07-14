@@ -12,6 +12,12 @@ export async function seedCustomerParameters(dataSource: DataSource) {
 
   const customerParameters = [
     {
+      code: 'RENT',
+      name: 'Arriendo',
+      description: 'Arriendo local comercial. Costo fijo que afecta el cálculo del periodo.',
+      dataType: 'number'
+    },
+    {
       code: 'MAX_STOCK_ALERT',
       name: 'Alerta de Stock Máximo',
       description: 'Porcentaje de stock máximo para generar alertas',

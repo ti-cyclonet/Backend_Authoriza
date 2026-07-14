@@ -691,27 +691,14 @@ export class SelfRegistrationService {
       { previousPackage: contract.package?.name, newPackage: pkg.name, newPrice: pkg.price },
     );
 
-    // If package is billable, deactivate principal and dependents until admin activates
+    // Package upgrade: keep users active so they can sign the new contract.
+    // Access restrictions are handled at the contract level (PENDING status),
+    // not by deactivating user accounts.
     const isBillable = (pkg as any).isBillable !== false;
     if (isBillable) {
-      const principalUser = await this.userRepository.findOne({
-        where: { id: contract.user?.id },
-      });
-      if (principalUser) {
-        principalUser.strStatus = 'INACTIVE';
-        await this.userRepository.save(principalUser);
-      }
-
-      const dependencies = await this.userDependencyRepository.find({
-        where: { principalUserId: contract.user?.id, status: 'ACTIVE' },
-      });
-      for (const dep of dependencies) {
-        const depUser = await this.userRepository.findOne({ where: { id: dep.dependentUserId } });
-        if (depUser) {
-          depUser.strStatus = 'INACTIVE';
-          await this.userRepository.save(depUser);
-        }
-      }
+      this.logger.log(
+        `Contract ${contract.code} upgraded to billable package "${pkg.name}". Users remain active for contract signing.`,
+      );
     }
 
     // Invalidate InOut cache

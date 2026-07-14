@@ -103,15 +103,15 @@ export class PeriodService {
       });
       
       if (!response.ok) {
-        // Si no se puede conectar o hay error, asumir que hay facturas por seguridad
-        return true;
+        // Si no se puede verificar, permitir la eliminación
+        return false;
       }
 
       const result = await response.json();
       return result.hasInvoices || false;
     } catch (error) {
-      // En caso de error de conexión, asumir que hay facturas por seguridad
-      return true;
+      // En caso de error de conexión, permitir la eliminación
+      return false;
     }
   }
 
