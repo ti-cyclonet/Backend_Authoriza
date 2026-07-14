@@ -76,6 +76,26 @@ export class Contract {
   @Column({ type: 'timestamp', nullable: true })
   signedAt?: Date;
 
+  // Client signature fields
+  @Column({ type: 'timestamp', nullable: true })
+  clientSignedAt?: Date;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  clientSignedBy?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  clientSignedIp?: string;
+
+  // Admin signature fields
+  @Column({ type: 'timestamp', nullable: true })
+  adminSignedAt?: Date;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  adminSignedBy?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  adminSignedIp?: string;
+
   @Column({ type: 'varchar', length: 3, nullable: true })
   codePrefix?: string;
 

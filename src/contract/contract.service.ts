@@ -354,6 +354,116 @@ export class ContractService {
     return this.contractRepository.save(contract);
   }
 
+  /**
+   * Client signs the contract.
+   * Contract must be ISSUED (have a PDF) to be signed by the client.
+   */
+  async signAsClient(contractId: string, signedBy: string, ip: string): Promise<Contract> {
+    const contract = await this.findOne(contractId);
+
+    if (!contract.pdfUrl || !contract.issuedAt) {
+      throw new BadRequestException(
+        'El contrato debe estar emitido (con PDF) antes de poder firmarse.',
+      );
+    }
+
+    if (contract.clientSignedAt) {
+      throw new BadRequestException('El cliente ya ha firmado este contrato.');
+    }
+
+    contract.clientSignedAt = new Date();
+    contract.clientSignedBy = signedBy;
+    contract.clientSignedIp = ip;
+
+    const saved = await this.contractRepository.save(contract);
+
+    // If admin already signed, activate automatically
+    if (saved.adminSignedAt) {
+      return this.autoActivateIfBothSigned(saved);
+    }
+
+    return saved;
+  }
+
+  /**
+   * Admin signs the contract.
+   * Requires that the contract is ISSUED.
+   */
+  async signAsAdmin(contractId: string, signedBy: string, ip: string): Promise<Contract> {
+    const contract = await this.findOne(contractId);
+
+    if (!contract.pdfUrl || !contract.issuedAt) {
+      throw new BadRequestException(
+        'El contrato debe estar emitido (con PDF) antes de poder firmarse.',
+      );
+    }
+
+    if (contract.adminSignedAt) {
+      throw new BadRequestException('El administrador ya ha firmado este contrato.');
+    }
+
+    contract.adminSignedAt = new Date();
+    contract.adminSignedBy = signedBy;
+    contract.adminSignedIp = ip;
+    contract.signedAt = new Date(); // Legacy field compatibility
+
+    const saved = await this.contractRepository.save(contract);
+
+    // If client already signed, activate automatically
+    if (saved.clientSignedAt) {
+      return this.autoActivateIfBothSigned(saved);
+    }
+
+    return saved;
+  }
+
+  /**
+   * Get signature status for a contract.
+   */
+  async getSignatures(contractId: string) {
+    const contract = await this.findOne(contractId);
+    return {
+      contractId: contract.id,
+      code: contract.code,
+      status: contract.status,
+      client: contract.clientSignedAt ? {
+        signedAt: contract.clientSignedAt,
+        signedBy: contract.clientSignedBy,
+        ip: contract.clientSignedIp,
+      } : null,
+      admin: contract.adminSignedAt ? {
+        signedAt: contract.adminSignedAt,
+        signedBy: contract.adminSignedBy,
+        ip: contract.adminSignedIp,
+      } : null,
+      bothSigned: !!(contract.clientSignedAt && contract.adminSignedAt),
+    };
+  }
+
+  /**
+   * Auto-activate contract when both parties have signed.
+   */
+  private async autoActivateIfBothSigned(contract: Contract): Promise<Contract> {
+    if (contract.clientSignedAt && contract.adminSignedAt && contract.status !== ContractStatus.ACTIVE) {
+      contract.status = ContractStatus.ACTIVE;
+      contract.startDate = new Date();
+
+      // Calculate endDate if temporal limit exists
+      const nDiasUso = contract.package?.usageLimitVariables?.find(
+        (v) => v.variableName === 'nDiasUso',
+      );
+      if (nDiasUso && nDiasUso.maxValue > 0) {
+        const end = new Date();
+        end.setDate(end.getDate() + nDiasUso.maxValue);
+        contract.endDate = end;
+      }
+
+      this.logger.log(`Contract ${contract.code} auto-activated: both parties signed.`);
+      return this.contractRepository.save(contract);
+    }
+    return contract;
+  }
+
   async activateContract(id: string): Promise<Contract> {
     const contract = await this.findOne(id);
 
@@ -538,11 +648,12 @@ export class ContractService {
   }
 
   private async sendContractEmail(contract: Contract, pdfUrl: string): Promise<void> {
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'https://factonet.cyclonet.com.co/login';
     await this.notificationsService.sendByTemplate('CONTRACT_READY', contract.user.strUserName, {
       customerName: this.getCustomerName(contract),
       contractCode: contract.code,
       packageName: contract.package?.name || 'N/A',
-      pdfUrl,
+      factonetUrl,
       year: new Date().getFullYear().toString(),
     });
   }

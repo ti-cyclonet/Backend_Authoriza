@@ -140,14 +140,14 @@ export class NotificationsService {
       <td style="padding:30px;">
         <h2 style="color:#1a237e;margin:0 0 15px;">Tu contrato está listo</h2>
         <p style="color:#333;line-height:1.6;">Estimado(a) <strong>{{customerName}}</strong>,</p>
-        <p style="color:#333;line-height:1.6;">Tu contrato <strong>{{contractCode}}</strong> ha sido preparado y está disponible para tu revisión.</p>
+        <p style="color:#333;line-height:1.6;">Tu contrato <strong>{{contractCode}}</strong> ha sido preparado y está disponible para tu revisión y firma.</p>
         <table width="100%" style="margin:20px 0;border-collapse:collapse;">
           <tr><td style="padding:8px 12px;background:#e3f2fd;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;background:#e3f2fd;">{{packageName}}</td></tr>
         </table>
         <div style="text-align:center;margin:28px 0;">
-          <a href="{{pdfUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#1e88e5);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ver contrato</a>
+          <a href="{{factonetUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#1e88e5);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ver y firmar contrato</a>
         </div>
-        <p style="color:#888;font-size:12px;text-align:center;margin:0;">Por favor revisa el contrato. Tu cuenta será activada una vez el administrador complete el proceso.</p>
+        <p style="color:#888;font-size:12px;text-align:center;margin:0;">Inicia sesión en FactoNet para revisar y firmar tu contrato. Tu cuenta será activada una vez ambas partes firmen.</p>
       </td>
     </tr>
     <tr>

@@ -151,7 +151,7 @@ export default class InitialApplicationsSeed {
         strName: 'Inout',
         strDescription: 'Gestión de Inventario y Manufactura',
         strUrlImage:
-          '',
+          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1783558772/logo_inout_ymcqms.png',
         strSlug: 'inout app',
         strTags: ['inventory', 'manufacturing', 'materials', 'products'],
         roles: [
@@ -332,7 +332,7 @@ export default class InitialApplicationsSeed {
         strDescription:
           'Invoice and payment management for Cyclonet Applications',
         strUrlImage:
-          '',
+          'https://res.cloudinary.com/dn8ki4idz/image/upload/v1783558645/FactoNet_1_khi11m.png',
         strSlug: 'factonet app',
         strTags: ['invoice', 'security', 'payment'],
         roles: [

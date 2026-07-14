@@ -4,6 +4,7 @@ import { InvoiceGeneratorService } from './invoice-generator.service';
 import { InvoiceSweepService } from './invoice-sweep.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
+import { RegisterPaymentDto } from './dto/register-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 
@@ -48,6 +49,11 @@ export class InvoicesController {
   @Public()
   updateStatus(@Param('id') id: string, @Body() body: { status: string }) {
     return this.invoicesService.updateStatus(+id, body.status);
+  }
+
+  @Post(':id/register-payment')
+  registerPayment(@Param('id') id: string, @Body() dto: RegisterPaymentDto) {
+    return this.invoicesService.registerPayment(+id, dto.paymentDate, dto.paidAmount);
   }
 
   @Delete(':id')

@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   Patch,
+  Req,
 } from '@nestjs/common';
 import { ContractService } from './contract.service';
 import { CreateContractDto } from './dto/create-contract.dto';
@@ -37,6 +38,31 @@ export class ContractController {
   @Patch(':id/sign')
   async signContract(@Param('id') contractId: string) {
     return this.contractService.signContract(contractId);
+  }
+
+  @Post(':id/sign-client')
+  async signAsClient(
+    @Param('id') contractId: string,
+    @Body() body: { signedBy: string },
+    @Req() req: any,
+  ) {
+    const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
+    return this.contractService.signAsClient(contractId, body.signedBy, ip);
+  }
+
+  @Post(':id/sign-admin')
+  async signAsAdmin(
+    @Param('id') contractId: string,
+    @Body() body: { signedBy: string },
+    @Req() req: any,
+  ) {
+    const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
+    return this.contractService.signAsAdmin(contractId, body.signedBy, ip);
+  }
+
+  @Get(':id/signatures')
+  async getSignatures(@Param('id') contractId: string) {
+    return this.contractService.getSignatures(contractId);
   }
 
   @Patch(':id/issue')
