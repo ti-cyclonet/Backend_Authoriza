@@ -648,7 +648,7 @@ export class ContractService {
   }
 
   private async sendContractEmail(contract: Contract, pdfUrl: string): Promise<void> {
-    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'https://factonet.cyclonet.com.co/login';
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
     await this.notificationsService.sendByTemplate('CONTRACT_READY', contract.user.strUserName, {
       customerName: this.getCustomerName(contract),
       contractCode: contract.code,

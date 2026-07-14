@@ -88,7 +88,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
         <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Soluciones tecnológicas a tu medida</p>
       </td>
     </tr>
@@ -132,7 +132,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
         <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Soluciones tecnológicas a tu medida</p>
       </td>
     </tr>
@@ -145,7 +145,7 @@ export class NotificationsService {
           <tr><td style="padding:8px 12px;background:#e3f2fd;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;background:#e3f2fd;">{{packageName}}</td></tr>
         </table>
         <div style="text-align:center;margin:28px 0;">
-          <a href="{{factonetUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#1e88e5);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ver y firmar contrato</a>
+          <a href="{{factonetUrl}}" style="display:inline-block;background-color:#1565c0;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;mso-padding-alt:14px 44px;">Ver y firmar contrato</a>
         </div>
         <p style="color:#888;font-size:12px;text-align:center;margin:0;">Inicia sesión en FactoNet para revisar y firmar tu contrato. Tu cuenta será activada una vez ambas partes firmen.</p>
       </td>
@@ -177,7 +177,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#0d47a1,#e65100);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
         <h1 style="margin:8px 0 4px;font-size:32px;font-weight:800;letter-spacing:2px;"><span style="color:#64b5f6;">In</span><span style="color:#ffb74d;">Out</span></h1>
         <p style="color:rgba(255,255,255,0.85);margin:0;font-size:13px;">Sistema de gestión de inventario y ventas</p>
       </td>
@@ -188,7 +188,7 @@ export class NotificationsService {
         <p style="color:#333;line-height:1.7;margin:0 0 12px;">Hola <strong>{{customerName}}</strong>,</p>
         <p style="color:#333;line-height:1.7;margin:0 0 24px;">Tu correo electrónico ha sido registrado en <strong>CycloNet S.A.S.</strong> para acceder a la aplicación <strong><span style="color:#1565c0;">In</span><span style="color:#e65100;">Out</span></strong>. Para activar tu cuenta y comenzar a gestionar tu inventario, haz clic en el botón:</p>
         <div style="text-align:center;margin:32px 0;">
-          <a href="{{verificationUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#e65100);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Verificar mi correo</a>
+          <a href="{{verificationUrl}}" style="display:inline-block;background-color:#1565c0;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;mso-padding-alt:14px 44px;">Verificar mi correo</a>
         </div>
         <p style="color:#888;font-size:12px;text-align:center;margin:0 0 8px;">Este enlace es válido por <strong>24 horas</strong>.</p>
         <p style="color:#aaa;font-size:12px;text-align:center;margin:0;">Si no solicitaste este registro, puedes ignorar este mensaje.</p>
@@ -221,7 +221,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
         <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Sistema de Facturación</p>
       </td>
     </tr>
@@ -232,7 +232,7 @@ export class NotificationsService {
         <p style="color:#333;line-height:1.6;">La factura <strong>{{invoiceCode}}</strong> ya está disponible en la plataforma FactoNet para su autogestión.</p>
         <p style="color:#333;line-height:1.6;">Puede consultar los detalles, realizar el pago y descargar su factura en formato PDF accediendo a la plataforma.</p>
         <div style="text-align:center;margin:28px 0;">
-          <a href="{{factonetUrl}}" style="display:inline-block;background:linear-gradient(135deg,#1565c0,#1e88e5);color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;">Ir a FactoNet</a>
+          <a href="{{factonetUrl}}" style="display:inline-block;background-color:#1565c0;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;mso-padding-alt:14px 44px;">Ir a FactoNet</a>
         </div>
       </td>
     </tr>
@@ -263,7 +263,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
         <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Gestión de Contratos</p>
       </td>
     </tr>
@@ -323,7 +323,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#2e7d32,#43a047);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
         <p style="color:#c8e6c9;margin:5px 0 0;font-size:14px;">Gestión de Contratos</p>
       </td>
     </tr>
@@ -378,7 +378,7 @@ export class NotificationsService {
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
     <tr>
       <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1774391294/branding/cyclonet_logo.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
         <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Soluciones tecnológicas a tu medida</p>
       </td>
     </tr>

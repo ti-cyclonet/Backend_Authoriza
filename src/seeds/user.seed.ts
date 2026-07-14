@@ -139,7 +139,8 @@ export default class UserSeed {
       cycloPackage = packageRepo.create({
         name: 'Cyclon Plus [+]',
         description: 'Paquete básico que incluye una cuenta de administrador para las aplicaciones Authoriza, FactoNet e InOut',
-        code: packageCode
+        code: packageCode,
+        isBillable: false
       });
       await packageRepo.save(cycloPackage);
       console.log('✅ Paquete Cyclon Plus [+] creado:', cycloPackage.id);
