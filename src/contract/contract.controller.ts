@@ -43,21 +43,23 @@ export class ContractController {
   @Post(':id/sign-client')
   async signAsClient(
     @Param('id') contractId: string,
-    @Body() body: { signedBy: string },
+    @Body() body: { signedBy: string; userId?: string },
     @Req() req: any,
   ) {
     const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
-    return this.contractService.signAsClient(contractId, body.signedBy, ip);
+    const userId = body.userId || req.user?.id || null;
+    return this.contractService.signAsClient(contractId, body.signedBy, ip, userId);
   }
 
   @Post(':id/sign-admin')
   async signAsAdmin(
     @Param('id') contractId: string,
-    @Body() body: { signedBy: string },
+    @Body() body: { signedBy: string; userId?: string },
     @Req() req: any,
   ) {
     const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
-    return this.contractService.signAsAdmin(contractId, body.signedBy, ip);
+    const userId = body.userId || req.user?.id || null;
+    return this.contractService.signAsAdmin(contractId, body.signedBy, ip, userId);
   }
 
   @Get(':id/signatures')

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Re
 import { InvoicesService } from './invoices.service';
 import { InvoiceGeneratorService } from './invoice-generator.service';
 import { InvoiceSweepService } from './invoice-sweep.service';
+import { InvoiceLifecycleCron } from './invoice-lifecycle.cron';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
@@ -14,7 +15,8 @@ export class InvoicesController {
   constructor(
     private readonly invoicesService: InvoicesService,
     private readonly invoiceGeneratorService: InvoiceGeneratorService,
-    private readonly invoiceSweepService: InvoiceSweepService
+    private readonly invoiceSweepService: InvoiceSweepService,
+    private readonly invoiceLifecycleCron: InvoiceLifecycleCron
   ) {}
 
   @Post()
@@ -87,6 +89,14 @@ export class InvoicesController {
   async sweepInvoices() {
     console.log('Sweep endpoint called');
     return await this.invoiceSweepService.sweepAndGenerateInvoices();
+  }
+
+  @Post('lifecycle-check')
+  @Public()
+  async lifecycleCheck() {
+    console.log('Lifecycle check endpoint called');
+    await this.invoiceLifecycleCron.handleInvoiceLifecycle();
+    return { message: 'Invoice lifecycle check completed' };
   }
 
   @Get('check-period')

@@ -35,4 +35,7 @@ export class UserResponseDto {
 
   @Expose()
   hasContracts?: boolean;
+
+  @Expose()
+  isAuthorizedSigner?: boolean;
 }

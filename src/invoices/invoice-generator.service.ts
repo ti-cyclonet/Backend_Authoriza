@@ -145,12 +145,40 @@ export class InvoiceGeneratorService {
   }
 
   private async createInvoiceForContract(contract: Contract, currentDate: Date): Promise<Invoice> {
-    const { periodStart, periodEnd } = this.calculatePeriod(contract, currentDate);
+    let { periodStart, periodEnd } = this.calculatePeriod(contract, currentDate);
     const issueDate = this.calculateIssueDate(contract, currentDate);
-    const expirationDate = new Date(issueDate);
-    expirationDate.setDate(expirationDate.getDate() + 30); // 30 días para pagar
+    
+    // Due date = PayDay + 7 days (grace period)
+    const payday = contract.payday || 1;
+    const expirationDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), payday);
+    // If payday already passed this month, use next month's payday
+    if (expirationDate < currentDate) {
+      expirationDate.setMonth(expirationDate.getMonth() + 1);
+    }
+    expirationDate.setDate(expirationDate.getDate() + 7);
 
-    const { calculatedValue, globalParams } = await this.calculateInvoiceValueWithParams(contract, periodStart, periodEnd);
+    let { calculatedValue, globalParams } = await this.calculateInvoiceValueWithParams(contract, periodStart, periodEnd);
+
+    // Pro-rata: If this is the first invoice and contract started mid-period,
+    // adjust the value proportionally and set periodStart to contract startDate
+    const contractStart = new Date(contract.startDate);
+    contractStart.setHours(0, 0, 0, 0);
+    const periodStartNorm = new Date(periodStart);
+    periodStartNorm.setHours(0, 0, 0, 0);
+    const periodEndNorm = new Date(periodEnd);
+    periodEndNorm.setHours(0, 0, 0, 0);
+
+    if (contractStart > periodStartNorm && contractStart <= periodEndNorm) {
+      // Adjust periodStart to contract start date
+      periodStart = contractStart;
+
+      const totalDaysInPeriod = Math.ceil((periodEndNorm.getTime() - periodStartNorm.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const coveredDays = Math.ceil((periodEndNorm.getTime() - contractStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const proRataFactor = coveredDays / totalDaysInPeriod;
+      const originalValue = calculatedValue;
+      calculatedValue = Math.round(calculatedValue * proRataFactor * 100) / 100;
+      this.logger.log(`Pro-rata applied: ${coveredDays}/${totalDaysInPeriod} days = factor ${proRataFactor.toFixed(4)}. Value: ${originalValue} → ${calculatedValue}. Period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`);
+    }
 
     // Generar código usando EntityCodeService
     const code = await this.entityCodeService.generateCode('Invoice');
@@ -259,13 +287,8 @@ export class InvoiceGeneratorService {
   }
 
   private calculateIssueDate(contract: Contract, currentDate: Date): Date {
-    const issueDate = new Date(currentDate);
-    
-    if (contract.mode === PaymentMode.MONTHLY && contract.payday) {
-      issueDate.setDate(contract.payday);
-    }
-    
-    return issueDate;
+    // Issue date is the actual generation date
+    return new Date(currentDate);
   }
 
   async generateInvoiceForContract(contractId: string): Promise<Invoice> {

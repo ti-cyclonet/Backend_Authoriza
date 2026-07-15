@@ -239,6 +239,15 @@ export class UsersController {
     return this.usersService.toggleStatus(id);
   }
 
+  @Patch(':id/set-authorized-signer')
+  @ApiOperation({ summary: 'Set or unset user as authorized signer' })
+  setAuthorizedSigner(
+    @Param('id') id: string,
+    @Body('isAuthorizedSigner') isAuthorizedSigner: boolean,
+  ) {
+    return this.usersService.setAuthorizedSigner(id, isAuthorizedSigner);
+  }
+
   @Patch(':id/status-with-dependents')
   @ApiOperation({ summary: 'Update status for user and its dependents' })
   async updateStatusAndDependents(

@@ -5,6 +5,7 @@ import { InvoicesController } from './invoices.controller';
 import { PublicInvoicesController } from './public-invoices.controller';
 import { InvoiceGeneratorService } from './invoice-generator.service';
 import { InvoiceSweepService } from './invoice-sweep.service';
+import { InvoiceLifecycleCron } from './invoice-lifecycle.cron';
 import { Invoice } from './entities/invoice.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { GlobalParametersPeriods } from '../global-parameters-periods/entities/global-parameters-periods.entity';
@@ -21,7 +22,7 @@ import { User } from '../users/entities/user.entity';
     NotificationsModule,
   ],
   controllers: [InvoicesController, PublicInvoicesController],
-  providers: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService],
+  providers: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService, InvoiceLifecycleCron],
   exports: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService]
 })
 export class InvoicesModule {}

@@ -54,7 +54,17 @@ export class InvoiceSweepService {
     const today = new Date();
     const nextPaymentDate = this.calculateNextPaymentDate(contract, today);
     
-    // Verificar si faltan 30 días o menos (ampliado para testing)
+    // Calculate the generation date (5 days before payday)
+    const generationDate = new Date(nextPaymentDate);
+    generationDate.setDate(generationDate.getDate() - 5);
+
+    // Don't generate if we haven't reached the generation date yet
+    if (today < generationDate) {
+      this.logger.log(`Contract ${contract.id}: Not yet time to generate (generation date: ${generationDate.toISOString()})`);
+      return false;
+    }
+
+    // Verificar si faltan 30 días o menos
     const daysUntilPayment = Math.ceil((nextPaymentDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     
     this.logger.log(`Contract ${contract.id}: Next payment ${nextPaymentDate.toISOString()}, Days until: ${daysUntilPayment}`);
@@ -65,12 +75,12 @@ export class InvoiceSweepService {
     }
 
     // Verificar si ya existe factura para el período
-    const { periodStart, periodEnd } = this.calculatePeriod(contract, nextPaymentDate);
+    const { periodStart: pStart, periodEnd } = this.calculatePeriod(contract, nextPaymentDate);
     
     const existingInvoice = await this.invoiceRepository.findOne({
       where: {
         contractId: contract.id,
-        periodStart,
+        periodStart: pStart,
         periodEnd
       }
     });

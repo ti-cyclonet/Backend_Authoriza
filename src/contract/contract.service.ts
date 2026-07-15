@@ -358,7 +358,7 @@ export class ContractService {
    * Client signs the contract.
    * Contract must be ISSUED (have a PDF) to be signed by the client.
    */
-  async signAsClient(contractId: string, signedBy: string, ip: string): Promise<Contract> {
+  async signAsClient(contractId: string, signedBy: string, ip: string, userId?: string): Promise<Contract> {
     const contract = await this.findOne(contractId);
 
     if (!contract.pdfUrl || !contract.issuedAt) {
@@ -369,6 +369,16 @@ export class ContractService {
 
     if (contract.clientSignedAt) {
       throw new BadRequestException('El cliente ya ha firmado este contrato.');
+    }
+
+    // Validate authorized signer if userId provided
+    if (userId) {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (user && !user.isAuthorizedSigner) {
+        throw new BadRequestException(
+          'No tienes autorización para firmar. Contacta al administrador del sistema para ser designado como firmante autorizado.',
+        );
+      }
     }
 
     contract.clientSignedAt = new Date();
@@ -382,6 +392,11 @@ export class ContractService {
       return this.autoActivateIfBothSigned(saved);
     }
 
+    // Notify authorized admin signer that client has signed
+    this.notifyAuthorizedAdminSigner(saved).catch(err =>
+      this.logger.warn(`Failed to notify admin signer: ${err.message}`),
+    );
+
     return saved;
   }
 
@@ -389,7 +404,7 @@ export class ContractService {
    * Admin signs the contract.
    * Requires that the contract is ISSUED.
    */
-  async signAsAdmin(contractId: string, signedBy: string, ip: string): Promise<Contract> {
+  async signAsAdmin(contractId: string, signedBy: string, ip: string, userId?: string): Promise<Contract> {
     const contract = await this.findOne(contractId);
 
     if (!contract.pdfUrl || !contract.issuedAt) {
@@ -400,6 +415,16 @@ export class ContractService {
 
     if (contract.adminSignedAt) {
       throw new BadRequestException('El administrador ya ha firmado este contrato.');
+    }
+
+    // Validate authorized signer if userId provided
+    if (userId) {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (user && !user.isAuthorizedSigner) {
+        throw new BadRequestException(
+          'No tienes autorización para firmar contratos. Solo el firmante autorizado puede realizar esta acción.',
+        );
+      }
     }
 
     contract.adminSignedAt = new Date();
@@ -462,6 +487,47 @@ export class ContractService {
       return this.contractRepository.save(contract);
     }
     return contract;
+  }
+
+  /**
+   * Notify the authorized admin signer (adminFactonet with isAuthorizedSigner=true)
+   * that a client has signed a contract and it's pending their signature.
+   */
+  private async notifyAuthorizedAdminSigner(contract: Contract): Promise<void> {
+    // Find adminFactonet users who are authorized signers
+    const authorizedAdmins = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .andWhere('user."isAuthorizedSigner" = :signer', { signer: true })
+      .andWhere('user."strStatus" = :userStatus', { userStatus: 'ACTIVE' })
+      .getMany();
+
+    if (authorizedAdmins.length === 0) {
+      this.logger.warn('No authorized admin signer found to notify about client signature.');
+      return;
+    }
+
+    const customerName = this.getCustomerName(contract);
+    const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
+
+    for (const admin of authorizedAdmins) {
+      try {
+        await this.notificationsService.sendByTemplate('CONTRACT_PENDING_ADMIN_SIGNATURE', admin.strUserName, {
+          adminName: admin.basicData?.naturalPersonData?.firstName || admin.strUserName,
+          customerName: customerName || 'Cliente',
+          contractCode: contract.code,
+          packageName: contract.package?.name || 'N/A',
+          factonetUrl,
+          year: new Date().getFullYear().toString(),
+        });
+        this.logger.log(`Notification sent to authorized signer: ${admin.strUserName}`);
+      } catch (err) {
+        this.logger.warn(`Failed to notify ${admin.strUserName}: ${err.message}`);
+      }
+    }
   }
 
   async activateContract(id: string): Promise<Contract> {

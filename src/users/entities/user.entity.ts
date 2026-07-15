@@ -40,6 +40,9 @@ export class User {
   @Column({ default: false })
   isVerified: boolean;
 
+  @Column({ default: false })
+  isAuthorizedSigner: boolean;
+
   @Column({ type: 'timestamp', nullable: true })
   verificationExpires: Date;
 

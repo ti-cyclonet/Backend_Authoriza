@@ -118,6 +118,14 @@ export class InvoicesService {
       return invoice;
     }
 
+    // Only apply penalty from NOTIFICATION2 onwards (PayDay+7)
+    // UNCONFIRMED, ISSUED, NOTIFICATION1 don't incur late fee yet
+    if (invoice.status === InvoiceStatus.UNCONFIRMED || 
+        invoice.status === InvoiceStatus.ISSUED ||
+        invoice.status === InvoiceStatus.NOTIFICATION1) {
+      return invoice;
+    }
+
     // Need the contract's payday to calculate overdue days
     const payday = invoice.contract?.payday || 1;
     const today = new Date();

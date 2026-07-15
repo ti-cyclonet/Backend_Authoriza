@@ -475,6 +475,13 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
+  async setAuthorizedSigner(userId: string, isAuthorizedSigner: boolean): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
+    user.isAuthorizedSigner = isAuthorizedSigner;
+    return this.userRepository.save(user);
+  }
+
   async updateStatusWithDependents(
     userId: string,
     newStatus: string,

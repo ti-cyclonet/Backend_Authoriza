@@ -361,6 +361,54 @@ export class NotificationsService {
       );
       this.logger.log('FREE_CONTRACT_ACTIVATED template seeded');
     }
+
+    // Template for notifying authorized admin when client signs
+    const pendingSignTpl = await this.templateRepo.findOne({ where: { code: 'CONTRACT_PENDING_ADMIN_SIGNATURE' } });
+    if (!pendingSignTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'CONTRACT_PENDING_ADMIN_SIGNATURE',
+          subject: 'Contrato {{contractCode}} firmado por el cliente - Pendiente tu firma',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:30px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:180px;margin-bottom:10px;" />
+        <p style="color:#bbdefb;margin:5px 0 0;font-size:14px;">Gestión de Contratos</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:30px;">
+        <h2 style="color:#1a237e;margin:0 0 15px;">Contrato pendiente de tu firma</h2>
+        <p style="color:#333;line-height:1.6;">Hola <strong>{{adminName}}</strong>,</p>
+        <p style="color:#333;line-height:1.6;">El cliente <strong>{{customerName}}</strong> ha firmado el contrato <strong>{{contractCode}}</strong>. El contrato está pendiente de tu firma como administrador autorizado para activarse.</p>
+        <table width="100%" style="margin:20px 0;border-collapse:collapse;">
+          <tr><td style="padding:8px 12px;background:#e3f2fd;font-weight:bold;color:#1a237e;">Contrato</td><td style="padding:8px 12px;background:#e3f2fd;">{{contractCode}}</td></tr>
+          <tr><td style="padding:8px 12px;font-weight:bold;color:#1a237e;">Paquete</td><td style="padding:8px 12px;">{{packageName}}</td></tr>
+          <tr><td style="padding:8px 12px;background:#e3f2fd;font-weight:bold;color:#1a237e;">Cliente</td><td style="padding:8px 12px;background:#e3f2fd;">{{customerName}}</td></tr>
+        </table>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{{factonetUrl}}" style="display:inline-block;background-color:#198754;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;mso-padding-alt:14px 44px;">Ir a FactoNet y firmar</a>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;margin:0;">Una vez firmes, el contrato se activará automáticamente.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#0d47a1;padding:20px 32px;">
+        <p style="color:#bbdefb;margin:0;font-size:12px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+          isActive: true,
+        }),
+      );
+      this.logger.log('CONTRACT_PENDING_ADMIN_SIGNATURE template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {
