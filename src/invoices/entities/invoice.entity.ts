@@ -9,6 +9,7 @@ export enum InvoiceStatus {
   NOTIFICATION1 = 'Notification1',
   NOTIFICATION2 = 'Notification2',
   SUSPENDED = 'Suspended',
+  PAYMENT_REPORTED = 'Payment Reported',
   PAID = 'Paid'
 }
 
@@ -74,6 +75,10 @@ export class Invoice {
   @Column({ type: 'jsonb', nullable: true })
   percentages?: Record<string, number>;
 
+  // Payment voucher (constancia de pago)
+  @Column({ nullable: true })
+  paymentVoucherUrl?: string;
+
   // Payment registration fields
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   paidAmount?: number;
@@ -86,6 +91,10 @@ export class Invoice {
 
   @Column({ type: 'decimal', precision: 6, scale: 4, nullable: true })
   lateFeePercentage?: number;
+
+  // Payment rejection reason (shown to client when payment is rejected)
+  @Column({ type: 'text', nullable: true })
+  rejectionReason?: string;
 
   @CreateDateColumn()
   createdAt: Date;

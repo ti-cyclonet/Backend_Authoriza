@@ -16,6 +16,7 @@ export interface AuthenticatedUser {
   firstName?: string;
   secondName?: string;
   businessName?: string;
+  isAuthorizedSigner?: boolean;
 }
 
 @Injectable()
@@ -67,7 +68,7 @@ export class AuthService {
     }
 
     // 4. validar si el usuario está activo o por vencer
-    const allowedStatuses = ['ACTIVE', 'EXPIRING'];
+    const allowedStatuses = ['ACTIVE', 'EXPIRING', 'CONFIRMED'];
     if (!allowedStatuses.includes(user.strStatus?.toUpperCase())) {
       throw new UnauthorizedException(
         'Inactive or expired user. Access denied.',
@@ -174,6 +175,7 @@ export class AuthService {
       businessName?: string;
       mustChangePassword?: boolean;
       passwordExpired?: boolean;
+      isAuthorizedSigner?: boolean;
     } = {
       id: user.id,
       email: user.strUserName,
@@ -183,6 +185,7 @@ export class AuthService {
       name: user.strUserName,
       rol: activeRole.strName,
       rolDescription: activeRole.strDescription1 || '',
+      isAuthorizedSigner: user.isAuthorizedSigner || false,
       mustChangePassword,
       passwordExpired,
     };

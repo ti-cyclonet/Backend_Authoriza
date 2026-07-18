@@ -409,6 +409,42 @@ export class NotificationsService {
       );
       this.logger.log('CONTRACT_PENDING_ADMIN_SIGNATURE template seeded');
     }
+
+    // Template for payment rejection notification
+    const paymentRejectedTpl = await this.templateRepo.findOne({ where: { code: 'PAYMENT_REJECTED' } });
+    if (!paymentRejectedTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'PAYMENT_REJECTED',
+          subject: 'Payment rejected for invoice {{invoiceCode}} - Action required',
+          htmlBody: `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: 'Segoe UI', Arial, sans-serif; background: #f4f6f8; margin: 0; padding: 20px;">
+  <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.08);">
+    <div style="background: linear-gradient(135deg, #c62828, #e53935); padding: 28px 32px; text-align: center;">
+      <h1 style="color: white; margin: 0; font-size: 22px;">⚠️ Payment Rejected</h1>
+    </div>
+    <div style="padding: 32px;">
+      <p style="font-size: 15px; color: #333;">Hello <strong>{{customerName}}</strong>,</p>
+      <p style="font-size: 15px; color: #333;">Your payment report for invoice <strong>{{invoiceCode}}</strong> has been <span style="color: #c62828; font-weight: 600;">rejected</span> by the administrator.</p>
+      <div style="background: #fff3e0; border-left: 4px solid #e65100; padding: 14px 18px; border-radius: 6px; margin: 20px 0;">
+        <p style="margin: 0; font-size: 14px; color: #e65100;"><strong>Reason:</strong> {{reason}}</p>
+      </div>
+      <p style="font-size: 15px; color: #333;">Please log in to FactoNet and submit a new payment report with a valid proof of payment.</p>
+      <div style="text-align: center; margin: 28px 0;">
+        <a href="{{factonetUrl}}" style="background: linear-gradient(135deg, #1a237e, #283593); color: white; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">Go to FactoNet</a>
+      </div>
+      <p style="font-size: 12px; color: #999; text-align: center; margin-top: 24px;">© {{year}} CycloNet S.A.S. — FactoNet Billing Platform</p>
+    </div>
+  </div>
+</body>
+</html>`,
+          isActive: true,
+        }),
+      );
+      this.logger.log('PAYMENT_REJECTED template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {
