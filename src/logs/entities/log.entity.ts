@@ -46,3 +46,6 @@ export class SystemLog {
   @CreateDateColumn()
   createdAt: Date;
 }
+
+// Alias para compatibilidad con imports existentes
+export { SystemLog as Log };

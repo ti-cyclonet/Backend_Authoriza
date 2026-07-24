@@ -17,7 +17,7 @@ async function bootstrap() {
   // CORS: en producción lo maneja Nginx, en local lo habilitamos aquí
   if (process.env.NODE_ENV !== 'production') {
     app.enableCors({
-      origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202', 'http://localhost:4203', 'http://localhost', 'http://localhost:80'],
+      origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202', 'http://localhost:4203', 'http://localhost:9002', 'http://localhost', 'http://localhost:80'],
       credentials: true,
     });
   }
