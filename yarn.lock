@@ -353,10 +353,10 @@
   dependencies:
     "@jridgewell/trace-mapping" "0.3.9"
 
-"@css-inline/css-inline-darwin-arm64@0.20.0":
+"@css-inline/css-inline-win32-x64-msvc@0.20.0":
   version "0.20.0"
-  resolved "https://registry.npmjs.org/@css-inline/css-inline-darwin-arm64/-/css-inline-darwin-arm64-0.20.0.tgz"
-  integrity sha512-hT8Mtwp4PJ9mMYFDG/xg7KCa7nPqseJdXaajxXVjXB8+6oemxgx+7TUO7HSfmeY4Ox7X2vaNfaIfti4ySgNvyg==
+  resolved "https://registry.npmjs.org/@css-inline/css-inline-win32-x64-msvc/-/css-inline-win32-x64-msvc-0.20.0.tgz"
+  integrity sha512-pdO/QXLRwuq/RxO5PSFMhmWGJSQOvkiDyV4RrewEkE7SOCY8HAYNhx1T0y0pj2WzxuVdbNQbpwiCHAdQNplUJw==
 
 "@css-inline/css-inline@0.20.0":
   version "0.20.0"
@@ -3530,11 +3530,6 @@ fs.realpath@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/fs.realpath/-/fs.realpath-1.0.0.tgz"
   integrity sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==
-
-fsevents@^2.3.2, fsevents@~2.3.2:
-  version "2.3.3"
-  resolved "https://registry.npmjs.org/fsevents/-/fsevents-2.3.3.tgz"
-  integrity sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==
 
 function-bind@^1.1.2:
   version "1.1.2"
