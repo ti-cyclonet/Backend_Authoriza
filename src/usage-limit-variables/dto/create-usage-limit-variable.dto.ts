@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsInt, Min } from 'class-validator';
+import { IsString, IsNotEmpty, IsInt, Min, IsOptional, IsIn } from 'class-validator';
 
 export class CreateUsageLimitVariableDto {
   @IsString()
@@ -16,4 +16,9 @@ export class CreateUsageLimitVariableDto {
   @IsString()
   @IsNotEmpty()
   targetApplication: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['quantity', 'feature'])
+  limitType?: string;
 }

@@ -26,6 +26,13 @@ export class UsageLimitVariable {
   @Column({ type: 'varchar', length: 50 })
   targetApplication: string;
 
+  /**
+   * 'quantity' = limits the number of records (e.g., max 50 clients)
+   * 'feature'  = enables/disables a feature (1 = enabled, 0 = disabled)
+   */
+  @Column({ type: 'varchar', length: 20, default: 'quantity' })
+  limitType: string;
+
   @ManyToOne(() => Package, (pkg) => pkg.usageLimitVariables, {
     onDelete: 'CASCADE',
   })
