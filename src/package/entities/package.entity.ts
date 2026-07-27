@@ -43,6 +43,9 @@ export class Package {
   @Column({ type: 'varchar', length: 20, nullable: true, default: 'register' })
   ctaType?: string;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  targetApplication?: string;
+
   @OneToMany(() => ConfigurationPackage, (config) => config.package)
   configurations: ConfigurationPackage[];
 
