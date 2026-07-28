@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Query, Request, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { InvoicesService } from './invoices.service';
 import { InvoiceGeneratorService } from './invoice-generator.service';
 import { InvoiceSweepService } from './invoice-sweep.service';
@@ -8,6 +9,7 @@ import { UpdateInvoiceDto } from './dto/update-invoice.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Controller('invoices')
 @UseGuards(JwtAuthGuard)
@@ -16,7 +18,8 @@ export class InvoicesController {
     private readonly invoicesService: InvoicesService,
     private readonly invoiceGeneratorService: InvoiceGeneratorService,
     private readonly invoiceSweepService: InvoiceSweepService,
-    private readonly invoiceLifecycleCron: InvoiceLifecycleCron
+    private readonly invoiceLifecycleCron: InvoiceLifecycleCron,
+    private readonly cloudinaryService: CloudinaryService
   ) {}
 
   @Post()
@@ -33,8 +36,15 @@ export class InvoicesController {
   }
 
   @Get(':id')
+  @Public()
   findOne(@Param('id') id: string) {
     return this.invoicesService.findOne(+id);
+  }
+
+  @Get(':id/voucher-url')
+  @Public()
+  async getVoucherSignedUrl(@Param('id') id: string) {
+    return this.invoicesService.getVoucherSignedUrl(+id);
   }
 
   @Get('user/:userId')
@@ -54,8 +64,34 @@ export class InvoicesController {
   }
 
   @Post(':id/register-payment')
-  registerPayment(@Param('id') id: string, @Body() dto: RegisterPaymentDto) {
-    return this.invoicesService.registerPayment(+id, dto.paymentDate, dto.paidAmount);
+  @Public()
+  @UseInterceptors(FileInterceptor('voucher'))
+  async registerPayment(
+    @Param('id') id: string,
+    @Body() dto: RegisterPaymentDto,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    let voucherUrl: string | undefined = dto.paymentVoucherUrl;
+
+    // If a file was uploaded, upload to Cloudinary
+    if (file) {
+      const uploadResult = await this.cloudinaryService.uploadImage(file, 'payment-vouchers');
+      voucherUrl = uploadResult.secure_url;
+    }
+
+    return this.invoicesService.registerPayment(+id, dto.paymentDate, dto.paidAmount, voucherUrl);
+  }
+
+  @Post(':id/confirm-payment')
+  @Public()
+  confirmPayment(@Param('id') id: string) {
+    return this.invoicesService.confirmPayment(+id);
+  }
+
+  @Post(':id/reject-payment')
+  @Public()
+  rejectPayment(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.invoicesService.rejectPayment(+id, body.reason);
   }
 
   @Delete(':id')

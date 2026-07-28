@@ -141,6 +141,10 @@ export class InvoiceGeneratorService {
         break;
     }
 
+    // Normalize to midnight to avoid timezone/time comparison issues with date columns
+    periodStart.setHours(0, 0, 0, 0);
+    periodEnd.setHours(0, 0, 0, 0);
+
     return { periodStart, periodEnd };
   }
 
@@ -314,15 +318,24 @@ export class InvoiceGeneratorService {
     const currentDate = new Date();
     const { periodStart, periodEnd } = this.calculatePeriod(contract, currentDate);
     
-    const existingInvoice = await this.invoiceRepository.findOne({
-      where: {
-        contractId: contract.id,
-        periodStart,
-        periodEnd
-      }
-    });
+    // Search by contractId and the current month/year of periodStart to avoid date comparison issues
+    const year = periodStart.getFullYear();
+    const month = periodStart.getMonth(); // 0-indexed
+    // First and last day of the month
+    const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
+
+    this.logger.log(`Checking duplicates for contract ${contract.id}: month range ${monthStart} to ${monthEnd}`);
+
+    const existingInvoice = await this.invoiceRepository
+      .createQueryBuilder('inv')
+      .where('inv.contractId = :contractId', { contractId: contract.id })
+      .andWhere('inv.periodStart >= :monthStart', { monthStart })
+      .andWhere('inv.periodStart <= :monthEnd', { monthEnd })
+      .getOne();
 
     if (existingInvoice) {
+      this.logger.log(`Duplicate found: invoice ${existingInvoice.id} (${existingInvoice.code}) already exists for this month`);
       throw new Error(`Invoice already exists for current period`);
     }
 

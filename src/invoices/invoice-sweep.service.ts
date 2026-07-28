@@ -77,16 +77,21 @@ export class InvoiceSweepService {
     // Verificar si ya existe factura para el período
     const { periodStart: pStart, periodEnd } = this.calculatePeriod(contract, nextPaymentDate);
     
-    const existingInvoice = await this.invoiceRepository.findOne({
-      where: {
-        contractId: contract.id,
-        periodStart: pStart,
-        periodEnd
-      }
-    });
+    // Search by contractId and month range to avoid date comparison issues
+    const year = pStart.getFullYear();
+    const month = pStart.getMonth();
+    const monthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const monthEnd = `${year}-${String(month + 1).padStart(2, '0')}-${new Date(year, month + 1, 0).getDate()}`;
+
+    const existingInvoice = await this.invoiceRepository
+      .createQueryBuilder('inv')
+      .where('inv.contractId = :contractId', { contractId: contract.id })
+      .andWhere('inv.periodStart >= :monthStart', { monthStart })
+      .andWhere('inv.periodStart <= :monthEnd', { monthEnd })
+      .getOne();
 
     if (existingInvoice) {
-      this.logger.log(`Contract ${contract.id}: Invoice already exists for period`);
+      this.logger.log(`Contract ${contract.id}: Invoice already exists for month ${monthStart} - ${monthEnd}`);
       return false;
     }
 
@@ -167,6 +172,10 @@ export class InvoiceSweepService {
         periodEnd.setMonth(12, 0);
         break;
     }
+
+    // Normalize to midnight to avoid timezone/time comparison issues with date columns
+    periodStart.setHours(0, 0, 0, 0);
+    periodEnd.setHours(0, 0, 0, 0);
 
     return { periodStart, periodEnd };
   }

@@ -20,9 +20,18 @@ export class CloudinaryService {
     file: Express.Multer.File,
     folder: string = '',
   ): Promise<UploadApiResponse> {
+    const originalName = file.originalname || 'file';
+    const nameWithoutExt = originalName.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const timestamp = Date.now();
+
     const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: this.prefixFolder(folder) },
+        { 
+          folder: this.prefixFolder(folder), 
+          resource_type: 'image',
+          public_id: `${nameWithoutExt}_${timestamp}`,
+          access_mode: 'public',
+        },
         (error, result) => {
           if (error) return reject(error);
           resolve(result);
@@ -72,6 +81,29 @@ export class CloudinaryService {
     });
 
     return result;
+  }
+
+  /**
+   * Generate a signed URL for a Cloudinary resource that bypasses delivery restrictions.
+   */
+  generateSignedUrl(publicUrl: string): string {
+    // Extract resource_type, version, and public_id from the secure_url
+    // URL format: https://res.cloudinary.com/{cloud}/{resource_type}/upload/v{version}/{public_id}
+    const match = publicUrl.match(/\/([^/]+)\/upload\/v(\d+)\/(.+)$/);
+    if (!match) return publicUrl;
+
+    const resourceType = match[1]; // 'image' or 'raw'
+    const publicId = match[3]; // includes folder path
+
+    // Generate signed URL - keeps type 'upload' but adds signature
+    const signedUrl = cloudinary.url(publicId, {
+      resource_type: resourceType,
+      type: 'upload',
+      sign_url: true,
+      secure: true,
+    });
+
+    return signedUrl;
   }
 
   async deleteImageByUrl(url: string): Promise<void> {

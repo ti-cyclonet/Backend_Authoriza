@@ -473,7 +473,7 @@ export class ContractService {
       contract.status = ContractStatus.ACTIVE;
       contract.startDate = new Date();
 
-      // Calculate endDate if temporal limit exists
+      // Calculate endDate based on temporal limit or default to 1 year
       const nDiasUso = contract.package?.usageLimitVariables?.find(
         (v) => v.variableName === 'nDiasUso',
       );
@@ -481,12 +481,100 @@ export class ContractService {
         const end = new Date();
         end.setDate(end.getDate() + nDiasUso.maxValue);
         contract.endDate = end;
+      } else {
+        // Default: 1 year from start
+        const end = new Date();
+        end.setFullYear(end.getFullYear() + 1);
+        contract.endDate = end;
       }
 
+      const saved = await this.contractRepository.save(contract);
+
+      // Activate principal user and all dependents
+      const principalUserId = contract.user?.id;
+      if (principalUserId) {
+        await this.userRepository.update({ id: principalUserId }, { strStatus: 'ACTIVE' });
+        this.logger.log(`User ${principalUserId} activated (contract owner).`);
+
+        // Activate dependent users
+        await this.userRepository
+          .createQueryBuilder()
+          .update(User)
+          .set({ strStatus: 'ACTIVE' })
+          .where('"id" IN (SELECT "dependentUserId" FROM user_dependencies WHERE "principalUserId" = :principalId AND status = :status)', {
+            principalId: principalUserId,
+            status: 'ACTIVE',
+          })
+          .execute();
+        this.logger.log(`Dependent users of ${principalUserId} activated.`);
+      }
+
+      // Send welcome email to the client
+      this.sendContractActivatedEmail(contract).catch(err =>
+        this.logger.warn(`Failed to send contract activated email: ${err.message}`)
+      );
+
       this.logger.log(`Contract ${contract.code} auto-activated: both parties signed.`);
-      return this.contractRepository.save(contract);
+      return saved;
     }
     return contract;
+  }
+
+  /**
+   * Send welcome email to the client after contract activation.
+   */
+  private async sendContractActivatedEmail(contract: Contract): Promise<void> {
+    const clientEmail = contract.user?.strUserName;
+    const clientName = contract.user?.basicData?.legalEntityData?.businessName
+      || contract.user?.basicData?.naturalPersonData?.firstName
+      || clientEmail;
+    const packageName = contract.package?.name || 'N/A';
+    const startDate = contract.startDate ? new Date(contract.startDate).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A';
+    const endDate = contract.endDate ? new Date(contract.endDate).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Indefinida';
+    const year = new Date().getFullYear().toString();
+
+    if (clientEmail) {
+      try {
+        await this.notificationsService.sendByTemplate('CONTRACT_ACTIVATED', clientEmail, {
+          customerName: clientName || 'Client',
+          contractCode: contract.code,
+          packageName,
+          startDate,
+          endDate,
+          year,
+        });
+        this.logger.log(`Contract activated email sent to ${clientEmail}`);
+      } catch (err) {
+        this.logger.warn(`Failed to send activation email to ${clientEmail}: ${err.message}`);
+      }
+    }
+
+    // Also send to dependent users
+    if (contract.user?.id) {
+      const dependents = await this.userRepository
+        .createQueryBuilder('user')
+        .innerJoin('user.principals', 'dep')
+        .where('dep.principalUserId = :principalId', { principalId: contract.user.id })
+        .andWhere('dep.status = :status', { status: 'ACTIVE' })
+        .getMany();
+
+      for (const dep of dependents) {
+        if (dep.strUserName && dep.strUserName !== clientEmail) {
+          try {
+            await this.notificationsService.sendByTemplate('CONTRACT_ACTIVATED', dep.strUserName, {
+              customerName: dep.basicData?.naturalPersonData?.firstName || dep.strUserName,
+              contractCode: contract.code,
+              packageName,
+              startDate,
+              endDate,
+              year,
+            });
+          } catch (err) {
+            this.logger.warn(`Failed to send activation email to dependent ${dep.strUserName}: ${err.message}`);
+          }
+        }
+      }
+    }
   }
 
   /**
