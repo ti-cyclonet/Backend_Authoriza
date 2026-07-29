@@ -8,6 +8,8 @@ import { DataSource } from 'typeorm';
 import GlobalParametersSeed from './seeds/global-parameters.seed';
 import InitialApplicationsSeed from './seeds/initial-applications.seed';
 import UserSeed from './seeds/user.seed';
+import InoutFreePackageSeed from './seeds/inout-free-package.seed';
+import KiriPackagesSeed from './seeds/kiri-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
 import { NotificationsService } from './notifications/notifications.service';
 
@@ -62,6 +64,12 @@ async function bootstrap() {
   await initialApplicationsSeed.run(dataSource);
   const userSeed = new UserSeed();
   await userSeed.run(dataSource);
+
+  const inoutFreePackageSeed = new InoutFreePackageSeed();
+  await inoutFreePackageSeed.run(dataSource);
+
+  const kiriPackagesSeed = new KiriPackagesSeed();
+  await kiriPackagesSeed.run(dataSource);
 
   // Seed de plantillas de email
   const notificationsService = app.get(NotificationsService);

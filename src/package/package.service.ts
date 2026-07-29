@@ -339,11 +339,16 @@ export class PackageService {
   /**
    * Returns packages visible in the landing page.
    * Public endpoint — no authentication required.
-   * Optionally filters by targetApplication from usageLimitVariables.
+   * Filters by package.targetApplication if provided, then by usageLimitVariables.targetApplication.
    */
   async findForLanding(application?: string) {
+    const whereCondition: any = { showInLanding: true };
+    if (application) {
+      whereCondition.targetApplication = application;
+    }
+
     const packages = await this.packageRepository.find({
-      where: { showInLanding: true },
+      where: whereCondition,
       relations: ['usageLimitVariables', 'images'],
       order: { displayOrder: 'ASC' },
     });
@@ -360,6 +365,12 @@ export class PackageService {
             if (v.maxValue === 0) return null; // No mostrar si es 0
             return `Disponible por ${v.maxValue} días`;
           }
+          // Feature type: show as enabled/disabled
+          if (v.limitType === 'feature') {
+            if (v.maxValue === 1) return v.displayName;
+            return null; // Don't show disabled features
+          }
+          // Quantity type: show count
           if (v.maxValue === 0) return `${v.displayName}: Ilimitado`;
           return `${v.maxValue} ${v.displayName}`;
         })

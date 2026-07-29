@@ -871,6 +871,7 @@ export class ContractService {
       displayName: v.displayName,
       maxValue: v.maxValue,
       targetApplication: v.targetApplication,
+      limitType: v.limitType || 'quantity',
     }));
 
     return {
