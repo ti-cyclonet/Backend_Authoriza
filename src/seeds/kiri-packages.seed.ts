@@ -46,10 +46,10 @@ export default class KiriPackagesSeed {
       { variableName: 'budgetManagement', displayName: 'Gestión de presupuesto', maxValue: 1, limitType: 'feature' },
       { variableName: 'debtsTracking', displayName: 'Control de deudas', maxValue: 1, limitType: 'feature' },
       { variableName: 'fixedExpenses', displayName: 'Gastos fijos', maxValue: 1, limitType: 'feature' },
-      { variableName: 'basicReports', displayName: 'Reportes básicos', maxValue: 1, limitType: 'feature' },
+      { variableName: 'savingsPockets', displayName: 'Bolsillos de ahorro', maxValue: 1, limitType: 'feature' },
       // Funcionalidades NO incluidas
+      { variableName: 'basicReports', displayName: 'Reportes básicos', maxValue: 0, limitType: 'feature' },
       { variableName: 'impulseExpenses', displayName: 'Gastos hormiga', maxValue: 0, limitType: 'feature' },
-      { variableName: 'savingsPockets', displayName: 'Bolsillos de ahorro', maxValue: 0, limitType: 'feature' },
       { variableName: 'extraIncomes', displayName: 'Ingresos extras', maxValue: 0, limitType: 'feature' },
       { variableName: 'emergencyFund', displayName: 'Fondo de emergencia', maxValue: 0, limitType: 'feature' },
       { variableName: 'gamification', displayName: 'Gamificación y jardín virtual', maxValue: 0, limitType: 'feature' },
