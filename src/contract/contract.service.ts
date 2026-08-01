@@ -514,6 +514,13 @@ export class ContractService {
         this.logger.warn(`Failed to send contract activated email: ${err.message}`)
       );
 
+      // Notify Kiri to reactivate local user (for Kiri app contracts)
+      if (contract.package?.targetApplication === 'Kiri') {
+        this.notifyKiriUserReactivation(contract).catch(err =>
+          this.logger.warn(`Failed to notify Kiri for user reactivation: ${err.message}`)
+        );
+      }
+
       this.logger.log(`Contract ${contract.code} auto-activated: both parties signed.`);
       return saved;
     }
@@ -763,6 +770,13 @@ export class ContractService {
           year: new Date().getFullYear().toString(),
         })
         .catch((err) => this.logger.error(`Notification error: ${err.message}`));
+
+      // Notify Kiri to reactivate local user (for Kiri app contracts)
+      if (contract.package?.targetApplication === 'Kiri') {
+        this.notifyKiriUserReactivation(contract).catch(err =>
+          this.logger.warn(`Failed to notify Kiri for user reactivation: ${err.message}`)
+        );
+      }
     } else {
       await this.userRepository.update({ id: contract.user.id }, { strStatus: 'INACTIVE' });
 
@@ -941,5 +955,39 @@ export class ContractService {
     }
 
     this.logger.log(`Notified ${adminUsers.length} adminFactonet user(s) about contract ${contract.code}`);
+  }
+
+  /**
+   * Notifies the Kiri backend to reactivate a user's local account
+   * after their contract has been activated.
+   */
+  private async notifyKiriUserReactivation(contract: Contract): Promise<void> {
+    const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
+    const email = contract.user?.strUserName;
+
+    if (!email) {
+      this.logger.warn('Cannot notify Kiri: no user email on contract');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${kiriApiUrl}/api/plan/activate-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          contractId: contract.id,
+        }),
+      });
+
+      if (response.ok) {
+        this.logger.log(`Kiri user ${email} reactivated successfully`);
+      } else {
+        const data = await response.json().catch(() => ({}));
+        this.logger.warn(`Kiri reactivation failed for ${email}: ${data.error || response.status}`);
+      }
+    } catch (error) {
+      this.logger.warn(`Could not reach Kiri API for user reactivation: ${error.message}`);
+    }
   }
 }

@@ -635,7 +635,7 @@ export class SelfRegistrationService {
     // 4. Find user's active contract
     const contract = await this.contractRepository.findOne({
       where: { user: { id: user.id } },
-      relations: ['package'],
+      relations: ['package', 'user'],
     });
 
     if (!contract) {
@@ -646,7 +646,7 @@ export class SelfRegistrationService {
       if (dependency) {
         const principalContract = await this.contractRepository.findOne({
           where: { user: { id: dependency.principalUserId } },
-          relations: ['package'],
+          relations: ['package', 'user'],
         });
         if (principalContract) {
           const currentIsPaid = Number(principalContract.package?.price) > 0 && (principalContract.package as any)?.isBillable !== false;
@@ -695,7 +695,27 @@ export class SelfRegistrationService {
     // Access restrictions are handled at the contract level (PENDING status),
     // not by deactivating user accounts.
     const isBillable = (pkg as any).isBillable !== false;
-    if (isBillable) {
+    const isKiriApp = (pkg as any).targetApplication === 'Kiri';
+
+    // For Kiri: deactivate user while contract is PENDING approval
+    // The user will be reactivated when the contract is activated (after signing)
+    if (isBillable && isKiriApp && contract.user?.id) {
+      await this.userRepository.update(
+        { id: contract.user.id },
+        { strStatus: 'INACTIVE' },
+      );
+      this.logger.log(
+        `User ${contract.user.id} deactivated (Kiri plan upgrade to "${pkg.name}"). Will be reactivated upon contract approval.`,
+      );
+
+      await this.logsService.info(
+        LogAction.USER_DEACTIVATED,
+        `User deactivated during Kiri plan upgrade to "${pkg.name}". Pending contract approval.`,
+        contract.user.id,
+        contract.id,
+        { reason: 'KIRI_PLAN_UPGRADE_PENDING' },
+      );
+    } else if (isBillable) {
       this.logger.log(
         `Contract ${contract.code} upgraded to billable package "${pkg.name}". Users remain active for contract signing.`,
       );
@@ -709,9 +729,19 @@ export class SelfRegistrationService {
       this.logger.warn('Could not invalidate InOut cache');
     }
 
-    const message = isBillable
-      ? `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`
-      : `Plan cambiado a "${pkg.name}" exitosamente.`;
+    // ─── KIRI PLUS Integration: Assign adminInvoices role & mark as Firmante ───
+    // When upgrading to a billable Kiri package, the user needs:
+    // 1. The adminInvoices role to access FactoNet for self-service invoicing
+    // 2. The isAuthorizedSigner flag to sign their own contract
+    if (isBillable && isKiriApp) {
+      await this.assignKiriPlusRolesAndSigner(contract);
+    }
+
+    const message = isBillable && isKiriApp
+      ? `Plan cambiado a "${pkg.name}". Tu acceso ha sido suspendido temporalmente hasta que el contrato sea aprobado. Se te ha asignado acceso a FactoNet para gestionar tu facturación.`
+      : isBillable
+        ? `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador. Se te ha asignado acceso a FactoNet para gestionar tu facturación.`
+        : `Plan cambiado a "${pkg.name}" exitosamente.`;
 
     // Notify adminFactonet about the plan upgrade
     this.notifyAdminFactonetUpgrade(contract, pkg).catch(err =>
@@ -719,6 +749,57 @@ export class SelfRegistrationService {
     );
 
     return { success: true, message };
+  }
+
+  /**
+   * Assigns the adminInvoices role from FactoNet to the Kiri user so they can
+   * log in to FactoNet and manage their invoices. Also marks the user as
+   * an authorized signer (Firmante) so they can sign their contract.
+   */
+  private async assignKiriPlusRolesAndSigner(contract: Contract): Promise<void> {
+    const userId = contract.user?.id;
+    if (!userId) return;
+
+    try {
+      // 1. Find the adminInvoices role
+      const adminInvoicesRole = await this.rolRepository.findOne({
+        where: { strName: 'adminInvoices' },
+      });
+
+      if (adminInvoicesRole) {
+        // Check if role is already assigned
+        const existingRole = await this.userRoleRepository.findOne({
+          where: {
+            userId,
+            roleId: adminInvoicesRole.id,
+            contractId: contract.id,
+          },
+        });
+
+        if (!existingRole) {
+          const newUserRole = this.userRoleRepository.create({
+            userId,
+            roleId: adminInvoicesRole.id,
+            contractId: contract.id,
+            status: 'ACTIVE',
+          });
+          await this.userRoleRepository.save(newUserRole);
+          this.logger.log(`Assigned adminInvoices role to user ${userId} for contract ${contract.code}`);
+        }
+      } else {
+        this.logger.warn('Role adminInvoices not found. Cannot assign FactoNet access.');
+      }
+
+      // 2. Mark user as authorized signer (Firmante)
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (user && !user.isAuthorizedSigner) {
+        user.isAuthorizedSigner = true;
+        await this.userRepository.save(user);
+        this.logger.log(`User ${userId} marked as authorized signer (Firmante) for Kiri PLUS upgrade`);
+      }
+    } catch (error) {
+      this.logger.error(`Error assigning Kiri PLUS roles/signer for user ${userId}: ${error.message}`);
+    }
   }
 
   private async notifyAdminFreeContractActivated(contract: Contract): Promise<void> {
