@@ -162,13 +162,6 @@ export class AuthController {
     return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId);
   }
 
-  @ApiOperation({ summary: 'Check if email already exists (for landing upgrade flow)' })
-  @Public()
-  @Post('check-email')
-  async checkEmail(@Body() body: { email: string }) {
-    return this.selfRegistrationService.checkEmailExists(body.email);
-  }
-
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })
   @Public()
   @Post('ensure-kiri-user')
