@@ -16,13 +16,25 @@ import { NotificationsService } from './notifications/notifications.service';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // CORS: en producción lo maneja Nginx, en local lo habilitamos aquí
-  if (process.env.NODE_ENV !== 'production') {
-    app.enableCors({
-      origin: ['http://localhost:4200', 'http://localhost:4201', 'http://localhost:4202', 'http://localhost:4203', 'http://localhost:9002', 'http://localhost', 'http://localhost:80'],
-      credentials: true,
-    });
-  }
+  // CORS: habilitado tanto en desarrollo como en producción
+  app.enableCors({
+    origin: [
+      'http://localhost:4200',
+      'http://localhost:4201',
+      'http://localhost:4202',
+      'http://localhost:4203',
+      'http://localhost:9002',
+      'http://localhost:9100',
+      'http://localhost',
+      'http://localhost:80',
+      'https://www.cyclonet.com.co',
+      'https://cyclonet.com.co',
+      'https://kiri.cyclonet.com.co',
+      'https://inout.cyclonet.com.co',
+      'https://billing.cyclonet.com.co',
+    ],
+    credentials: true,
+  });
   app.setGlobalPrefix('api');
 
   app.useGlobalPipes(
