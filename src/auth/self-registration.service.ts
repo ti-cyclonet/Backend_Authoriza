@@ -656,7 +656,9 @@ export class SelfRegistrationService {
           return this.executeUpgrade(principalContract, pkg, packageId);
         }
       }
-      throw new NotFoundException('No se encontró un contrato activo');
+
+      // No contract exists — create a new one for this Kiri user
+      return this.createContractForUpgrade(user, pkg, packageId);
     }
 
     const currentIsPaid = Number(contract.package?.price) > 0 && (contract.package as any)?.isBillable !== false;
@@ -665,6 +667,96 @@ export class SelfRegistrationService {
     }
 
     return this.executeUpgrade(contract, pkg, packageId);
+  }
+
+  /**
+   * Creates a brand new contract for a Kiri FREE user upgrading to a paid plan.
+   * This happens when the user registered directly in Kiri (without going through
+   * the InOut/Authoriza self-registration flow that creates a contract automatically).
+   */
+  private async createContractForUpgrade(user: User, pkg: Package, packageId: string) {
+    const contractCode = await this.entityCodeService.generateCode('Contract');
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setFullYear(endDate.getFullYear() + 1);
+
+    // Generate codePrefix from user email or name
+    const userName = user.basicData?.legalEntityData?.businessName
+      || user.basicData?.naturalPersonData?.firstName
+      || user.strUserName.split('@')[0];
+    const codePrefix = await this.generateUniqueCodePrefix(userName, this.contractRepository.manager);
+
+    const contract = this.contractRepository.create({
+      code: contractCode,
+      user: { id: user.id } as any,
+      package: { id: packageId } as any,
+      value: (pkg.price || 0) * 12,
+      mode: PaymentMode.MONTHLY,
+      payday: 1,
+      startDate: today,
+      endDate,
+      status: ContractStatus.PENDING,
+      codePrefix,
+      businessSector: 'personal',
+    });
+
+    const savedContract = await this.contractRepository.save(contract);
+
+    // Assign accountOwner role to the user
+    const accountOwnerRole = await this.rolRepository.findOne({
+      where: { strName: 'accountOwner' },
+    });
+    if (accountOwnerRole) {
+      const existingRole = await this.userRoleRepository.findOne({
+        where: { userId: user.id, roleId: accountOwnerRole.id },
+      });
+      if (!existingRole) {
+        await this.userRoleRepository.save(
+          this.userRoleRepository.create({
+            userId: user.id,
+            roleId: accountOwnerRole.id,
+            contractId: savedContract.id,
+            status: 'ACTIVE',
+          }),
+        );
+      }
+    }
+
+    // Reload contract with user relation for downstream logic
+    const fullContract = await this.contractRepository.findOne({
+      where: { id: savedContract.id },
+      relations: ['package', 'user'],
+    });
+
+    this.logger.log(
+      `New contract ${contractCode} created for Kiri user ${user.strUserName} upgrading to "${pkg.name}"`,
+    );
+
+    // Now apply the same post-upgrade logic (roles, signer, notifications)
+    const isBillable = (pkg as any).isBillable !== false;
+    const isKiriApp = (pkg as any).targetApplication === 'Kiri';
+
+    // Deactivate user while contract is pending (Kiri specific)
+    if (isBillable && isKiriApp) {
+      await this.userRepository.update({ id: user.id }, { strStatus: 'INACTIVE' });
+      this.logger.log(`User ${user.id} deactivated (Kiri plan upgrade). Pending contract approval.`);
+    }
+
+    // Assign adminInvoices role & mark as Firmante
+    if (isBillable && isKiriApp && fullContract) {
+      await this.assignKiriPlusRolesAndSigner(fullContract);
+    }
+
+    // Notify adminFactonet
+    this.notifyAdminFactonetUpgrade(fullContract!, pkg).catch(err =>
+      this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
+    );
+
+    const message = isBillable && isKiriApp
+      ? `Plan cambiado a "${pkg.name}". Se ha generado un contrato nuevo. Tu acceso será suspendido temporalmente hasta que el contrato sea aprobado.`
+      : `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`;
+
+    return { success: true, message };
   }
 
   private async executeUpgrade(contract: Contract, pkg: Package, packageId: string) {
@@ -957,6 +1049,67 @@ export class SelfRegistrationService {
     }
 
     this.logger.log(`Notified ${adminUsers.length} adminFactonet user(s) about new contract ${contract.code}`);
+  }
+
+  /**
+   * Checks if an email already exists as a registered user.
+   * Used by the landing page to determine if the user should register or upgrade.
+   */
+  async checkEmailExists(email: string) {
+    if (!email) return { exists: false };
+    const user = await this.userRepository.findOne({
+      where: { strUserName: email },
+    });
+    return { exists: !!user };
+  }
+
+  /**
+   * Ensures a Kiri user exists in Authoriza. If not found, creates a minimal user
+   * with the provided email and password. This is needed for Kiri FREE users who
+   * registered only in the Kiri app and now want to upgrade to PLUS.
+   */
+  async ensureKiriUser(email: string, password: string, nombre?: string) {
+    const existing = await this.userRepository.findOne({
+      where: { strUserName: email },
+    });
+
+    if (existing) {
+      // Already exists — update password to match Kiri's password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      existing.strPassword = hashedPassword;
+      existing.isVerified = true;
+      existing.strStatus = 'ACTIVE';
+      await this.userRepository.save(existing);
+      return { success: true, message: 'User already exists, password synced.', userId: existing.id };
+    }
+
+    // Create new user in Authoriza
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const code = await this.entityCodeService.generateCode('User');
+
+    const newUser = this.userRepository.create({
+      strUserName: email,
+      strPassword: hashedPassword,
+      code,
+      strStatus: 'ACTIVE',
+      isVerified: true,
+      mustChangePassword: false,
+      lastPasswordChange: new Date(),
+    });
+    const savedUser = await this.userRepository.save(newUser);
+
+    // Create BasicData for the user (natural person)
+    const basicData = this.basicDataRepository.create({
+      strPersonType: 'N',
+      strStatus: 'ACTIVE',
+      user: savedUser,
+    });
+    const savedBasicData = await this.basicDataRepository.save(basicData);
+    savedUser.basicData = savedBasicData;
+    await this.userRepository.save(savedUser);
+
+    this.logger.log(`Kiri user ${email} created in Authoriza for plan upgrade`);
+    return { success: true, message: 'User created.', userId: savedUser.id };
   }
 
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {
