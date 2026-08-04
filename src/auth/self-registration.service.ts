@@ -749,11 +749,9 @@ export class SelfRegistrationService {
     const isBillable = (pkg as any).isBillable !== false;
     const isKiriApp = (pkg as any).targetApplication === 'Kiri';
 
-    // Deactivate user while contract is pending (Kiri specific)
-    if (isBillable && isKiriApp) {
-      await this.userRepository.update({ id: user.id }, { strStatus: 'INACTIVE' });
-      this.logger.log(`User ${user.id} deactivated (Kiri plan upgrade). Pending contract approval.`);
-    }
+    // NOTE: Do NOT deactivate user in Authoriza — they may have other active roles
+    // (e.g., adminFactonet, adminInout). The deactivation is handled ONLY in the
+    // Kiri local database (isActive = false) by the Kiri backend.
 
     // Assign adminInvoices role & mark as Firmante
     if (isBillable && isKiriApp && fullContract) {
@@ -798,31 +796,15 @@ export class SelfRegistrationService {
 
     // Package upgrade: keep users active so they can sign the new contract.
     // Access restrictions are handled at the contract level (PENDING status),
-    // not by deactivating user accounts.
+    // not by deactivating user accounts in Authoriza.
+    // The user may have other active roles (adminFactonet, adminInout) — deactivating
+    // them here would break access to other apps. Kiri handles its own isActive locally.
     const isBillable = (pkg as any).isBillable !== false;
     const isKiriApp = (pkg as any).targetApplication === 'Kiri';
 
-    // For Kiri: deactivate user while contract is PENDING approval
-    // The user will be reactivated when the contract is activated (after signing)
-    if (isBillable && isKiriApp && contract.user?.id) {
-      await this.userRepository.update(
-        { id: contract.user.id },
-        { strStatus: 'INACTIVE' },
-      );
+    if (isBillable) {
       this.logger.log(
-        `User ${contract.user.id} deactivated (Kiri plan upgrade to "${pkg.name}"). Will be reactivated upon contract approval.`,
-      );
-
-      await this.logsService.info(
-        LogAction.USER_DEACTIVATED,
-        `User deactivated during Kiri plan upgrade to "${pkg.name}". Pending contract approval.`,
-        contract.user.id,
-        contract.id,
-        { reason: 'KIRI_PLAN_UPGRADE_PENDING' },
-      );
-    } else if (isBillable) {
-      this.logger.log(
-        `Contract ${contract.code} upgraded to billable package "${pkg.name}". Users remain active for contract signing.`,
+        `Contract ${contract.code} upgraded to billable package "${pkg.name}". User remains active in Authoriza.`,
       );
     }
 
