@@ -50,7 +50,7 @@ export default class InoutProPackageSeed {
       });
       if (!existingConfig) {
         const config = configRepo.create({
-          price: '0',
+          price: 0,
           totalAccount: 2,
           package: pkg,
           rol: adminInoutRole,
