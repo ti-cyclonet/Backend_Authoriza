@@ -9,6 +9,7 @@ import GlobalParametersSeed from './seeds/global-parameters.seed';
 import InitialApplicationsSeed from './seeds/initial-applications.seed';
 import UserSeed from './seeds/user.seed';
 import InoutFreePackageSeed from './seeds/inout-free-package.seed';
+import InoutProPackageSeed from './seeds/inout-pro-package.seed';
 import KiriPackagesSeed from './seeds/kiri-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
 import { NotificationsService } from './notifications/notifications.service';
@@ -76,6 +77,9 @@ async function bootstrap() {
 
   const inoutFreePackageSeed = new InoutFreePackageSeed();
   await inoutFreePackageSeed.run(dataSource);
+
+  const inoutProPackageSeed = new InoutProPackageSeed();
+  await inoutProPackageSeed.run(dataSource);
 
   const kiriPackagesSeed = new KiriPackagesSeed();
   await kiriPackagesSeed.run(dataSource);
