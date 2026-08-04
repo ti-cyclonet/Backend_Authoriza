@@ -219,9 +219,9 @@ export class AuthService {
     };
   }
 
-  async checkEmailExists(email: string): Promise<boolean> {
+  async checkEmailExists(email: string): Promise<{ id: string } | null> {
     const user = await this.usersService.findEntityByEmail(email);
-    return !!user;
+    return user ? { id: user.id } : null;
   }
 
   async loginAfterVerification(email: string): Promise<{ access_token: string; user: AuthenticatedUser }> {
