@@ -76,6 +76,10 @@ export class CreatePackageDto {
   @IsOptional()
   ctaType?: string = 'register';
 
+  @IsString()
+  @IsOptional()
+  targetApplication?: string;
+
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
