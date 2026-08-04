@@ -30,8 +30,8 @@ export default class InoutFreePackageSeed {
         isHighlighted: false,
         ctaLabel: 'Probar',
         ctaType: 'register',
-        targetApplication: 'Inout',
       });
+      pkg.targetApplication = 'Inout';
       await packageRepo.save(pkg);
       console.log('✅ Paquete CN-00 FREE (InOut) creado:', pkg.id);
     } else {
