@@ -639,25 +639,38 @@ export class SelfRegistrationService {
     });
 
     if (!contract) {
-      // If user is a dependent, find via principal
-      const dependency = await this.userDependencyRepository.findOne({
-        where: { dependentUserId: user.id, status: 'ACTIVE' },
-      });
-      if (dependency) {
-        const principalContract = await this.contractRepository.findOne({
-          where: { user: { id: dependency.principalUserId } },
-          relations: ['package', 'user'],
+      // For Kiri packages: always create a direct contract with the user
+      // Do NOT look for dependencies — Kiri contracts are personal
+      const isKiriPackage = (pkg as any).targetApplication === 'Kiri';
+
+      if (!isKiriPackage) {
+        // For non-Kiri packages: check if user is a dependent and use principal's contract
+        const dependency = await this.userDependencyRepository.findOne({
+          where: { dependentUserId: user.id, status: 'ACTIVE' },
         });
-        if (principalContract) {
-          const currentIsPaid = Number(principalContract.package?.price) > 0 && (principalContract.package as any)?.isBillable !== false;
-          if (currentIsPaid && newPackageIsFree) {
-            throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
+        if (dependency) {
+          const principalContract = await this.contractRepository.findOne({
+            where: { user: { id: dependency.principalUserId } },
+            relations: ['package', 'user'],
+          });
+          if (principalContract) {
+            const currentIsPaid = Number(principalContract.package?.price) > 0 && (principalContract.package as any)?.isBillable !== false;
+            if (currentIsPaid && newPackageIsFree) {
+              throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
+            }
+            return this.executeUpgrade(principalContract, pkg, packageId);
           }
-          return this.executeUpgrade(principalContract, pkg, packageId);
         }
       }
 
-      // No contract exists — create a new one for this Kiri user
+      // No direct contract exists — create a new one for this user
+      return this.createContractForUpgrade(user, pkg, packageId);
+    }
+
+    // If existing contract is for a different application (e.g., InOut), create a new Kiri contract
+    const isKiriPackage = (pkg as any).targetApplication === 'Kiri';
+    const existingIsKiri = contract.package?.targetApplication === 'Kiri';
+    if (isKiriPackage && !existingIsKiri) {
       return this.createContractForUpgrade(user, pkg, packageId);
     }
 
