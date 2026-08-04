@@ -32,8 +32,8 @@ export default class KiriPackagesSeed {
         isHighlighted: false,
         ctaLabel: 'Comenzar gratis',
         ctaType: 'register',
-        targetApplication: 'Kiri',
       });
+      freePkg.targetApplication = 'Kiri';
       await packageRepo.save(freePkg);
       console.log('✅ Paquete KIRI FREE creado:', freePkg.id);
     } else {
@@ -97,8 +97,8 @@ export default class KiriPackagesSeed {
         isHighlighted: true,
         ctaLabel: 'Elegir Plan',
         ctaType: 'register',
-        targetApplication: 'Kiri',
       });
+      plusPkg.targetApplication = 'Kiri';
       await packageRepo.save(plusPkg);
       console.log('✅ Paquete KIRI PLUS creado:', plusPkg.id);
     } else {

@@ -34,8 +34,8 @@ export default class InoutProPackageSeed {
         isHighlighted: true,
         ctaLabel: 'Elegir Plan',
         ctaType: 'register',
-        targetApplication: 'Inout',
       });
+      pkg.targetApplication = 'Inout';
       await packageRepo.save(pkg);
       console.log('✅ Paquete CN-01 PRO (InOut) creado:', pkg.id);
     } else {
