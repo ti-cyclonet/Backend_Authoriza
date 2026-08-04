@@ -57,6 +57,7 @@ export class AuthController {
     const user = await this.authService.checkEmailExists(body.email);
     return {
       exists: !!user,
+      userId: user?.id || null,
       message: user ? 'Este correo ya tiene una cuenta registrada.' : 'Email disponible.',
     };
   }
