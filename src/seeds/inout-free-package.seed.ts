@@ -43,6 +43,7 @@ export default class InoutFreePackageSeed {
       { variableName: 'nDiasUso', displayName: 'Días de uso', maxValue: 20, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nSesionesCap', displayName: 'Sesiones de Capacitación', maxValue: 3, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nVentas', displayName: 'Ventas', maxValue: 10, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nPedidos', displayName: 'Pedidos', maxValue: 5, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nClientes', displayName: 'Clientes', maxValue: 5, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nLotes', displayName: 'Lotes de Producción', maxValue: 2, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nProductos', displayName: 'Productos', maxValue: 2, targetApplication: 'Inout', limitType: 'quantity' },
