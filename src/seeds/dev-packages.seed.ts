@@ -155,6 +155,7 @@ export default class DevPackagesSeed {
       { variableName: 'nLotes', displayName: 'Lotes de Producción', maxValue: 99999 },
       { variableName: 'nClientes', displayName: 'Clientes', maxValue: 99999 },
       { variableName: 'nVentas', displayName: 'Ventas', maxValue: 99999 },
+      { variableName: 'nPedidos', displayName: 'Pedidos', maxValue: 99999 },
       { variableName: 'nSesionesCap', displayName: 'Sesiones de Capacitación', maxValue: 99999 },
       { variableName: 'nProveedores', displayName: 'Proveedores', maxValue: 99999 },
     ];

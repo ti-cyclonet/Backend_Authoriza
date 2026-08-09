@@ -69,6 +69,7 @@ export default class InoutProPackageSeed {
       { variableName: 'nLotes', displayName: 'Lotes de Producción', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nClientes', displayName: 'Clientes', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nVentas', displayName: 'Ventas', maxValue: 100, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nPedidos', displayName: 'Pedidos', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nSesionesCap', displayName: 'Sesiones de Capacitación', maxValue: 3, targetApplication: 'Inout', limitType: 'quantity' },
     ];
 
