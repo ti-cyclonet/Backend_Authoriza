@@ -31,6 +31,11 @@ export class UserDependenciesController {
     return this.userDependenciesService.deactivate(id);
   }
 
+  @Patch(':id/signer')
+  updateSigner(@Param('id') id: string, @Body('isAuthorizedSigner') isAuthorizedSigner: boolean) {
+    return this.userDependenciesService.updateSigner(id, isAuthorizedSigner);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.userDependenciesService.remove(id);

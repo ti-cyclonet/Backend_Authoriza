@@ -213,11 +213,12 @@ export class SelfRegistrationService {
       });
       const savedContract = await manager.save(contract);
 
-      // 4.7 Create user dependency
+      // 4.7 Create user dependency (admin is auto-designated as authorized signer)
       const dependency = manager.create(UserDependency, {
         principalUserId: savedPrincipal.id,
         dependentUserId: savedDependent.id,
         status: 'ACTIVE',
+        isAuthorizedSigner: true,
       });
       await manager.save(dependency);
 
@@ -246,6 +247,7 @@ export class SelfRegistrationService {
     // 5. Send verification emails (outside transaction)
     const apiBaseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000/api';
     const year = new Date().getFullYear().toString();
+    const applicationName = pkg.targetApplication || 'CycloNet';
 
     // 5.1 Email to principal
     try {
@@ -256,7 +258,7 @@ export class SelfRegistrationService {
       await this.notificationsService.sendByTemplate(
         'USER_VERIFICATION',
         dto.principal.email,
-        { customerName, verificationUrl, year },
+        { customerName, verificationUrl, year, applicationName },
       );
     } catch (err) {
       this.logger.warn(`Failed to send verification email to principal: ${err.message}`);
@@ -270,7 +272,7 @@ export class SelfRegistrationService {
       await this.notificationsService.sendByTemplate(
         'USER_VERIFICATION',
         dto.dependent.email,
-        { customerName: depName, verificationUrl: depVerificationUrl, year },
+        { customerName: depName, verificationUrl: depVerificationUrl, year, applicationName },
       );
     } catch (err) {
       this.logger.warn(`Failed to send verification email to dependent: ${err.message}`);
@@ -521,7 +523,7 @@ export class SelfRegistrationService {
       await this.notificationsService.sendByTemplate(
         'USER_VERIFICATION',
         email,
-        { customerName: 'Usuario', verificationUrl, year },
+        { customerName: 'Usuario', verificationUrl, year, applicationName: 'CycloNet' },
       );
     } catch (err) {
       this.logger.warn(`Failed to resend verification: ${err.message}`);

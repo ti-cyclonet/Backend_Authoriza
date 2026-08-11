@@ -63,4 +63,13 @@ export class UserDependenciesService {
     dependency.status = 'INACTIVE';
     return this.userDependencyRepository.save(dependency);
   }
+
+  async updateSigner(id: string, isAuthorizedSigner: boolean): Promise<UserDependency> {
+    const dependency = await this.userDependencyRepository.findOne({ where: { id } });
+    if (!dependency) {
+      throw new NotFoundException('Dependency not found');
+    }
+    dependency.isAuthorizedSigner = isAuthorizedSigner;
+    return this.userDependencyRepository.save(dependency);
+  }
 }

@@ -169,35 +169,37 @@ export class NotificationsService {
       await this.templateRepo.save(
         this.templateRepo.create({
           code: 'USER_VERIFICATION',
-          subject: 'Confirma tu correo electrónico - InOut by CycloNet',
+          subject: 'Confirma tu correo electrónico - {{applicationName}} by CycloNet',
           htmlBody: `<!DOCTYPE html>
 <html lang="es">
 <head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:20px auto;background:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(12,79,202,0.08);">
+    <!-- Header -->
     <tr>
-      <td style="background:linear-gradient(135deg,#0d47a1,#e65100);padding:30px;text-align:center;">
-        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:160px;margin-bottom:10px;" />
-        <h1 style="margin:8px 0 4px;font-size:32px;font-weight:800;letter-spacing:2px;"><span style="color:#64b5f6;">In</span><span style="color:#ffb74d;">Out</span></h1>
-        <p style="color:rgba(255,255,255,0.85);margin:0;font-size:13px;">Sistema de gestión de inventario y ventas</p>
+      <td style="background:linear-gradient(135deg,#0c4fca,#3b82f6);padding:32px 32px 28px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:140px;margin-bottom:12px;" />
+        <p style="color:rgba(255,255,255,0.9);margin:0;font-size:13px;letter-spacing:0.5px;">Plataforma de gestión empresarial</p>
       </td>
     </tr>
+    <!-- Body -->
     <tr>
-      <td style="padding:36px 32px;">
-        <h2 style="color:#0d47a1;margin:0 0 16px;font-size:20px;">Confirma tu correo electrónico</h2>
-        <p style="color:#333;line-height:1.7;margin:0 0 12px;">Hola <strong>{{customerName}}</strong>,</p>
-        <p style="color:#333;line-height:1.7;margin:0 0 24px;">Tu correo electrónico ha sido registrado en <strong>CycloNet S.A.S.</strong> para acceder a la aplicación <strong><span style="color:#1565c0;">In</span><span style="color:#e65100;">Out</span></strong>. Para activar tu cuenta y comenzar a gestionar tu inventario, haz clic en el botón:</p>
+      <td style="padding:40px 36px 32px;">
+        <h2 style="color:#0c4fca;margin:0 0 20px;font-size:22px;font-weight:700;">Confirma tu correo electrónico</h2>
+        <p style="color:#374151;line-height:1.7;margin:0 0 12px;font-size:15px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#374151;line-height:1.7;margin:0 0 28px;font-size:15px;">Tu correo electrónico ha sido registrado en <strong>CycloNet S.A.S.</strong> para acceder a <strong>{{applicationName}}</strong>. Para activar tu cuenta, haz clic en el botón:</p>
         <div style="text-align:center;margin:32px 0;">
-          <a href="{{verificationUrl}}" style="display:inline-block;background-color:#1565c0;color:#ffffff;text-decoration:none;padding:14px 44px;border-radius:8px;font-size:16px;font-weight:700;mso-padding-alt:14px 44px;">Verificar mi correo</a>
+          <a href="{{verificationUrl}}" style="display:inline-block;background:linear-gradient(135deg,#0c4fca,#3b82f6);color:#ffffff;text-decoration:none;padding:14px 48px;border-radius:50px;font-size:15px;font-weight:700;box-shadow:0 4px 15px rgba(12,79,202,0.3);">Verificar mi correo</a>
         </div>
-        <p style="color:#888;font-size:12px;text-align:center;margin:0 0 8px;">Este enlace es válido por <strong>24 horas</strong>.</p>
-        <p style="color:#aaa;font-size:12px;text-align:center;margin:0;">Si no solicitaste este registro, puedes ignorar este mensaje.</p>
+        <p style="color:#9ca3af;font-size:12px;text-align:center;margin:24px 0 8px;">Este enlace es válido por <strong>24 horas</strong>.</p>
+        <p style="color:#d1d5db;font-size:12px;text-align:center;margin:0;">Si no solicitaste este registro, puedes ignorar este mensaje.</p>
       </td>
     </tr>
+    <!-- Footer -->
     <tr>
-      <td style="background:#0d47a1;padding:20px 32px;">
-        <p style="color:#bbdefb;margin:0;font-size:12px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
-        <p style="color:#bbdefb;margin:6px 0 0;font-size:12px;text-align:center;">www.cyclonet.com.co</p>
+      <td style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+        <p style="color:#9ca3af;margin:6px 0 0;font-size:11px;text-align:center;">www.cyclonet.com.co</p>
       </td>
     </tr>
   </table>

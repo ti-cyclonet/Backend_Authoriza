@@ -9,7 +9,10 @@ import {
   Query,
   Patch,
   Req,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { ContractService } from './contract.service';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
@@ -33,6 +36,36 @@ export class ContractController {
     const pdfBuffer = Buffer.from(body.pdfBuffer, 'base64');
     const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer);
     return { pdfUrl };
+  }
+
+  @Public()
+  @Get(':id/pdf/download')
+  async downloadPDF(
+    @Param('id') contractId: string,
+    @Res() res: Response,
+  ) {
+    const contract = await this.contractService.findOne(contractId);
+    if (!contract.pdfUrl) {
+      res.status(404).json({ message: 'PDF not found for this contract' });
+      return;
+    }
+
+    // Fetch PDF from Cloudinary and stream it
+    const response = await fetch(contract.pdfUrl);
+    if (!response.ok) {
+      res.status(502).json({ message: 'Could not fetch PDF from storage' });
+      return;
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const filename = `Contrato_${contract.code || contractId}.pdf`;
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="${filename}"`,
+      'Content-Length': buffer.length.toString(),
+    });
+    res.send(buffer);
   }
 
   @Patch(':id/sign')

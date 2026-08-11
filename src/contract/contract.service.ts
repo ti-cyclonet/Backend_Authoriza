@@ -12,6 +12,7 @@ import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { User } from 'src/users/entities/user.entity';
 import { Package } from 'src/package/entities/package.entity';
+import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 import { ContractStatus } from './enums/contract-status.enum';
 import { PaymentMode } from './enums/payment-mode.enum';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
@@ -34,6 +35,8 @@ export class ContractService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Package)
     private readonly packageRepository: Repository<Package>,
+    @InjectRepository(UserDependency)
+    private readonly userDependencyRepository: Repository<UserDependency>,
     private readonly entityCodeService: EntityCodeService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly logsService: LogsService,
@@ -371,18 +374,40 @@ export class ContractService {
       throw new BadRequestException('El cliente ya ha firmado este contrato.');
     }
 
-    // Validate authorized signer if userId provided
+    // Validate signer authorization
     if (userId) {
-      const user = await this.userRepository.findOne({ where: { id: userId } });
-      if (user && !user.isAuthorizedSigner) {
-        throw new BadRequestException(
-          'No tienes autorización para firmar. Contacta al administrador del sistema para ser designado como firmante autorizado.',
-        );
+      const contractOwnerId = contract.user?.id;
+
+      // Case 1: The signer IS the contract owner (KIRI user signing their own contract)
+      if (userId === contractOwnerId) {
+        // Owner can always sign their own contract — no extra validation needed
+      } else {
+        // Case 2: The signer is a dependent — check UserDependency.isAuthorizedSigner
+        const dependency = await this.userDependencyRepository.findOne({
+          where: {
+            principalUserId: contractOwnerId,
+            dependentUserId: userId,
+            status: 'ACTIVE',
+          },
+        });
+
+        if (!dependency) {
+          throw new BadRequestException(
+            'No tienes relación de dependencia con el dueño del contrato.',
+          );
+        }
+
+        if (!dependency.isAuthorizedSigner) {
+          throw new BadRequestException(
+            'No tienes autorización para firmar. El administrador debe designarte como firmante autorizado en la gestión de dependencias.',
+          );
+        }
       }
     }
 
     contract.clientSignedAt = new Date();
     contract.clientSignedBy = signedBy;
+    contract.clientSignedByUserId = userId || null;
     contract.clientSignedIp = ip;
 
     const saved = await this.contractRepository.save(contract);
@@ -417,12 +442,20 @@ export class ContractService {
       throw new BadRequestException('El administrador ya ha firmado este contrato.');
     }
 
-    // Validate authorized signer if userId provided
+    // Validate authorized admin signer
     if (userId) {
-      const user = await this.userRepository.findOne({ where: { id: userId } });
-      if (user && !user.isAuthorizedSigner) {
+      // Check if user is an authorized signer via UserDependency
+      const signerDependency = await this.userDependencyRepository.findOne({
+        where: {
+          dependentUserId: userId,
+          status: 'ACTIVE',
+          isAuthorizedSigner: true,
+        },
+      });
+
+      if (!signerDependency) {
         throw new BadRequestException(
-          'No tienes autorización para firmar contratos. Solo el firmante autorizado puede realizar esta acción.',
+          'No tienes autorización para firmar contratos. Debes ser designado como firmante autorizado en la gestión de dependencias.',
         );
       }
     }
@@ -454,6 +487,7 @@ export class ContractService {
       client: contract.clientSignedAt ? {
         signedAt: contract.clientSignedAt,
         signedBy: contract.clientSignedBy,
+        signedByUserId: contract.clientSignedByUserId || null,
         ip: contract.clientSignedIp,
       } : null,
       admin: contract.adminSignedAt ? {

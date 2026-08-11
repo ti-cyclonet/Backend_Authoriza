@@ -599,6 +599,7 @@ export class UsersService {
       customerName,
       verificationUrl,
       year: new Date().getFullYear().toString(),
+      applicationName: 'CycloNet',
     });
   }
 
@@ -645,5 +646,18 @@ export class UsersService {
   async restoreDependents(userId: string): Promise<void> {
     // Esta funcionalidad necesita ser reimplementada con UserDependency
     console.log('TODO: Implement with UserDependency service');
+  }
+
+  /**
+   * Check if a user is an authorized signer in any active dependency.
+   * Uses user_dependencies.isAuthorizedSigner instead of the global user flag.
+   */
+  async isUserAuthorizedSigner(userId: string): Promise<boolean> {
+    const result = await this.userRepository.manager.query(
+      `SELECT COUNT(*) as count FROM user_dependencies 
+       WHERE "dependentUserId" = $1 AND status = 'ACTIVE' AND "isAuthorizedSigner" = true`,
+      [userId],
+    );
+    return parseInt(result[0]?.count || '0') > 0;
   }
 }

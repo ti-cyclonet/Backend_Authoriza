@@ -5,6 +5,7 @@ import { ContractService } from './contract.service';
 import { ContractController } from './contract.controller';
 import { User } from 'src/users/entities/user.entity';
 import { Package } from 'src/package/entities/package.entity';
+import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 import { EntityCodesModule } from '../entity-codes/entity-codes.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { LogsModule } from '../logs/logs.module';
@@ -13,7 +14,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Contract, User, Package]),
+    TypeOrmModule.forFeature([Contract, User, Package, UserDependency]),
     EntityCodesModule,
     CloudinaryModule,
     LogsModule,
