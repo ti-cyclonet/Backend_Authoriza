@@ -83,6 +83,13 @@ export class Contract {
   @Column({ type: 'varchar', length: 255, nullable: true })
   clientSignedBy?: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  clientSignedByUserId?: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'clientSignedByUserId' })
+  clientSignedByUser?: User;
+
   @Column({ type: 'varchar', length: 50, nullable: true })
   clientSignedIp?: string;
 

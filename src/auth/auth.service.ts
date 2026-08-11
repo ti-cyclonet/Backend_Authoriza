@@ -185,7 +185,7 @@ export class AuthService {
       name: user.strUserName,
       rol: activeRole.strName,
       rolDescription: activeRole.strDescription1 || '',
-      isAuthorizedSigner: user.isAuthorizedSigner || false,
+      isAuthorizedSigner: await this.usersService.isUserAuthorizedSigner(user.id),
       mustChangePassword,
       passwordExpired,
     };

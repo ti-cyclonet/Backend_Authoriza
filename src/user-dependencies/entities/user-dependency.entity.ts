@@ -35,6 +35,9 @@ export class UserDependency {
   })
   status: string;
 
+  @Column({ type: 'boolean', default: false })
+  isAuthorizedSigner: boolean;
+
   @CreateDateColumn()
   createdAt: Date;
 

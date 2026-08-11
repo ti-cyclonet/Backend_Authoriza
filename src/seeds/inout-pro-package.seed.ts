@@ -30,7 +30,7 @@ export default class InoutProPackageSeed {
         price: 85000,
         isBillable: true,
         showInLanding: true,
-        displayOrder: 1,
+        displayOrder: 2,
         isHighlighted: true,
         ctaLabel: 'Elegir Plan',
         ctaType: 'register',
@@ -39,6 +39,11 @@ export default class InoutProPackageSeed {
       await packageRepo.save(pkg);
       console.log('✅ Paquete CN-01 PRO (InOut) creado:', pkg.id);
     } else {
+      // Update displayOrder and highlight if needed
+      let updated = false;
+      if (pkg.displayOrder !== 2) { pkg.displayOrder = 2; updated = true; }
+      if (!pkg.isHighlighted) { pkg.isHighlighted = true; updated = true; }
+      if (updated) await packageRepo.save(pkg);
       console.log('⚠️ Paquete CN-01 PRO ya existe con ID:', pkg.id);
     }
 
@@ -60,6 +65,40 @@ export default class InoutProPackageSeed {
       }
     }
 
+    const operatorInoutRole = await rolRepo.findOne({ where: { strName: 'operatorInout' } });
+    if (operatorInoutRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: operatorInoutRole.id } },
+      });
+      if (!existingConfig) {
+        const config = configRepo.create({
+          price: 0,
+          totalAccount: 5,
+          package: pkg,
+          rol: operatorInoutRole,
+        });
+        await configRepo.save(config);
+        console.log('  ✅ Rol operatorInout (5 cuentas) asignado');
+      }
+    }
+
+    const viewerInoutRole = await rolRepo.findOne({ where: { strName: 'viewerInout' } });
+    if (viewerInoutRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: viewerInoutRole.id } },
+      });
+      if (!existingConfig) {
+        const config = configRepo.create({
+          price: 0,
+          totalAccount: 3,
+          package: pkg,
+          rol: viewerInoutRole,
+        });
+        await configRepo.save(config);
+        console.log('  ✅ Rol viewerInout (3 cuentas) asignado');
+      }
+    }
+
     // ========== VARIABLES DE LÍMITE ==========
     const variables = [
       { variableName: 'nDiasUso', displayName: 'Límite Temporal de Uso (días)', maxValue: 0, targetApplication: 'Inout', limitType: 'quantity' },
@@ -71,6 +110,7 @@ export default class InoutProPackageSeed {
       { variableName: 'nVentas', displayName: 'Ventas', maxValue: 100, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nPedidos', displayName: 'Pedidos', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nSesionesCap', displayName: 'Sesiones de Capacitación', maxValue: 3, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nProveedores', displayName: 'Proveedores', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
     ];
 
     for (const varData of variables) {
