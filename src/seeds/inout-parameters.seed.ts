@@ -56,9 +56,33 @@ export default class InoutParametersSeed {
         dataType: 'number',
       },
       {
+        code: 'INTERES_CREDITO',
+        name: 'Interés para Ventas a Crédito (%)',
+        description: 'Porcentaje de interés mensual aplicado a ventas a crédito',
+        dataType: 'number',
+      },
+      {
         code: 'DIAS_CREDITO',
         name: 'Días de Crédito',
         description: 'Número de días de plazo para pago de facturas a crédito',
+        dataType: 'number',
+      },
+      {
+        code: 'PUNTOS_POR_COMPRA',
+        name: 'Puntos por Compra',
+        description: 'Cantidad de puntos de fidelidad otorgados por cada compra realizada',
+        dataType: 'number',
+      },
+      {
+        code: 'PUNTOS_POR_PESO',
+        name: 'Puntos por Monto ($)',
+        description: 'Cantidad de puntos otorgados por cada $X gastado (ej: 1 punto por cada $10.000)',
+        dataType: 'number',
+      },
+      {
+        code: 'DIAS_VIGENCIA_COTIZACION',
+        name: 'Vigencia de Cotización (días)',
+        description: 'Número de días que una cotización permanece vigente antes de expirar',
         dataType: 'number',
       },
 

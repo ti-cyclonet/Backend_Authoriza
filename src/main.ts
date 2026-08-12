@@ -13,6 +13,7 @@ import InoutProPackageSeed from './seeds/inout-pro-package.seed';
 import KiriPackagesSeed from './seeds/kiri-packages.seed';
 import DevPackagesSeed from './seeds/dev-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
+import InoutParametersSeed from './seeds/inout-parameters.seed';
 import { NotificationsService } from './notifications/notifications.service';
 
 async function bootstrap() {
@@ -91,6 +92,10 @@ async function bootstrap() {
   // Seed de plantillas de email
   const notificationsService = app.get(NotificationsService);
   await notificationsService.seedDefaultTemplates();
+
+  // Seed de parámetros predefinidos de InOut
+  const inoutParametersSeed = new InoutParametersSeed();
+  await inoutParametersSeed.run(dataSource);
   
   const port = process.env.PORT ?? 3000;
   await app.listen(port);
