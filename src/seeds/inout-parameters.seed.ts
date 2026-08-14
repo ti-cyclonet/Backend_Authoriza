@@ -24,6 +24,18 @@ export default class InoutParametersSeed {
         dataType: 'number',
       },
       {
+        code: 'IVA_PORCENTAJE_REDUCIDO',
+        name: 'IVA Reducido (%)',
+        description: 'IVA reducido (5%) para alimentos, medicamentos y bienes de la canasta familiar',
+        dataType: 'number',
+      },
+      {
+        code: 'INC_PORCENTAJE',
+        name: 'INC - Impoconsumo (%)',
+        description: 'Impuesto Nacional al Consumo (8%) para restaurantes, bares y comidas preparadas. No aplica simultáneamente con IVA.',
+        dataType: 'number',
+      },
+      {
         code: 'RETENCION_FUENTE',
         name: 'Retención en la Fuente (%)',
         description: 'Porcentaje de retención en la fuente aplicable',
