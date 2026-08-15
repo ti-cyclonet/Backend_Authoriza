@@ -372,6 +372,7 @@ export class PackageService {
           }
           // Quantity type: show count
           if (v.maxValue === 0) return `${v.displayName}: Ilimitado`;
+          if (v.maxValue >= 999999) return `${v.displayName} Ilimitados`;
           return `${v.maxValue} ${v.displayName}`;
         })
         .filter(f => f !== null);
@@ -384,6 +385,7 @@ export class PackageService {
         price: Number(pkg.price),
         isHighlighted: pkg.isHighlighted,
         displayOrder: pkg.displayOrder,
+        badge: pkg.badge || null,
         features,
         ctaLabel: pkg.ctaLabel || 'Elegir Plan',
         ctaType: pkg.ctaType || 'register',
