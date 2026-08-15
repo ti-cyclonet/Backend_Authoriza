@@ -78,6 +78,10 @@ export class CreatePackageDto {
 
   @IsString()
   @IsOptional()
+  badge?: string;
+
+  @IsString()
+  @IsOptional()
   targetApplication?: string;
 
   @IsOptional()

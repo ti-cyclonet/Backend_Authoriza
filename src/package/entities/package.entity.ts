@@ -44,6 +44,9 @@ export class Package {
   ctaType?: string;
 
   @Column({ type: 'varchar', length: 50, nullable: true })
+  badge?: string;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
   targetApplication?: string;
 
   @OneToMany(() => ConfigurationPackage, (config) => config.package)

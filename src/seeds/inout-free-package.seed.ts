@@ -26,7 +26,7 @@ export default class InoutFreePackageSeed {
         code,
         displayName: 'CN-00 FREE',
         description:
-          'Para pruebas de clientes potenciales. Acceso completo a las funcionalidades base con límites reducidos durante 15 días.',
+          'Para pruebas de clientes potenciales. Acceso completo a las funcionalidades base con límites reducidos durante 30 días.',
         price: 0,
         isBillable: false,
         showInLanding: true,

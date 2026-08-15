@@ -10,6 +10,7 @@ import InitialApplicationsSeed from './seeds/initial-applications.seed';
 import UserSeed from './seeds/user.seed';
 import InoutFreePackageSeed from './seeds/inout-free-package.seed';
 import InoutProPackageSeed from './seeds/inout-pro-package.seed';
+import InoutEnterprisePackageSeed from './seeds/inout-enterprise-package.seed';
 import KiriPackagesSeed from './seeds/kiri-packages.seed';
 import DevPackagesSeed from './seeds/dev-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
@@ -82,6 +83,9 @@ async function bootstrap() {
 
   const inoutProPackageSeed = new InoutProPackageSeed();
   await inoutProPackageSeed.run(dataSource);
+
+  const inoutEnterprisePackageSeed = new InoutEnterprisePackageSeed();
+  await inoutEnterprisePackageSeed.run(dataSource);
 
   const kiriPackagesSeed = new KiriPackagesSeed();
   await kiriPackagesSeed.run(dataSource);
