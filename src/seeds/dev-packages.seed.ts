@@ -23,7 +23,7 @@ export default class DevPackagesSeed {
     // ================================================================
     // KIRI DEV — Full access a Kiri Finance (desarrollo)
     // ================================================================
-    await this.createKiriDev(packageRepo, ulvRepo, entityCodeService);
+    await this.createKiriDev(packageRepo, ulvRepo, configRepo, rolRepo, entityCodeService);
 
     // ================================================================
     // INOUT DEV — Full access a InOut (desarrollo)
@@ -34,7 +34,7 @@ export default class DevPackagesSeed {
   }
 
   private async createKiriDev(
-    packageRepo: any, ulvRepo: any, entityCodeService: EntityCodeService,
+    packageRepo: any, ulvRepo: any, configRepo: any, rolRepo: any, entityCodeService: EntityCodeService,
   ) {
     const name = 'KIRI DEV';
     let pkg = await packageRepo.findOne({ where: { name } });
@@ -98,6 +98,23 @@ export default class DevPackagesSeed {
           limitType: 'feature',
           packageId: pkg.id,
         }));
+      }
+    }
+
+    // Rol para KIRI DEV: 1 adminKiri
+    const adminKiriRole = await rolRepo.findOne({ where: { strName: 'adminKiri' } });
+    if (adminKiriRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: adminKiriRole.id } },
+      });
+      if (!existingConfig) {
+        await configRepo.save(configRepo.create({
+          price: 0,
+          totalAccount: 1,
+          package: pkg,
+          rol: adminKiriRole,
+        }));
+        console.log('  ✅ Rol adminKiri (1 cuenta) asignado a KIRI DEV');
       }
     }
   }

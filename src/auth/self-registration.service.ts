@@ -76,6 +76,43 @@ export class SelfRegistrationService {
       where: { documentType: dependentDocTypeCode },
     });
 
+    // 3.1 Validate document number uniqueness
+    if (dto.principal.documentNumber && principalDocType) {
+      const existingDocument = await this.basicDataRepository.findOne({
+        where: {
+          documentTypeId: principalDocType.id,
+          documentNumber: dto.principal.documentNumber,
+        },
+        relations: ['user'],
+      });
+
+      if (existingDocument) {
+        const ownerEmail = existingDocument.user?.strUserName || '';
+        const maskedEmail = ownerEmail
+          ? ownerEmail.replace(/(.{2})(.*)(@.*)/, '$1***$3')
+          : '';
+        throw new ConflictException(
+          `El número de documento ${dto.principal.documentType} ${dto.principal.documentNumber} ya está registrado` +
+          (maskedEmail ? ` con el correo ${maskedEmail}` : '') +
+          '. Si esta cuenta te pertenece, inicia sesión con tu correo registrado.',
+        );
+      }
+    }
+
+    if (dto.dependent?.documentNumber && dependentDocType) {
+      const existingDepDocument = await this.basicDataRepository.findOne({
+        where: {
+          documentTypeId: dependentDocType.id,
+          documentNumber: dto.dependent.documentNumber,
+        },
+      });
+
+      if (existingDepDocument) {
+        throw new ConflictException(
+          `El número de documento del operador (${dependentDocTypeCode} ${dto.dependent.documentNumber}) ya está registrado en la plataforma.`,
+        );
+      }
+    }
     // 4. Execute in transaction
     const result = await this.dataSource.transaction(async (manager) => {
       const hashedPassword = await bcrypt.hash('1234567890', 10);

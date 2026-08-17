@@ -76,6 +76,34 @@ export class UsersService {
   async createFullUser(dto: CreateFullUserDto): Promise<User> {
     console.log('Creating full user with DTO:', JSON.stringify(dto, null, 2));
     
+    // === VALIDACIONES PREVIAS (antes de crear cualquier registro) ===
+    
+    // Buscar el ID del tipo de documento
+    const documentTypeRecord = await this.userRepository.manager.findOne(DocumentType, {
+      where: { documentType: dto.documentType.strDocumentType }
+    });
+
+    if (!documentTypeRecord) {
+      throw new BadRequestException(`Document type ${dto.documentType.strDocumentType} not found`);
+    }
+
+    // Validar unicidad de documento
+    if (dto.documentType.strDocumentNumber) {
+      const existingDoc = await this.userRepository.manager.findOne(BasicData, {
+        where: {
+          documentTypeId: documentTypeRecord.id,
+          documentNumber: dto.documentType.strDocumentNumber,
+        },
+      });
+      if (existingDoc) {
+        throw new ConflictException(
+          `El documento ${dto.documentType.strDocumentType} ${dto.documentType.strDocumentNumber} ya está registrado en la plataforma.`,
+        );
+      }
+    }
+
+    // === CREACIÓN (todo válido, proceder) ===
+    
     const genericPassword = '1234567890';
     const salt = await bcrypt.genSalt();
     const hashedPassword = await bcrypt.hash(genericPassword, salt);
@@ -91,17 +119,6 @@ export class UsersService {
       strStatus: dto.user.strStatus,
     });
     const savedUser = await this.userRepository.save(user);
-    console.log('User created:', savedUser.id);
-
-    // Buscar el ID del tipo de documento
-    const documentTypeRecord = await this.userRepository.manager.findOne(DocumentType, {
-      where: { documentType: dto.documentType.strDocumentType }
-    });
-
-    if (!documentTypeRecord) {
-      throw new BadRequestException(`Document type ${dto.documentType.strDocumentType} not found`);
-    }
-    console.log('Document type found:', documentTypeRecord.id);
 
     // Crear datos básicos con referencia al tipo de documento
     const basicData = this.userRepository.manager.create(BasicData, {
@@ -112,7 +129,6 @@ export class UsersService {
       user: savedUser,
     });
     const savedBasicData = await this.userRepository.manager.save(basicData);
-    console.log('BasicData created:', savedBasicData.id);
 
     // Crear datos específicos según tipo de persona
     if (dto.basicData.strPersonType === 'N' && dto.naturalPersonData) {

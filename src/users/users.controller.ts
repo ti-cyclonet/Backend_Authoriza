@@ -105,7 +105,7 @@ export class UsersController {
     try {
       await this.usersService.verifyEmail(email, code);
       title = '¡Verificación exitosa!';
-      message = 'Tu correo electrónico ha sido verificado correctamente. Se ha creado tu usuario en la suite <strong>CycloNet</strong> para usar la aplicación <strong><span style="color:#1565c0;">In</span><span style="color:#e65100;">Out</span></strong>.';
+      message = 'Tu correo electrónico ha sido verificado correctamente. Se ha creado tu usuario en la suite <strong>CycloNet</strong> para usar las aplicaciones de la plataforma.';
       icon = '✅';
       color = '#2e7d32';
     } catch (err) {

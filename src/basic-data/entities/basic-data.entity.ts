@@ -5,6 +5,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
   JoinColumn,
+  Unique,
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Expose, Type } from 'class-transformer';
@@ -13,6 +14,7 @@ import { LegalEntityData } from '../../legal-entity-data/entities/legal-entity-d
 import { DocumentType } from '../../document-types/entities/document-type.entity';
 
 @Entity()
+@Unique('UQ_basic_data_document', ['documentTypeId', 'documentNumber'])
 export class BasicData {
   @Expose()
   @PrimaryGeneratedColumn('uuid')

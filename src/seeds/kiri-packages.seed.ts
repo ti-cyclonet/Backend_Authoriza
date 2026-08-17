@@ -1,6 +1,8 @@
 import { DataSource } from 'typeorm';
 import { Package } from '../package/entities/package.entity';
 import { UsageLimitVariable } from '../usage-limit-variables/entities/usage-limit-variable.entity';
+import { ConfigurationPackage } from '../configuration-package/entities/configuration-package.entity';
+import { Rol } from '../roles/entities/rol.entity';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 import { EntityCode } from '../entity-codes/entities/entity-code.entity';
 
@@ -8,6 +10,8 @@ export default class KiriPackagesSeed {
   async run(dataSource: DataSource): Promise<void> {
     const packageRepo = dataSource.getRepository(Package);
     const ulvRepo = dataSource.getRepository(UsageLimitVariable);
+    const configRepo = dataSource.getRepository(ConfigurationPackage);
+    const rolRepo = dataSource.getRepository(Rol);
     const entityCodeRepo = dataSource.getRepository(EntityCode);
     const entityCodeService = new EntityCodeService(entityCodeRepo);
 
@@ -76,6 +80,23 @@ export default class KiriPackagesSeed {
     }
     console.log('  ✅ Variables KIRI FREE configuradas');
 
+    // Rol para KIRI FREE: 1 userKiri
+    const userKiriRole = await rolRepo.findOne({ where: { strName: 'userKiri' } });
+    if (userKiriRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: freePkg.id }, rol: { id: userKiriRole.id } },
+      });
+      if (!existingConfig) {
+        await configRepo.save(configRepo.create({
+          price: 0,
+          totalAccount: 1,
+          package: freePkg,
+          rol: userKiriRole,
+        }));
+        console.log('  ✅ Rol userKiri (1 cuenta) asignado a KIRI FREE');
+      }
+    }
+
     // ================================================================
     // PAQUETE 2: KIRI PLUS
     // ================================================================
@@ -139,5 +160,22 @@ export default class KiriPackagesSeed {
       }
     }
     console.log('  ✅ Variables KIRI PLUS configuradas');
+
+    // Rol para KIRI PLUS: 1 adminKiri
+    const adminKiriRole = await rolRepo.findOne({ where: { strName: 'adminKiri' } });
+    if (adminKiriRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: plusPkg.id }, rol: { id: adminKiriRole.id } },
+      });
+      if (!existingConfig) {
+        await configRepo.save(configRepo.create({
+          price: 0,
+          totalAccount: 1,
+          package: plusPkg,
+          rol: adminKiriRole,
+        }));
+        console.log('  ✅ Rol adminKiri (1 cuenta) asignado a KIRI PLUS');
+      }
+    }
   }
 }
