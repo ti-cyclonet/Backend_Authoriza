@@ -111,7 +111,7 @@ export default class KiriPackagesSeed {
         displayName: 'KIRI PLUS',
         description:
           'Todas las funcionalidades de Kiri Finance. Asistente IA, reportes avanzados, estrategias de deuda, funciones sociales y sin límites en registros.',
-        price: 29900,
+        price: 16000,
         isBillable: true,
         showInLanding: true,
         displayOrder: 2,
