@@ -244,7 +244,8 @@ export class SelfRegistrationService {
         payday: 1,
         startDate: today,
         endDate,
-        status: ContractStatus.PENDING,
+        status: pkg.isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE,
+        issuedAt: new Date(),
         codePrefix,
         businessSector: dto.businessSector || 'general',
       });
@@ -747,7 +748,8 @@ export class SelfRegistrationService {
       payday: 1,
       startDate: today,
       endDate,
-      status: ContractStatus.PENDING,
+      status: pkg.isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE,
+      issuedAt: new Date(),
       codePrefix,
       businessSector: 'personal',
     });
@@ -816,10 +818,10 @@ export class SelfRegistrationService {
     contract.value = (pkg.price || 0) * 12;
     contract.startDate = new Date();
     contract.endDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d; })();
-    contract.status = ContractStatus.PENDING;
+    contract.status = pkg.isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE;
     // Reset PDF and signing — contract must be re-generated, re-issued, and re-signed
     contract.pdfUrl = null;
-    contract.issuedAt = null;
+    contract.issuedAt = pkg.isBillable ? null : new Date();
     contract.signedAt = null;
 
     await this.contractRepository.save(contract);
