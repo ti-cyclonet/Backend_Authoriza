@@ -1115,6 +1115,7 @@ export class SelfRegistrationService {
       existing.strPassword = hashedPassword;
       existing.isVerified = true;
       existing.strStatus = 'ACTIVE';
+      existing.isAuthorizedSigner = true;
       await this.userRepository.save(existing);
       return { success: true, message: 'User already exists, password synced.', userId: existing.id };
     }
@@ -1131,6 +1132,7 @@ export class SelfRegistrationService {
       isVerified: true,
       mustChangePassword: false,
       lastPasswordChange: new Date(),
+      isAuthorizedSigner: true,
     });
     const savedUser = await this.userRepository.save(newUser);
 
@@ -1141,6 +1143,24 @@ export class SelfRegistrationService {
       user: savedUser,
     });
     const savedBasicData = await this.basicDataRepository.save(basicData);
+
+    // Create NaturalPersonData with the name from Kiri
+    if (nombre) {
+      const nameParts = nombre.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const firstSurname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+      const secondName = nameParts.length > 2 ? nameParts[1] : '';
+
+      const naturalPersonData = this.userRepository.manager.create(NaturalPersonData, {
+        firstName,
+        secondName,
+        firstSurname,
+        secondSurname: '',
+        basicData: savedBasicData,
+      });
+      await this.userRepository.manager.save(naturalPersonData);
+    }
+
     savedUser.basicData = savedBasicData;
     await this.userRepository.save(savedUser);
 
