@@ -678,17 +678,22 @@ export class ContractService {
       );
     }
 
-    const dependentUsers = await this.userRepository
-      .createQueryBuilder('user')
-      .innerJoin('user.principals', 'dependency')
-      .where('dependency.principalUserId = :principalId', { principalId: contract.user.id })
-      .andWhere('dependency.status = :status', { status: 'ACTIVE' })
-      .getCount();
+    // Owner users with isAuthorizedSigner can operate alone without dependents
+    const ownerCanSignAlone = contract.user?.isAuthorizedSigner === true;
 
-    if (dependentUsers === 0) {
-      throw new BadRequestException(
-        'No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.',
-      );
+    if (!ownerCanSignAlone) {
+      const dependentUsers = await this.userRepository
+        .createQueryBuilder('user')
+        .innerJoin('user.principals', 'dependency')
+        .where('dependency.principalUserId = :principalId', { principalId: contract.user.id })
+        .andWhere('dependency.status = :status', { status: 'ACTIVE' })
+        .getCount();
+
+      if (dependentUsers === 0) {
+        throw new BadRequestException(
+          'No se puede activar el contrato. Debe crear al menos una cuenta de usuario dependiente.',
+        );
+      }
     }
 
     if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
@@ -728,17 +733,22 @@ export class ContractService {
         );
       }
 
-      const dependentUsers = await this.userRepository
-        .createQueryBuilder('user')
-        .innerJoin('user.principals', 'dependency')
-        .where('dependency.principalUserId = :principalId', { principalId: contract.user.id })
-        .andWhere('dependency.status = :status', { status: 'ACTIVE' })
-        .getCount();
+      // Owner users with isAuthorizedSigner can operate alone without dependents
+      const ownerCanSignAlone = contract.user?.isAuthorizedSigner === true;
 
-      if (dependentUsers === 0) {
-        throw new BadRequestException(
-          'Cannot activate contract. At least one dependent user account must be created.',
-        );
+      if (!ownerCanSignAlone) {
+        const dependentUsers = await this.userRepository
+          .createQueryBuilder('user')
+          .innerJoin('user.principals', 'dependency')
+          .where('dependency.principalUserId = :principalId', { principalId: contract.user.id })
+          .andWhere('dependency.status = :status', { status: 'ACTIVE' })
+          .getCount();
+
+        if (dependentUsers === 0) {
+          throw new BadRequestException(
+            'Cannot activate contract. At least one dependent user account must be created.',
+          );
+        }
       }
 
       if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {

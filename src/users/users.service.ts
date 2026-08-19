@@ -665,10 +665,19 @@ export class UsersService {
   }
 
   /**
-   * Check if a user is an authorized signer in any active dependency.
-   * Uses user_dependencies.isAuthorizedSigner instead of the global user flag.
+   * Check if a user is an authorized signer.
+   * Returns true if:
+   * 1. The user's own isAuthorizedSigner flag is true (Owner/principal users), OR
+   * 2. The user is listed as an authorized signer in an active dependency relationship.
    */
   async isUserAuthorizedSigner(userId: string): Promise<boolean> {
+    // Check the user's own isAuthorizedSigner column (Owner can always sign their own contracts)
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (user?.isAuthorizedSigner) {
+      return true;
+    }
+
+    // Check if user is an authorized signer via dependency relationship
     const result = await this.userRepository.manager.query(
       `SELECT COUNT(*) as count FROM user_dependencies 
        WHERE "dependentUserId" = $1 AND status = 'ACTIVE' AND "isAuthorizedSigner" = true`,
