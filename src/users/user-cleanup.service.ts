@@ -40,7 +40,7 @@ export class UserCleanupService {
           `DELETE FROM "user_roles" WHERE "userId" = $1`, [user.id]
         );
         await this.userRepository.manager.query(
-          `DELETE FROM "user_dependencies" WHERE "dependentUserId" = $1 OR "principalUserId" = $1`, [user.id, user.id]
+          `DELETE FROM "user_dependencies" WHERE "dependentUserId" = $1 OR "principalUserId" = $2`, [user.id, user.id]
         );
 
         // 2. Get basicDataId before deleting user

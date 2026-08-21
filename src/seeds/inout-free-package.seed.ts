@@ -26,7 +26,7 @@ export default class InoutFreePackageSeed {
         code,
         displayName: 'CN-00 FREE',
         description:
-          'Para pruebas de clientes potenciales. Acceso completo a las funcionalidades base con límites reducidos durante 30 días.',
+          'Para pruebas de clientes potenciales. Acceso completo a las funcionalidades del plan Pro durante 30 días.',
         price: 0,
         isBillable: false,
         showInLanding: true,
@@ -39,11 +39,12 @@ export default class InoutFreePackageSeed {
       await packageRepo.save(pkg);
       console.log('✅ Paquete CN-00 FREE (InOut) creado:', pkg.id);
     } else {
-      // Update displayOrder if needed
-      if (pkg.displayOrder !== 1) {
-        pkg.displayOrder = 1;
-        await packageRepo.save(pkg);
-      }
+      // Update description and displayOrder if needed
+      let updated = false;
+      if (pkg.displayOrder !== 1) { pkg.displayOrder = 1; updated = true; }
+      const expectedDesc = 'Para pruebas de clientes potenciales. Acceso completo a las funcionalidades del plan Pro durante 30 días.';
+      if (pkg.description !== expectedDesc) { pkg.description = expectedDesc; updated = true; }
+      if (updated) await packageRepo.save(pkg);
       console.log('⚠️ Paquete CN-00 FREE ya existe con ID:', pkg.id);
     }
 
@@ -66,18 +67,18 @@ export default class InoutFreePackageSeed {
     }
 
     // ========== VARIABLES DE LÍMITE ==========
-    // Orden idéntico al PRO para que la landing los muestre igual
+    // Mismos límites que el plan PRO, pero con 30 días de vigencia
     const variables = [
-      { variableName: 'nDiasUso', displayName: 'Días de uso', maxValue: 20, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nMateriales', displayName: 'Materiales', maxValue: 5, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nMaterialesT', displayName: 'Materiales Compuestos', maxValue: 2, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nProductos', displayName: 'Productos', maxValue: 2, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nLotes', displayName: 'Lotes de Producción', maxValue: 2, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nClientes', displayName: 'Clientes', maxValue: 5, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nVentas', displayName: 'Ventas', maxValue: 10, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nPedidos', displayName: 'Pedidos', maxValue: 5, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nDiasUso', displayName: 'Días de uso', maxValue: 30, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nMateriales', displayName: 'Materiales', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nMaterialesT', displayName: 'Materiales Compuestos', maxValue: 30, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nProductos', displayName: 'Productos', maxValue: 20, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nLotes', displayName: 'Lotes de Producción', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nClientes', displayName: 'Clientes', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nVentas', displayName: 'Ventas', maxValue: 100, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nPedidos', displayName: 'Pedidos', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
       { variableName: 'nSesionesCap', displayName: 'Sesiones de Capacitación', maxValue: 3, targetApplication: 'Inout', limitType: 'quantity' },
-      { variableName: 'nProveedores', displayName: 'Proveedores', maxValue: 3, targetApplication: 'Inout', limitType: 'quantity' },
+      { variableName: 'nProveedores', displayName: 'Proveedores', maxValue: 50, targetApplication: 'Inout', limitType: 'quantity' },
     ];
 
     for (const varData of variables) {
@@ -92,6 +93,11 @@ export default class InoutFreePackageSeed {
         });
         await ulvRepo.save(ulv);
         console.log(`  ✅ Variable ${varData.variableName} = ${varData.maxValue} creada`);
+      } else if (existing.maxValue !== varData.maxValue) {
+        // Actualizar si el valor cambió
+        existing.maxValue = varData.maxValue;
+        await ulvRepo.save(existing);
+        console.log(`  🔄 Variable ${varData.variableName} actualizada: ${existing.maxValue} → ${varData.maxValue}`);
       }
     }
 
