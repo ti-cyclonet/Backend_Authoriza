@@ -672,11 +672,19 @@ export class SelfRegistrationService {
     // 3. Validate not downgrading from paid to free
     const newPackageIsFree = Number(pkg.price) === 0 || (pkg as any).isBillable === false;
 
-    // 4. Find user's active contract
-    const contract = await this.contractRepository.findOne({
-      where: { user: { id: user.id } },
+    // 4. Find user's active contract for the same application first
+    const newTargetApplication = (pkg as any).targetApplication;
+    let contract = await this.contractRepository.findOne({
+      where: { user: { id: user.id }, package: { targetApplication: newTargetApplication } },
       relations: ['package', 'user'],
     });
+    // If no contract for the same app, find any contract
+    if (!contract) {
+      contract = await this.contractRepository.findOne({
+        where: { user: { id: user.id } },
+        relations: ['package', 'user'],
+      });
+    }
 
     if (!contract) {
       // For Kiri packages: always create a direct contract with the user
@@ -694,6 +702,16 @@ export class SelfRegistrationService {
             relations: ['package', 'user'],
           });
           if (principalContract) {
+            // Only upgrade principal's contract if it's for the same application
+            const principalApp = principalContract.package?.targetApplication;
+            const newApp = (pkg as any).targetApplication;
+            if (principalApp && newApp && principalApp !== newApp) {
+              // Different application — create a new contract for the principal
+              const principalUser = await this.userRepository.findOne({ where: { id: dependency.principalUserId } });
+              if (principalUser) {
+                return this.createContractForUpgrade(principalUser, pkg, packageId);
+              }
+            }
             const currentIsPaid = Number(principalContract.package?.price) > 0 && (principalContract.package as any)?.isBillable !== false;
             if (currentIsPaid && newPackageIsFree) {
               throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
@@ -707,10 +725,10 @@ export class SelfRegistrationService {
       return this.createContractForUpgrade(user, pkg, packageId);
     }
 
-    // If existing contract is for a different application (e.g., InOut), create a new Kiri contract
-    const isKiriPackage = (pkg as any).targetApplication === 'Kiri';
-    const existingIsKiri = contract.package?.targetApplication === 'Kiri';
-    if (isKiriPackage && !existingIsKiri) {
+    // If existing contract is for a different application, create a new contract
+    // (e.g., user has Cyclon Plus and wants to try InOut FREE — keep both active)
+    const existingTargetApp = contract.package?.targetApplication;
+    if (newTargetApplication && existingTargetApp && newTargetApplication !== existingTargetApp) {
       return this.createContractForUpgrade(user, pkg, packageId);
     }
 

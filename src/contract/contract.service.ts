@@ -901,7 +901,7 @@ export class ContractService {
     }
   }
 
-  async findTenantLimits(tenantId: string) {
+  async findTenantLimits(tenantId: string, application?: string) {
     // Reuse findByTenant logic to resolve the active contract for the tenant
     const dependency = await this.contractRepository.manager
       .createQueryBuilder()
@@ -913,10 +913,21 @@ export class ContractService {
 
     const userId = dependency?.principalUserId || tenantId;
 
-    const contract = await this.contractRepository.findOne({
-      where: { user: { id: userId } },
-      relations: ['package', 'package.usageLimitVariables'],
-    });
+    // If application is specified, find the contract for that specific app
+    let contract: any = null;
+    if (application) {
+      contract = await this.contractRepository.findOne({
+        where: { user: { id: userId }, package: { targetApplication: application } },
+        relations: ['package', 'package.usageLimitVariables'],
+      });
+    }
+    // Fallback: find any contract for this user
+    if (!contract) {
+      contract = await this.contractRepository.findOne({
+        where: { user: { id: userId } },
+        relations: ['package', 'package.usageLimitVariables'],
+      });
+    }
 
     if (!contract) {
       throw new NotFoundException(

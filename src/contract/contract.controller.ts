@@ -127,8 +127,11 @@ export class ContractController {
 
   @Public()
   @Get('tenant/:tenantId/limits')
-  findTenantLimits(@Param('tenantId') tenantId: string) {
-    return this.contractService.findTenantLimits(tenantId);
+  findTenantLimits(
+    @Param('tenantId') tenantId: string,
+    @Query('application') application?: string,
+  ) {
+    return this.contractService.findTenantLimits(tenantId, application);
   }
 
   @Get('tenant/:tenantId')
