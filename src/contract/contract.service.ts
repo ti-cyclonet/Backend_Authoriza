@@ -941,8 +941,8 @@ export class ContractService {
         .createQueryBuilder('contract')
         .leftJoinAndSelect('contract.package', 'package')
         .leftJoinAndSelect('package.usageLimitVariables', 'ulv')
-        .where('contract.userId = :userId', { userId })
-        .andWhere('package.targetApplication = :app', { app: application })
+        .where('contract."userId" = :userId', { userId })
+        .andWhere('package."targetApplication" = :app', { app: application })
         .andWhere('contract.status = :status', { status: ContractStatus.ACTIVE })
         .getOne();
 
@@ -952,8 +952,8 @@ export class ContractService {
           .createQueryBuilder('contract')
           .leftJoinAndSelect('contract.package', 'package')
           .leftJoinAndSelect('package.usageLimitVariables', 'ulv')
-          .where('contract.userId = :userId', { userId })
-          .andWhere('package.targetApplication = :app', { app: application })
+          .where('contract."userId" = :userId', { userId })
+          .andWhere('package."targetApplication" = :app', { app: application })
           .getOne();
       }
     }
