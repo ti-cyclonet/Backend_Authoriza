@@ -936,35 +936,34 @@ export class ContractService {
     // Prioritize ACTIVE contracts over PENDING ones
     let contract: any = null;
     if (application) {
-      // Use QueryBuilder with TypeORM property references
-      contract = await this.contractRepository
-        .createQueryBuilder('c')
-        .innerJoinAndSelect('c.package', 'p')
-        .leftJoinAndSelect('p.usageLimitVariables', 'ulv')
-        .where('c.user = :userId', { userId })
-        .andWhere('p.targetApplication = :app', { app: application })
-        .andWhere('c.status = :activeStatus', { activeStatus: 'ACTIVE' })
-        .getOne();
-
-      // Fallback to any status if no ACTIVE found
-      if (!contract) {
-        contract = await this.contractRepository
-          .createQueryBuilder('c')
-          .innerJoinAndSelect('c.package', 'p')
-          .leftJoinAndSelect('p.usageLimitVariables', 'ulv')
-          .where('c.user = :userId', { userId })
-          .andWhere('p.targetApplication = :app', { app: application })
-          .getOne();
-      }
-    }
-    // Fallback: find any ACTIVE contract for this user
-    if (!contract) {
-      contract = await this.contractRepository.findOne({
-        where: { user: { id: userId }, status: ContractStatus.ACTIVE },
+      // Direct query using find with explicit relations
+      const allContracts = await this.contractRepository.find({
+        where: { user: { id: userId } },
         relations: ['package', 'package.usageLimitVariables'],
       });
-    }
-    if (!contract) {
+
+      // Filter by targetApplication and status in JS (most reliable)
+      contract = allContracts.find(
+        c => c.package?.targetApplication?.toLowerCase() === application.toLowerCase() && c.status === 'ACTIVE'
+      );
+
+      // Fallback: any status for the same app
+      if (!contract) {
+        contract = allContracts.find(
+          c => c.package?.targetApplication?.toLowerCase() === application.toLowerCase()
+        );
+      }
+
+      // Fallback: any ACTIVE contract
+      if (!contract) {
+        contract = allContracts.find(c => c.status === 'ACTIVE');
+      }
+
+      // Fallback: any contract
+      if (!contract && allContracts.length > 0) {
+        contract = allContracts[0];
+      }
+    } else {
       contract = await this.contractRepository.findOne({
         where: { user: { id: userId } },
         relations: ['package', 'package.usageLimitVariables'],
