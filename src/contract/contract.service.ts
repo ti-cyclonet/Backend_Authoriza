@@ -936,24 +936,24 @@ export class ContractService {
     // Prioritize ACTIVE contracts over PENDING ones
     let contract: any = null;
     if (application) {
-      // Use QueryBuilder for reliable nested filtering
+      // Use QueryBuilder with TypeORM property references
       contract = await this.contractRepository
-        .createQueryBuilder('contract')
-        .leftJoinAndSelect('contract.package', 'package')
-        .leftJoinAndSelect('package.usageLimitVariables', 'ulv')
-        .where('contract."userId" = :userId', { userId })
-        .andWhere('package."targetApplication" = :app', { app: application })
-        .andWhere('contract.status = :status', { status: ContractStatus.ACTIVE })
+        .createQueryBuilder('c')
+        .innerJoinAndSelect('c.package', 'p')
+        .leftJoinAndSelect('p.usageLimitVariables', 'ulv')
+        .where('c.user = :userId', { userId })
+        .andWhere('p.targetApplication = :app', { app: application })
+        .andWhere('c.status = :activeStatus', { activeStatus: 'ACTIVE' })
         .getOne();
 
       // Fallback to any status if no ACTIVE found
       if (!contract) {
         contract = await this.contractRepository
-          .createQueryBuilder('contract')
-          .leftJoinAndSelect('contract.package', 'package')
-          .leftJoinAndSelect('package.usageLimitVariables', 'ulv')
-          .where('contract."userId" = :userId', { userId })
-          .andWhere('package."targetApplication" = :app', { app: application })
+          .createQueryBuilder('c')
+          .innerJoinAndSelect('c.package', 'p')
+          .leftJoinAndSelect('p.usageLimitVariables', 'ulv')
+          .where('c.user = :userId', { userId })
+          .andWhere('p.targetApplication = :app', { app: application })
           .getOne();
       }
     }
