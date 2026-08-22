@@ -444,19 +444,24 @@ export class ContractService {
 
     // Validate authorized admin signer
     if (userId) {
-      // Check if user is an authorized signer via UserDependency
-      const signerDependency = await this.userDependencyRepository.findOne({
-        where: {
-          dependentUserId: userId,
-          status: 'ACTIVE',
-          isAuthorizedSigner: true,
-        },
-      });
+      // Check if user is an authorized signer via User entity or UserDependency
+      const signerUser = await this.userRepository.findOne({ where: { id: userId } });
+      const isSignerViaUser = signerUser?.isAuthorizedSigner === true;
 
-      if (!signerDependency) {
-        throw new BadRequestException(
-          'No tienes autorización para firmar contratos. Debes ser designado como firmante autorizado en la gestión de dependencias.',
-        );
+      if (!isSignerViaUser) {
+        const signerDependency = await this.userDependencyRepository.findOne({
+          where: {
+            dependentUserId: userId,
+            status: 'ACTIVE',
+            isAuthorizedSigner: true,
+          },
+        });
+
+        if (!signerDependency) {
+          throw new BadRequestException(
+            'No tienes autorización para firmar contratos. Debes ser designado como firmante autorizado.',
+          );
+        }
       }
     }
 
@@ -547,6 +552,20 @@ export class ContractService {
       this.sendContractActivatedEmail(contract).catch(err =>
         this.logger.warn(`Failed to send contract activated email: ${err.message}`)
       );
+
+      // Cancel any other contracts for the same user + same application (old plan)
+      if (contract.package?.targetApplication) {
+        await this.contractRepository
+          .createQueryBuilder()
+          .update(Contract)
+          .set({ status: ContractStatus.CANCELLED })
+          .where('"userId" = :userId', { userId: principalUserId })
+          .andWhere('id != :contractId', { contractId: contract.id })
+          .andWhere('"packageId" IN (SELECT id FROM package WHERE "targetApplication" = :app)', { app: contract.package.targetApplication })
+          .andWhere('status = :activeStatus', { activeStatus: ContractStatus.ACTIVE })
+          .execute();
+        this.logger.log(`Cancelled old contracts for user ${principalUserId} in app ${contract.package.targetApplication}`);
+      }
 
       // Notify Kiri to reactivate local user (for Kiri app contracts)
       if (contract.package?.targetApplication === 'Kiri') {
@@ -914,14 +933,28 @@ export class ContractService {
     const userId = dependency?.principalUserId || tenantId;
 
     // If application is specified, find the contract for that specific app
+    // Prioritize ACTIVE contracts over PENDING ones
     let contract: any = null;
     if (application) {
       contract = await this.contractRepository.findOne({
-        where: { user: { id: userId }, package: { targetApplication: application } },
+        where: { user: { id: userId }, package: { targetApplication: application }, status: ContractStatus.ACTIVE },
+        relations: ['package', 'package.usageLimitVariables'],
+      });
+      // Fallback to any status if no ACTIVE found
+      if (!contract) {
+        contract = await this.contractRepository.findOne({
+          where: { user: { id: userId }, package: { targetApplication: application } },
+          relations: ['package', 'package.usageLimitVariables'],
+        });
+      }
+    }
+    // Fallback: find any contract for this user (ACTIVE first)
+    if (!contract) {
+      contract = await this.contractRepository.findOne({
+        where: { user: { id: userId }, status: ContractStatus.ACTIVE },
         relations: ['package', 'package.usageLimitVariables'],
       });
     }
-    // Fallback: find any contract for this user
     if (!contract) {
       contract = await this.contractRepository.findOne({
         where: { user: { id: userId } },

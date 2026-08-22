@@ -140,9 +140,17 @@ export class AuthService {
     const passwordExpired = now > expirationDate;
 
     // 8. Generar token JWT con tenantId basado en el contrato
-    // Si el usuario es dependiente, usar el principalUserId como tenantId
-    const dependency = user.principals?.find(p => p.status === 'ACTIVE');
-    let tenantId = dependency ? dependency.principalUserId : (userActiveRoles[0].contract?.user?.id || user.id);
+    // El tenantId es el dueño del contrato al que está vinculado el rol activo del usuario
+    const contractOwner = userActiveRoles[0].contract?.user;
+    let tenantId = contractOwner?.id || user.id;
+    
+    // Si el usuario no tiene contrato directo, buscar a través de dependencias
+    if (!contractOwner) {
+      const dependency = user.principals?.find(p => p.status === 'ACTIVE');
+      if (dependency) {
+        tenantId = dependency.principalUserId;
+      }
+    }
     let codePrefix = userActiveRoles[0].contract?.codePrefix || null;
 
     const payload = { 
@@ -298,9 +306,15 @@ export class AuthService {
     const passwordExpired = now > expirationDate;
 
     // Generar token con tenantId basado en el propietario del contrato seleccionado
-    // Si el usuario es dependiente, usar el principalUserId como tenantId
-    const dependency = user.principals?.find(p => p.status === 'ACTIVE');
-    let tenantId = dependency ? dependency.principalUserId : (userRoleForContract.contract?.user?.id || user.id);
+    const contractOwnerComplete = userRoleForContract.contract?.user;
+    let tenantId = contractOwnerComplete?.id || user.id;
+    
+    if (!contractOwnerComplete) {
+      const dependency = user.principals?.find(p => p.status === 'ACTIVE');
+      if (dependency) {
+        tenantId = dependency.principalUserId;
+      }
+    }
     let codePrefix = userRoleForContract.contract?.codePrefix || null;
 
     const payload = { 

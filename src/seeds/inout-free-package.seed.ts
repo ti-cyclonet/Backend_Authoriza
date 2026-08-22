@@ -66,6 +66,31 @@ export default class InoutFreePackageSeed {
       }
     }
 
+    // Roles adicionales: hasta 2 usuarios extra con operatorInout o viewerInout
+    const operatorInoutRole = await rolRepo.findOne({ where: { strName: 'operatorInout' } });
+    if (operatorInoutRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: operatorInoutRole.id } },
+      });
+      if (!existingConfig) {
+        const config = configRepo.create({ price: 0, totalAccount: 2, package: pkg, rol: operatorInoutRole });
+        await configRepo.save(config);
+        console.log('  ✅ Rol operatorInout (2 cuentas) asignado al paquete FREE');
+      }
+    }
+
+    const viewerInoutRole = await rolRepo.findOne({ where: { strName: 'viewerInout' } });
+    if (viewerInoutRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: viewerInoutRole.id } },
+      });
+      if (!existingConfig) {
+        const config = configRepo.create({ price: 0, totalAccount: 2, package: pkg, rol: viewerInoutRole });
+        await configRepo.save(config);
+        console.log('  ✅ Rol viewerInout (2 cuentas) asignado al paquete FREE');
+      }
+    }
+
     // ========== VARIABLES DE LÍMITE ==========
     // Mismos límites que el plan PRO, pero con 30 días de vigencia
     const variables = [

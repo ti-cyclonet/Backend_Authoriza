@@ -59,11 +59,18 @@ export default class UserSeed {
         code,
         strStatus: 'ACTIVE',
         mustChangePassword: true,
+        isAuthorizedSigner: true,
         dtmLatestUpdateDate: new Date(),
       });
       await userRepo.save(user);
       console.log('✅ Usuario creado:', user.id, 'Code:', code);
     } else {
+      // Asegurar que siempre sea firmante
+      if (!user.isAuthorizedSigner) {
+        user.isAuthorizedSigner = true;
+        await userRepo.save(user);
+        console.log('🔄 Usuario marcado como firmante autorizado');
+      }
       console.log('⚠️ Usuario ya existe con ID:', user.id);
     }
 

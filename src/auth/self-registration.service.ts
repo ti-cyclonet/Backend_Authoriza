@@ -830,16 +830,25 @@ export class SelfRegistrationService {
   }
 
   private async executeUpgrade(contract: Contract, pkg: Package, packageId: string) {
-    // Update the EXISTING contract with new package terms
-    // The contract code, tenantId, and codePrefix remain the same
+    const isBillable = (pkg as any).isBillable !== false;
+    const isKiriApp = (pkg as any).targetApplication === 'Kiri';
+
+    // For billable Kiri upgrades: keep old contract ACTIVE, create new PENDING contract
+    // This allows the user to keep using the old plan while the new contract awaits signatures
+    if (isBillable && isKiriApp) {
+      const user = contract.user;
+      const result = await this.createContractForUpgrade(user, pkg, packageId);
+      return result;
+    }
+
+    // For non-billable or non-Kiri: update the EXISTING contract in place
     contract.package = { id: packageId } as any;
     contract.value = (pkg.price || 0) * 12;
     contract.startDate = new Date();
     contract.endDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d; })();
-    contract.status = pkg.isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE;
-    // Reset PDF and signing — contract must be re-generated, re-issued, and re-signed
+    contract.status = isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE;
     contract.pdfUrl = null;
-    contract.issuedAt = pkg.isBillable ? null : new Date();
+    contract.issuedAt = isBillable ? null : new Date();
     contract.signedAt = null;
 
     await this.contractRepository.save(contract);
@@ -858,8 +867,6 @@ export class SelfRegistrationService {
     // not by deactivating user accounts in Authoriza.
     // The user may have other active roles (adminFactonet, adminInout) — deactivating
     // them here would break access to other apps. Kiri handles its own isActive locally.
-    const isBillable = (pkg as any).isBillable !== false;
-    const isKiriApp = (pkg as any).targetApplication === 'Kiri';
 
     if (isBillable) {
       this.logger.log(
