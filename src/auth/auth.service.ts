@@ -232,6 +232,44 @@ export class AuthService {
     return user ? { id: user.id } : null;
   }
 
+  /**
+   * Returns the access status of a user by email, used by external apps (Kiri)
+   * to determine if the user is allowed to access. Authoriza is the source of truth.
+   * A user is allowed only if verified and status is ACTIVE.
+   */
+  async getUserAccessStatus(email: string): Promise<{
+    exists: boolean;
+    allowed: boolean;
+    status: string | null;
+    isVerified: boolean;
+    reason?: string;
+  }> {
+    const user = await this.usersService.findEntityByEmail(email);
+    if (!user) {
+      return { exists: false, allowed: false, status: null, isVerified: false, reason: 'USER_NOT_FOUND' };
+    }
+
+    const status = user.strStatus;
+    const isVerified = !!user.isVerified;
+    const blockedStatuses = ['INACTIVE', 'SUSPENDED', 'DELINQUENT', 'DELETED'];
+
+    let allowed = true;
+    let reason: string | undefined;
+
+    if (!isVerified) {
+      allowed = false;
+      reason = 'NOT_VERIFIED';
+    } else if (blockedStatuses.includes(status)) {
+      allowed = false;
+      reason = status;
+    } else if (status === 'UNCONFIRMED') {
+      allowed = false;
+      reason = 'UNCONFIRMED';
+    }
+
+    return { exists: true, allowed, status, isVerified, reason };
+  }
+
   async loginAfterVerification(email: string): Promise<{ access_token: string; user: AuthenticatedUser }> {
     const user = await this.usersService.findEntityByEmail(email);
     if (!user) throw new UnauthorizedException('User not found');

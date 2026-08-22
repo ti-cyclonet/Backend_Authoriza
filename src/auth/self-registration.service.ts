@@ -1193,6 +1193,140 @@ export class SelfRegistrationService {
     return { success: true, message: 'User created.', userId: savedUser.id };
   }
 
+  /**
+   * Registers a Kiri user in Authoriza with email verification.
+   * Creates the user as UNCONFIRMED and sends a Kiri-branded verification email.
+   * Returns whether verification is required.
+   */
+  async registerKiriUser(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    secondName?: string;
+    firstSurname: string;
+    secondSurname?: string;
+    documentType?: string;
+    documentNumber?: string;
+  }) {
+    const existing = await this.userRepository.findOne({
+      where: { strUserName: data.email },
+    });
+    if (existing) {
+      // Already exists — sync password and return
+      return { success: true, message: 'Usuario ya existe en Authoriza.', alreadyExists: true, userId: existing.id };
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const code = await this.entityCodeService.generateCode('User');
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpires = new Date();
+    verificationExpires.setHours(verificationExpires.getHours() + 24);
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      // Create user UNCONFIRMED
+      const newUser = manager.create(User, {
+        strUserName: data.email,
+        strPassword: hashedPassword,
+        code,
+        strStatus: 'UNCONFIRMED',
+        isVerified: false,
+        mustChangePassword: false,
+        lastPasswordChange: new Date(),
+        verificationCode,
+        verificationExpires,
+      });
+      const savedUser = await manager.save(newUser);
+
+      // Resolve document type
+      const docType = await this.documentTypeRepository.findOne({
+        where: { documentType: data.documentType || 'CC' },
+      });
+
+      // Create BasicData
+      const basicData = manager.create(BasicData, {
+        strPersonType: 'N' as const,
+        strStatus: 'ACTIVE',
+        documentTypeId: docType?.id || null,
+        documentNumber: data.documentNumber || '',
+        user: savedUser,
+      });
+      const savedBasicData = await manager.save(basicData);
+
+      savedUser.basicData = savedBasicData;
+      await manager.save(savedUser);
+
+      // Create NaturalPersonData
+      const naturalData = manager.create(NaturalPersonData, {
+        firstName: data.firstName,
+        secondName: data.secondName || null,
+        firstSurname: data.firstSurname,
+        secondSurname: data.secondSurname || null,
+        basicData: savedBasicData,
+      });
+      await manager.save(naturalData);
+
+      return savedUser;
+    });
+
+    // Send Kiri-branded verification email
+    try {
+      const apiBaseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000/api';
+      const verificationUrl = `${apiBaseUrl}/auth/verify-kiri?email=${encodeURIComponent(data.email)}&code=${verificationCode}`;
+      const year = new Date().getFullYear().toString();
+      await this.notificationsService.sendByTemplate('KIRI_VERIFICATION', data.email, {
+        customerName: data.firstName,
+        verificationUrl,
+        year,
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to send Kiri verification email: ${err.message}`);
+    }
+
+    return {
+      success: true,
+      message: 'Registro exitoso. Revisa tu correo para verificar tu cuenta.',
+      verificationRequired: true,
+      userId: result.id,
+    };
+  }
+
+  /**
+   * Verifies a Kiri user's email. Activates the user in Authoriza and notifies Kiri.
+   */
+  async verifyKiriUser(email: string, code: string) {
+    const user = await this.userRepository.findOne({ where: { strUserName: email } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (user.isVerified) {
+      return { success: true, message: 'Email ya verificado.', alreadyVerified: true };
+    }
+    if (user.verificationCode !== code) {
+      throw new BadRequestException('Código de verificación inválido.');
+    }
+    if (user.verificationExpires && new Date() > user.verificationExpires) {
+      throw new BadRequestException('El código ha expirado. Solicita uno nuevo.');
+    }
+
+    user.isVerified = true;
+    user.verificationCode = null;
+    user.verificationExpires = null;
+    user.strStatus = 'ACTIVE';
+    await this.userRepository.save(user);
+
+    // Notify Kiri to activate the local user
+    try {
+      const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
+      await fetch(`${kiriApiUrl}/api/plan/activate-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to notify Kiri about verification: ${err.message}`);
+    }
+
+    return { success: true, message: '¡Cuenta verificada! Ya puedes acceder a Kiri Finance.' };
+  }
+
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {
     const { name, email, phone, subject, message } = data;
 

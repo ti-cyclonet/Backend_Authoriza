@@ -445,6 +445,11 @@ export class UsersService {
     try {
       const savedUser = await this.userRepository.save(userToSave);
       console.log('User saved successfully:', savedUser.id);
+      // Notify Kiri if status changed
+      if (dto.strStatus) {
+        const allowed = dto.strStatus === 'ACTIVE' || dto.strStatus === 'CONFIRMED';
+        this.notifyKiriStatusChange(savedUser.strUserName, allowed);
+      }
       return savedUser;
     } catch (error) {
       console.error('Error saving user:', error);
@@ -488,7 +493,25 @@ export class UsersService {
   async toggleStatus(userId: string): Promise<User> {
     const user = await this.findOne(userId);
     user.strStatus = user.strStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    return this.userRepository.save(user);
+    const saved = await this.userRepository.save(user);
+    this.notifyKiriStatusChange(saved.strUserName, saved.strStatus === 'ACTIVE');
+    return saved;
+  }
+
+  /**
+   * Notifies the Kiri backend when a user's access status changes.
+   * Authoriza is the source of truth for Kiri user access.
+   */
+  private notifyKiriStatusChange(email: string, allowed: boolean): void {
+    const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
+    // Fire-and-forget — don't block the response
+    fetch(`${kiriApiUrl}/api/plan/set-user-status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, allowed }),
+    }).catch(() => {
+      // Non-blocking: Kiri will also verify status on next login
+    });
   }
 
   async setAuthorizedSigner(userId: string, isAuthorizedSigner: boolean): Promise<User> {
@@ -514,6 +537,10 @@ export class UsersService {
     user.strStatus = newStatus;
     user.dtmLatestUpdateDate = new Date();
     await this.userRepository.save(user);
+
+    // Notify Kiri about the status change (source of truth for access)
+    const allowed = newStatus === 'ACTIVE' || newStatus === 'CONFIRMED';
+    this.notifyKiriStatusChange(user.strUserName, allowed);
 
     // TODO: Actualizar dependientes usando UserDependency service
 
@@ -567,6 +594,8 @@ export class UsersService {
     user.strStatus = 'DELETED';
     await this.userRepository.save(user);
     await this.userRepository.softDelete(id);
+    // Notify Kiri to block access
+    this.notifyKiriStatusChange(user.strUserName, false);
     
     // Log eliminación de usuario principal
     await this.logsService.info(

@@ -447,6 +447,109 @@ export class NotificationsService {
       );
       this.logger.log('PAYMENT_REJECTED template seeded');
     }
+
+    // Kiri Finance verification template
+    const kiriVerificationTpl = await this.templateRepo.findOne({ where: { code: 'KIRI_VERIFICATION' } });
+    if (!kiriVerificationTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'KIRI_VERIFICATION',
+          subject: 'Confirma tu correo - Kiri Finance',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f0f4f0;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(27,67,50,0.12);">
+    <!-- Header -->
+    <tr>
+      <td style="background:linear-gradient(135deg,#1b4332,#2d6a4f);padding:40px 32px;text-align:center;">
+        <div style="display:inline-block;width:64px;height:64px;background:rgba(255,255,255,0.15);border-radius:18px;line-height:64px;font-size:32px;">🌱</div>
+        <h1 style="color:#ffffff;margin:16px 0 4px;font-size:24px;font-weight:800;">Kiri Finance</h1>
+        <p style="color:rgba(255,255,255,0.6);margin:0;font-size:13px;">Tu dinero, tu futuro, tu control</p>
+      </td>
+    </tr>
+    <!-- Body -->
+    <tr>
+      <td style="padding:40px 36px 32px;">
+        <h2 style="color:#1b4332;margin:0 0 20px;font-size:22px;font-weight:700;">¡Bienvenido a Kiri! 🎉</h2>
+        <p style="color:#374151;line-height:1.7;margin:0 0 12px;font-size:15px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#374151;line-height:1.7;margin:0 0 28px;font-size:15px;">Gracias por unirte a <strong>Kiri Finance</strong>. Para activar tu cuenta y empezar a organizar tus finanzas, confirma tu correo electrónico:</p>
+        <div style="text-align:center;margin:32px 0;">
+          <a href="{{verificationUrl}}" style="display:inline-block;background:linear-gradient(135deg,#2d6a4f,#40916c);color:#ffffff;text-decoration:none;padding:15px 52px;border-radius:50px;font-size:15px;font-weight:700;box-shadow:0 4px 15px rgba(45,106,79,0.35);">Verificar mi correo</a>
+        </div>
+        <p style="color:#9ca3af;font-size:12px;text-align:center;margin:24px 0 8px;">Este enlace es válido por <strong>24 horas</strong>.</p>
+        <p style="color:#d1d5db;font-size:12px;text-align:center;margin:0;">Si no creaste esta cuenta, puedes ignorar este mensaje.</p>
+      </td>
+    </tr>
+    <!-- Footer -->
+    <tr>
+      <td style="background:#f0f4f0;padding:20px 32px;border-top:1px solid #d8e3d8;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Kiri Finance</p>
+        <p style="color:#9ca3af;margin:6px 0 0;font-size:11px;text-align:center;">kiri.cyclonet.com.co</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('KIRI_VERIFICATION template seeded');
+    }
+
+    // Kiri Plus welcome (paid plan activated)
+    const kiriPlusWelcomeTpl = await this.templateRepo.findOne({ where: { code: 'KIRI_PLUS_WELCOME' } });
+    if (!kiriPlusWelcomeTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'KIRI_PLUS_WELCOME',
+          subject: '🎉 ¡Bienvenido a {{packageName}}! Tu control financiero sube de nivel',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f0f4f0;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(27,67,50,0.12);">
+    <!-- Header -->
+    <tr>
+      <td style="background:linear-gradient(135deg,#1b4332,#2d6a4f,#40916c);padding:44px 32px;text-align:center;">
+        <div style="display:inline-block;width:72px;height:72px;background:rgba(255,255,255,0.15);border-radius:20px;line-height:72px;font-size:38px;">🌟</div>
+        <h1 style="color:#ffffff;margin:18px 0 4px;font-size:26px;font-weight:800;">¡Bienvenido a {{packageName}}!</h1>
+        <p style="color:rgba(255,255,255,0.7);margin:0;font-size:13px;">Kiri Finance — Tu dinero, tu futuro, tu control</p>
+      </td>
+    </tr>
+    <!-- Body -->
+    <tr>
+      <td style="padding:40px 36px 28px;">
+        <h2 style="color:#1b4332;margin:0 0 18px;font-size:20px;font-weight:700;">¡En hora buena, {{customerName}}! 🎉</h2>
+        <p style="color:#374151;line-height:1.7;margin:0 0 16px;font-size:15px;">
+          Acabas de dar un paso enorme hacia el control total de tus finanzas. Tu plan <strong>{{packageName}}</strong> ya está <span style="color:#2d6a4f;font-weight:700;">activo</span> y listo para acompañarte.
+        </p>
+        <p style="color:#374151;line-height:1.7;margin:0 0 16px;font-size:15px;">
+          Admiramos tu decisión de invertir en ti y en tu futuro financiero. A partir de hoy tienes acceso a todas las herramientas premium de Kiri para ahorrar más, gastar mejor y alcanzar tus metas más rápido.
+        </p>
+        <div style="background:#f0f9f2;border-left:4px solid #2d6a4f;border-radius:8px;padding:16px 20px;margin:24px 0;">
+          <p style="color:#1b4332;margin:0;font-size:14px;line-height:1.6;">
+            💚 <strong>Recuerda:</strong> las mejores decisiones financieras no son las más grandes, sino las más constantes. Estamos aquí para acompañarte en cada paso.
+          </p>
+        </div>
+        <div style="text-align:center;margin:32px 0 8px;">
+          <a href="https://kiri.cyclonet.com.co" style="display:inline-block;background:linear-gradient(135deg,#2d6a4f,#40916c);color:#ffffff;text-decoration:none;padding:15px 52px;border-radius:50px;font-size:15px;font-weight:700;box-shadow:0 4px 15px rgba(45,106,79,0.35);">Empezar ahora →</a>
+        </div>
+      </td>
+    </tr>
+    <!-- Footer -->
+    <tr>
+      <td style="background:#f0f4f0;padding:20px 32px;border-top:1px solid #d8e3d8;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Kiri Finance</p>
+        <p style="color:#9ca3af;margin:6px 0 0;font-size:11px;text-align:center;">Gracias por confiar en nosotros para cuidar lo que más importa.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('KIRI_PLUS_WELCOME template seeded');
+    }
   }
 
   async seedContactConfirmationTemplate(): Promise<void> {
