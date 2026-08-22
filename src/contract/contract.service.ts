@@ -1055,7 +1055,7 @@ export class ContractService {
 
   /**
    * Notifies the Kiri backend to reactivate a user's local account
-   * after their contract has been activated.
+   * after their contract has been activated, and flags a plan-upgrade welcome.
    */
   private async notifyKiriUserReactivation(contract: Contract): Promise<void> {
     const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
@@ -1066,6 +1066,9 @@ export class ContractService {
       return;
     }
 
+    const isBillablePlan = (contract.package as any)?.isBillable !== false && Number(contract.package?.price) > 0;
+    const packageName = contract.package?.name || 'Kiri Plus';
+
     try {
       const response = await fetch(`${kiriApiUrl}/api/plan/activate-user`, {
         method: 'POST',
@@ -1073,6 +1076,8 @@ export class ContractService {
         body: JSON.stringify({
           email,
           contractId: contract.id,
+          planUpgraded: isBillablePlan,
+          packageName,
         }),
       });
 
@@ -1085,5 +1090,33 @@ export class ContractService {
     } catch (error) {
       this.logger.warn(`Could not reach Kiri API for user reactivation: ${error.message}`);
     }
+
+    // Send welcome email for paid plan upgrade
+    if (isBillablePlan) {
+      this.sendKiriPlusWelcomeEmail(contract).catch(err =>
+        this.logger.warn(`Failed to send Kiri Plus welcome email: ${err.message}`)
+      );
+    }
+  }
+
+  /**
+   * Sends a warm welcome email when a Kiri user upgrades to a paid plan.
+   */
+  private async sendKiriPlusWelcomeEmail(contract: Contract): Promise<void> {
+    const email = contract.user?.strUserName;
+    if (!email) return;
+
+    const customerName = contract.user?.basicData?.naturalPersonData?.firstName
+      || contract.user?.basicData?.legalEntityData?.businessName
+      || 'crack de las finanzas';
+    const packageName = contract.package?.name || 'Kiri Plus';
+    const year = new Date().getFullYear().toString();
+
+    await this.notificationsService.sendByTemplate('KIRI_PLUS_WELCOME', email, {
+      customerName,
+      packageName,
+      year,
+    });
+    this.logger.log(`Kiri Plus welcome email sent to ${email}`);
   }
 }

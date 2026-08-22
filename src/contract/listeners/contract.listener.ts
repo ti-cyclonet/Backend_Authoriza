@@ -22,11 +22,16 @@ export class ContractListener implements EntitySubscriberInterface<Contract> {
 
     // Si el contrato cambió a ACTIVE desde cualquier otro estado
     if (currentStatus === ContractStatus.ACTIVE && previousStatus !== ContractStatus.ACTIVE) {
-      this.logger.log(`Contract ${contract.id} activated, generating first invoice...`);
-      
+      this.logger.log(`Contract ${contract.id} activated. Checking if first invoice is due (payday - 5)...`);
+
       try {
-        await this.invoiceGeneratorService.generateInvoiceForContract(contract.id);
-        this.logger.log(`First invoice generated for contract ${contract.id}`);
+        // Only generates if it's already generation day (payday - 5); otherwise the daily cron handles it
+        const invoice = await this.invoiceGeneratorService.generateFirstInvoiceIfDue(contract.id);
+        if (invoice) {
+          this.logger.log(`First invoice generated for contract ${contract.id}`);
+        } else {
+          this.logger.log(`First invoice for contract ${contract.id} deferred until generation day.`);
+        }
       } catch (error) {
         this.logger.error(`Failed to generate invoice for contract ${contract.id}:`, error);
       }

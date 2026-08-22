@@ -62,6 +62,16 @@ export class AuthController {
     };
   }
 
+  @ApiOperation({ summary: 'Get user access status by email (for external apps like Kiri)' })
+  @Public()
+  @Post('user-status')
+  async getUserStatus(@Body() body: { email: string }) {
+    if (!body.email) {
+      return { exists: false, allowed: false, status: null };
+    }
+    return this.authService.getUserAccessStatus(body.email);
+  }
+
   @ApiOperation({ summary: 'Self-register a new account (principal + dependent)' })
   @Public()
   @Post('self-register')
@@ -168,5 +178,51 @@ export class AuthController {
   @Post('ensure-kiri-user')
   async ensureKiriUser(@Body() body: { email: string; password: string; nombre?: string }) {
     return this.selfRegistrationService.ensureKiriUser(body.email, body.password, body.nombre);
+  }
+
+  @ApiOperation({ summary: 'Register a Kiri user with email verification' })
+  @Public()
+  @Post('register-kiri')
+  async registerKiri(@Body() body: {
+    email: string; password: string; firstName: string; secondName?: string;
+    firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string;
+  }) {
+    return this.selfRegistrationService.registerKiriUser(body);
+  }
+
+  @ApiOperation({ summary: 'Verify Kiri user email via link (GET)' })
+  @Public()
+  @Get('verify-kiri')
+  @Header('Content-Type', 'text/html')
+  async verifyKiriViaLink(@Query('email') email: string, @Query('code') code: string, @Res() res: Response) {
+    let result: any;
+    try {
+      result = await this.selfRegistrationService.verifyKiriUser(email, code);
+    } catch (err) {
+      result = { success: false, message: err.message || 'Error de verificación' };
+    }
+    const isSuccess = result.success;
+    const kiriUrl = process.env.KIRI_LOGIN_URL || 'https://kiri.cyclonet.com.co/login';
+    const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'} - Kiri Finance</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#f0f4f0,#d8e3d8);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+  .card{background:#fff;border-radius:20px;padding:3rem 2.5rem;max-width:440px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(27,67,50,0.15)}
+  .icon{width:80px;height:80px;background:${isSuccess ? '#d8f3dc' : '#fff3cd'};border-radius:24px;line-height:80px;font-size:40px;margin:0 auto 1.5rem}
+  h1{color:#1b4332;font-size:1.5rem;margin-bottom:0.75rem;font-weight:800}
+  p{color:#6b7280;font-size:0.95rem;margin-bottom:1.5rem;line-height:1.6}
+  .btn{display:inline-block;padding:0.85rem 2.5rem;background:linear-gradient(135deg,#2d6a4f,#40916c);color:#fff;text-decoration:none;border-radius:50px;font-weight:700;font-size:0.95rem}
+</style></head>
+<body>
+  <div class="card">
+    <div class="icon">${isSuccess ? '🌱' : '⚠️'}</div>
+    <h1>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'}</h1>
+    <p>${isSuccess ? 'Tu cuenta de Kiri Finance ha sido activada. Ya puedes iniciar sesión y empezar a organizar tus finanzas.' : (result.message || 'No se pudo verificar tu cuenta.')}</p>
+    ${isSuccess ? `<a href="${kiriUrl}" class="btn">Ir a Kiri Finance →</a>` : ''}
+  </div>
+</body></html>`;
+    res.send(html);
   }
 }
