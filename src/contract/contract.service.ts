@@ -932,45 +932,29 @@ export class ContractService {
 
     const userId = dependency?.principalUserId || tenantId;
 
-    // If application is specified, find the contract for that specific app
-    // Prioritize ACTIVE contracts over PENDING ones
+    // Resolve the contract that governs access. Only ACTIVE contracts grant a plan.
+    // A PENDING contract (e.g. a plan upgrade awaiting signature) must NOT be
+    // returned, so the app keeps applying the previous/free plan until it activates.
     let contract: any = null;
-    if (application) {
-      // Direct query using find with explicit relations
-      const allContracts = await this.contractRepository.find({
-        where: { user: { id: userId } },
-        relations: ['package', 'package.usageLimitVariables'],
-      });
+    const allContracts = await this.contractRepository.find({
+      where: { user: { id: userId } },
+      relations: ['package', 'package.usageLimitVariables'],
+    });
 
-      // Filter by targetApplication and status in JS (most reliable)
+    if (application) {
+      // ACTIVE contract for the requested application (case-insensitive)
       contract = allContracts.find(
         c => c.package?.targetApplication?.toLowerCase() === application.toLowerCase() && c.status === 'ACTIVE'
       );
-
-      // Fallback: any status for the same app
-      if (!contract) {
-        contract = allContracts.find(
-          c => c.package?.targetApplication?.toLowerCase() === application.toLowerCase()
-        );
-      }
-
-      // Fallback: any ACTIVE contract
-      if (!contract) {
-        contract = allContracts.find(c => c.status === 'ACTIVE');
-      }
-
-      // Fallback: any contract
-      if (!contract && allContracts.length > 0) {
-        contract = allContracts[0];
-      }
     } else {
-      contract = await this.contractRepository.findOne({
-        where: { user: { id: userId } },
-        relations: ['package', 'package.usageLimitVariables'],
-      });
+      // No application specified: any ACTIVE contract
+      contract = allContracts.find(c => c.status === 'ACTIVE');
     }
 
     if (!contract) {
+      // No ACTIVE contract for this app → treated as "no plan" (free tier).
+      // Do NOT fall back to PENDING/other-status contracts: an unsigned upgrade
+      // must not unlock the new plan.
       throw new NotFoundException(
         `No se encontró un contrato activo para el tenant '${tenantId}'`,
       );
