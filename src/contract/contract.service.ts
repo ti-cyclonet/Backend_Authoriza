@@ -112,6 +112,8 @@ export class ContractService {
       (contract as any).user = user;
     }
     let recalculatedValue: number | undefined;
+    let downgradedToNonBillableKiri = false;
+    const previousPackage = contract.package;
     if (dto.packageId) {
       const pkg = await this.packageRepository.findOne({ where: { id: dto.packageId } });
       if (!pkg) throw new BadRequestException('Package not found');
@@ -121,6 +123,17 @@ export class ContractService {
       // This ensures free/DEV packages (price 0) reset the value to 0.
       if (dto.value === undefined || dto.value === null) {
         recalculatedValue = (Number(pkg.price) || 0) * 12;
+      }
+      // Detect a Kiri downgrade from a billable plan (e.g. KIRI PLUS) to a
+      // non-billable one (e.g. KIRI DEV / FREE). In that case the user no longer
+      // needs FactoNet self-invoicing access, so it must be revoked.
+      const newIsKiri = (pkg as any).targetApplication === 'Kiri';
+      const newIsNonBillable = (pkg as any).isBillable === false || Number(pkg.price) === 0;
+      const prevWasBillable = previousPackage
+        ? ((previousPackage as any).isBillable !== false && Number(previousPackage.price) > 0)
+        : false;
+      if (newIsKiri && newIsNonBillable && prevWasBillable) {
+        downgradedToNonBillableKiri = true;
       }
     }
 
@@ -163,12 +176,79 @@ export class ContractService {
       );
     }
 
+    // Downgrade Kiri (billable -> non-billable): revoke FactoNet self-invoicing
+    // access for this contract's user and drop the authorized-signer flag.
+    if (downgradedToNonBillableKiri) {
+      await this.revokeKiriFactonetAccess(savedContract).catch((err) =>
+        this.logger.warn(`Error revoking FactoNet access on Kiri downgrade: ${err.message}`),
+      );
+    }
+
     // Si el estado cambió, usar updateStatus para activar/desactivar dependientes
     if (statusChanged) {
       return this.updateStatus(id, dto.status);
     }
 
     return savedContract;
+  }
+
+  /**
+   * Revokes FactoNet self-invoicing access when a Kiri contract is downgraded
+   * from a billable plan (KIRI PLUS) to a non-billable one (KIRI DEV / FREE).
+   * Removes the adminInvoices UserRole tied to this contract and, if the user
+   * has no other billable contract requiring it, clears the authorized-signer flag.
+   */
+  private async revokeKiriFactonetAccess(contract: Contract): Promise<void> {
+    const userId = contract.user?.id;
+    if (!userId) return;
+
+    const manager = this.contractRepository.manager;
+
+    // 1. Find the adminInvoices role id
+    const adminInvoicesRole = await manager
+      .createQueryBuilder()
+      .select('r.id', 'id')
+      .from('rol', 'r')
+      .where('r."strName" = :name', { name: 'adminInvoices' })
+      .getRawOne();
+
+    if (adminInvoicesRole?.id) {
+      // 2. Remove the adminInvoices role tied to THIS contract (this tenant)
+      const result = await manager
+        .createQueryBuilder()
+        .delete()
+        .from('user_roles')
+        .where('"userId" = :userId', { userId })
+        .andWhere('"roleId" = :roleId', { roleId: adminInvoicesRole.id })
+        .andWhere('"contractId" = :contractId', { contractId: contract.id })
+        .execute();
+      this.logger.log(
+        `Revoked FactoNet (adminInvoices) access for user ${userId} on contract ${contract.code} (${result.affected ?? 0} role(s) removed)`,
+      );
+    }
+
+    // 3. If the user has no remaining billable contract, clear the signer flag
+    const remainingBillable = await manager
+      .createQueryBuilder(Contract, 'c')
+      .leftJoin('c.package', 'p')
+      .where('c."userId" = :userId', { userId })
+      .andWhere('c.id != :contractId', { contractId: contract.id })
+      .andWhere('c.status = :status', { status: ContractStatus.ACTIVE })
+      .andWhere('p."isBillable" = true')
+      .andWhere('p.price > 0')
+      .getCount();
+
+    if (remainingBillable === 0) {
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+      if (user && user.isAuthorizedSigner) {
+        user.isAuthorizedSigner = false;
+        await this.userRepository.save(user);
+        this.logger.log(`Cleared authorized-signer flag for user ${userId} (no remaining billable contracts)`);
+      }
+    }
+
+    // 4. Notify InOut/clients to refresh caches
+    this.invalidateClientCaches(userId).catch(() => {});
   }
 
   /**
