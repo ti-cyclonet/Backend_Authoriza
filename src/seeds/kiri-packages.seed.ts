@@ -76,6 +76,12 @@ export default class KiriPackagesSeed {
           packageId: freePkg.id,
         });
         await ulvRepo.save(ulv);
+      } else if (existing.limitType !== varData.limitType || existing.maxValue !== varData.maxValue) {
+        // Keep existing records in sync (e.g. fix legacy limitType='quantity')
+        existing.limitType = varData.limitType;
+        existing.maxValue = varData.maxValue;
+        existing.displayName = varData.displayName;
+        await ulvRepo.save(existing);
       }
     }
     console.log('  ✅ Variables KIRI FREE configuradas');
@@ -157,6 +163,12 @@ export default class KiriPackagesSeed {
           packageId: plusPkg.id,
         });
         await ulvRepo.save(ulv);
+      } else if (existing.limitType !== varData.limitType || existing.maxValue !== varData.maxValue) {
+        // Keep existing records in sync (e.g. fix legacy limitType='quantity')
+        existing.limitType = varData.limitType;
+        existing.maxValue = varData.maxValue;
+        existing.displayName = varData.displayName;
+        await ulvRepo.save(existing);
       }
     }
     console.log('  ✅ Variables KIRI PLUS configuradas');

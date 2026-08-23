@@ -264,6 +264,12 @@ export default class DevPackagesSeed {
           limitType: 'feature',
           packageId: pkg.id,
         }));
+      } else if (existing.limitType !== 'feature' || existing.maxValue !== 1) {
+        // Keep existing records in sync (fix legacy limitType='quantity')
+        existing.limitType = 'feature';
+        existing.maxValue = 1;
+        existing.displayName = featureNames[variableName] || variableName;
+        await ulvRepo.save(existing);
       }
     }
   }

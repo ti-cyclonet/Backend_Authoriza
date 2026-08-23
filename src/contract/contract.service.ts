@@ -111,10 +111,17 @@ export class ContractService {
       if (!user) throw new BadRequestException('User not found');
       (contract as any).user = user;
     }
+    let recalculatedValue: number | undefined;
     if (dto.packageId) {
       const pkg = await this.packageRepository.findOne({ where: { id: dto.packageId } });
       if (!pkg) throw new BadRequestException('Package not found');
       (contract as any).package = pkg;
+      // When the package changes and no explicit value is provided, recalculate
+      // the contract value from the new package price (annual = price * 12).
+      // This ensures free/DEV packages (price 0) reset the value to 0.
+      if (dto.value === undefined || dto.value === null) {
+        recalculatedValue = (Number(pkg.price) || 0) * 12;
+      }
     }
 
     // Determine the effective mode: use dto.mode if provided, otherwise keep the existing contract mode
@@ -139,7 +146,7 @@ export class ContractService {
     const statusChanged = dto.status && dto.status !== contract.status;
 
     Object.assign(contract, {
-      value: dto.value ?? contract.value,
+      value: dto.value ?? recalculatedValue ?? contract.value,
       mode: dto.mode ?? contract.mode,
       payday: dto.payday ?? contract.payday,
       startDate: dto.startDate ?? contract.startDate,
@@ -553,18 +560,27 @@ export class ContractService {
         this.logger.warn(`Failed to send contract activated email: ${err.message}`)
       );
 
-      // Cancel any other contracts for the same user + same application (old plan)
+      // Cancel any other contracts for the same user + same application (old plan).
+      // Wrapped in try/catch: a failure here must NOT block the Kiri reactivation
+      // webhook or the welcome email that follow.
       if (contract.package?.targetApplication) {
-        await this.contractRepository
-          .createQueryBuilder()
-          .update(Contract)
-          .set({ status: ContractStatus.CANCELLED })
-          .where('"userId" = :userId', { userId: principalUserId })
-          .andWhere('id != :contractId', { contractId: contract.id })
-          .andWhere('"packageId" IN (SELECT id FROM package WHERE "targetApplication" = :app)', { app: contract.package.targetApplication })
-          .andWhere('status = :activeStatus', { activeStatus: ContractStatus.ACTIVE })
-          .execute();
-        this.logger.log(`Cancelled old contracts for user ${principalUserId} in app ${contract.package.targetApplication}`);
+        try {
+          await this.contractRepository
+            .createQueryBuilder()
+            .update(Contract)
+            .set({ status: ContractStatus.CANCELLED })
+            .where('"userId" = :userId', { userId: principalUserId })
+            .andWhere('id != :contractId', { contractId: contract.id })
+            .andWhere(
+              '"packageId" IN (SELECT "id" FROM "package" WHERE "targetApplication" = :app)',
+              { app: contract.package.targetApplication },
+            )
+            .andWhere('status = :activeStatus', { activeStatus: ContractStatus.ACTIVE })
+            .execute();
+          this.logger.log(`Cancelled old contracts for user ${principalUserId} in app ${contract.package.targetApplication}`);
+        } catch (err) {
+          this.logger.warn(`Failed to cancel old contracts for user ${principalUserId}: ${err.message}`);
+        }
       }
 
       // Notify Kiri to reactivate local user (for Kiri app contracts)
