@@ -46,6 +46,11 @@ export default class DevPackagesSeed {
     await this.createKiriDev(packageRepo, ulvRepo, configRepo, rolRepo, entityCodeService);
 
     // ================================================================
+    // 5. SHOTRA DEV
+    // ================================================================
+    await this.createShotraDev(packageRepo, ulvRepo, configRepo, rolRepo, entityCodeService);
+
+    // ================================================================
     // Asignar contratos DEV al usuario admin (ti.cyclonet@hotmail.com)
     // ================================================================
     await this.assignAdminContracts(dataSource, packageRepo, entityCodeService);
@@ -299,6 +304,90 @@ export default class DevPackagesSeed {
   }
 
   // ─────────────────────────────────────────────────────────────────
+  // SHOTRA DEV — Acceso completo a Shotra
+  // ─────────────────────────────────────────────────────────────────
+  private async createShotraDev(
+    packageRepo: any, ulvRepo: any, configRepo: any, rolRepo: any, entityCodeService: EntityCodeService,
+  ) {
+    const name = 'SHOTRA DEV';
+    let pkg = await packageRepo.findOne({ where: { name } });
+
+    if (!pkg) {
+      const code = await entityCodeService.generateCode('Package');
+      pkg = packageRepo.create({
+        name,
+        code,
+        displayName: 'SHOTRA DEV',
+        description: 'Acceso completo a Shotra. Para desarrollo y testing.',
+        price: 0,
+        isBillable: false,
+        showInLanding: false,
+        displayOrder: 99,
+        isHighlighted: false,
+        ctaLabel: '',
+        ctaType: 'register',
+      });
+      pkg.targetApplication = 'Shotra';
+      await packageRepo.save(pkg);
+      console.log('  ✅ SHOTRA DEV creado:', pkg.id);
+    } else {
+      console.log('  ⚠️ SHOTRA DEV ya existe:', pkg.id);
+    }
+
+    const roles = [
+      { strName: 'adminShotra', totalAccount: 1 },
+    ];
+    await this.assignRolesToPackage(configRepo, rolRepo, pkg, roles);
+
+    // Todas las features habilitadas
+    const features = [
+      'basicMessaging', 'basicProfile', 'ratings',
+      'priorityMatching', 'featuredProvider', 'analytics',
+      'unlimitedProposals', 'verifiedBadge',
+    ];
+    const featureNames: Record<string, string> = {
+      basicMessaging: 'Mensajería básica',
+      basicProfile: 'Perfil básico',
+      ratings: 'Evaluaciones',
+      priorityMatching: 'Matching prioritario',
+      featuredProvider: 'Perfil destacado',
+      analytics: 'Analytics de rendimiento',
+      unlimitedProposals: 'Propuestas ilimitadas',
+      verifiedBadge: 'Insignia verificado',
+    };
+
+    for (const variableName of features) {
+      const existing = await ulvRepo.findOne({ where: { packageId: pkg.id, variableName } });
+      if (!existing) {
+        await ulvRepo.save(ulvRepo.create({
+          variableName,
+          displayName: featureNames[variableName] || variableName,
+          maxValue: 1,
+          targetApplication: 'Shotra',
+          limitType: 'feature',
+          packageId: pkg.id,
+        }));
+      } else if (existing.limitType !== 'feature' || existing.maxValue !== 1) {
+        existing.limitType = 'feature';
+        existing.maxValue = 1;
+        await ulvRepo.save(existing);
+      }
+    }
+
+    // Límites de cantidad sin restricción
+    const quantities = [
+      { variableName: 'nSolicitudes', displayName: 'Solicitudes por mes', maxValue: 99999 },
+      { variableName: 'nPropuestas', displayName: 'Propuestas por mes', maxValue: 99999 },
+    ];
+    for (const q of quantities) {
+      const existing = await ulvRepo.findOne({ where: { packageId: pkg.id, variableName: q.variableName } });
+      if (!existing) {
+        await ulvRepo.save(ulvRepo.create({ ...q, targetApplication: 'Shotra', limitType: 'quantity', packageId: pkg.id }));
+      }
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────
   // Asignar contratos DEV al usuario admin (ti.cyclonet@hotmail.com)
   // ─────────────────────────────────────────────────────────────────
   private async assignAdminContracts(
@@ -318,7 +407,7 @@ export default class DevPackagesSeed {
     }
 
     // Crear un contrato por cada paquete DEV
-    const devPackages = ['AUTHORIZA DEV', 'FACTONET DEV', 'INOUT DEV', 'KIRI DEV'];
+    const devPackages = ['AUTHORIZA DEV', 'FACTONET DEV', 'INOUT DEV', 'KIRI DEV', 'SHOTRA DEV'];
 
     for (const pkgName of devPackages) {
       const pkg = await packageRepo.findOne({ where: { name: pkgName } });

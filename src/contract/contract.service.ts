@@ -851,7 +851,10 @@ export class ContractService {
       // Owner users with isAuthorizedSigner can operate alone without dependents
       const ownerCanSignAlone = contract.user?.isAuthorizedSigner === true;
 
-      if (!ownerCanSignAlone) {
+      // Paquetes no facturables (DEV, FREE) se activan directamente sin dependientes, PDF ni firma.
+      const isNonBillable = contract.package?.isBillable === false || Number(contract.package?.price) === 0;
+
+      if (!isNonBillable && !ownerCanSignAlone) {
         const dependentUsers = await this.userRepository
           .createQueryBuilder('user')
           .innerJoin('user.principals', 'dependency')
@@ -866,19 +869,19 @@ export class ContractService {
         }
       }
 
-      if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
+      if (!isNonBillable && (!contract.pdfUrl || contract.pdfUrl.trim() === '')) {
         throw new BadRequestException(
           'Cannot activate contract. Contract PDF must be generated before activation.',
         );
       }
 
-      if (!contract.issuedAt) {
+      if (!isNonBillable && !contract.issuedAt) {
         throw new BadRequestException(
           'Cannot activate contract. The contract must be issued (PDF generated) first.',
         );
       }
 
-      if (!contract.signedAt) {
+      if (!isNonBillable && !contract.signedAt) {
         throw new BadRequestException(
           'Cannot activate contract. The contract must be signed before activation.',
         );
@@ -909,6 +912,29 @@ export class ContractService {
         contract.id,
         { contractCode: contract.code, userEmail: contract.user.strUserName },
       );
+
+      // Asignar los roles configurados en el paquete al usuario del contrato
+      try {
+        const packageConfigs = await this.contractRepository.manager.query(
+          `SELECT cp."rolId" FROM configuration_package cp WHERE cp."packageId" = $1`,
+          [contract.package?.id],
+        );
+        for (const config of packageConfigs) {
+          const existingRole = await this.contractRepository.manager.query(
+            `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 AND "contractId" = $3`,
+            [contract.user.id, config.rolId, contract.id],
+          );
+          if (!existingRole || existingRole.length === 0) {
+            await this.contractRepository.manager.query(
+              `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status) VALUES (gen_random_uuid(), $1, $2, $3, 'ACTIVE')`,
+              [contract.user.id, config.rolId, contract.id],
+            );
+            this.logger.log(`Role ${config.rolId} assigned to user ${contract.user.id} for contract ${contract.code}`);
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to assign package roles on activation: ${(err as Error).message}`);
+      }
 
       await this.logsService.info(
         LogAction.USER_ACTIVATED,

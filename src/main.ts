@@ -13,6 +13,7 @@ import InoutProPackageSeed from './seeds/inout-pro-package.seed';
 import InoutEnterprisePackageSeed from './seeds/inout-enterprise-package.seed';
 import KiriPackagesSeed from './seeds/kiri-packages.seed';
 import DevPackagesSeed from './seeds/dev-packages.seed';
+import ShotraPackagesSeed from './seeds/shotra-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
 import InoutParametersSeed from './seeds/inout-parameters.seed';
 import { NotificationsService } from './notifications/notifications.service';
@@ -27,6 +28,8 @@ async function bootstrap() {
       'http://localhost:4201',
       'http://localhost:4202',
       'http://localhost:4203',
+      'http://localhost:8081',
+      'http://localhost:19006',
       'http://localhost:9002',
       'http://localhost:9100',
       'http://localhost',
@@ -94,6 +97,9 @@ async function bootstrap() {
 
   const devPackagesSeed = new DevPackagesSeed();
   await devPackagesSeed.run(dataSource);
+
+  const shotraPackagesSeed = new ShotraPackagesSeed();
+  await shotraPackagesSeed.run(dataSource);
 
   // Seed de plantillas de email
   const notificationsService = app.get(NotificationsService);
