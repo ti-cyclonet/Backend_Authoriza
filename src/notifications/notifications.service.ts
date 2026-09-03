@@ -496,6 +496,51 @@ export class NotificationsService {
       this.logger.log('KIRI_VERIFICATION template seeded');
     }
 
+    // SHOTRA verification template
+    const shotraVerificationTpl = await this.templateRepo.findOne({ where: { code: 'SHOTRA_VERIFICATION' } });
+    if (!shotraVerificationTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'SHOTRA_VERIFICATION',
+          subject: 'Confirma tu correo - SHOTRA',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0e0f11;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:24px auto;background:#161616;border-radius:16px;overflow:hidden;box-shadow:0 8px 30px rgba(0,0,0,0.5);border:1px solid #262626;">
+    <tr>
+      <td style="background:#0e0f11;padding:40px 32px;text-align:center;border-bottom:1px solid #262626;">
+        <div style="display:inline-block;width:64px;height:64px;background:rgba(78,205,196,0.15);border-radius:18px;line-height:64px;font-size:32px;">🤝</div>
+        <h1 style="color:#ffffff;margin:16px 0 4px;font-size:24px;font-weight:800;">SHOTRA</h1>
+        <p style="color:rgba(255,255,255,0.5);margin:0;font-size:13px;">Conectamos soluciones con quienes las necesitan</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:40px 36px 32px;">
+        <h2 style="color:#ffffff;margin:0 0 20px;font-size:22px;font-weight:700;">¡Bienvenido a SHOTRA! 🎉</h2>
+        <p style="color:#cccccc;line-height:1.7;margin:0 0 12px;font-size:15px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#cccccc;line-height:1.7;margin:0 0 28px;font-size:15px;">Gracias por unirte a <strong>SHOTRA</strong>. Para activar tu cuenta y empezar a ofrecer o solicitar servicios, confirma tu correo electrónico:</p>
+        <div style="text-align:center;margin:32px 0;">
+          <a href="{{verificationUrl}}" style="display:inline-block;background:#4ecdc4;color:#04211f;text-decoration:none;padding:15px 52px;border-radius:50px;font-size:15px;font-weight:800;">Verificar mi correo</a>
+        </div>
+        <p style="color:#888;font-size:12px;text-align:center;margin:24px 0 8px;">Este enlace es válido por <strong>24 horas</strong>.</p>
+        <p style="color:#666;font-size:12px;text-align:center;margin:0;">Si no creaste esta cuenta, puedes ignorar este mensaje.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#0e0f11;padding:20px 32px;border-top:1px solid #262626;">
+        <p style="color:#888;margin:0;font-size:11px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — SHOTRA</p>
+        <p style="color:#666;margin:6px 0 0;font-size:11px;text-align:center;">shotra.cyclonet.com.co</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('SHOTRA_VERIFICATION template seeded');
+    }
+
     // Kiri Plus welcome (paid plan activated)
     const kiriPlusWelcomeTpl = await this.templateRepo.findOne({ where: { code: 'KIRI_PLUS_WELCOME' } });
     if (!kiriPlusWelcomeTpl) {
