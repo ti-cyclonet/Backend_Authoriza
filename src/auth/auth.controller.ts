@@ -190,6 +190,23 @@ export class AuthController {
     return this.selfRegistrationService.registerKiriUser(body);
   }
 
+  @ApiOperation({ summary: 'Register a Shotra user with email verification' })
+  @Public()
+  @Post('register-shotra')
+  async registerShotra(@Body() body: {
+    email: string; password: string; firstName: string; secondName?: string;
+    firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string; phone?: string;
+  }) {
+    return this.selfRegistrationService.registerShotraUser(body);
+  }
+
+  @ApiOperation({ summary: 'Verify Shotra user email (POST, para clientes móviles)' })
+  @Public()
+  @Post('verify-shotra')
+  async verifyShotra(@Body() body: { email: string; code: string }) {
+    return this.selfRegistrationService.verifyShotraUser(body.email, body.code);
+  }
+
   @ApiOperation({ summary: 'Verify Kiri user email via link (GET)' })
   @Public()
   @Get('verify-kiri')
@@ -221,6 +238,42 @@ export class AuthController {
     <h1>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'}</h1>
     <p>${isSuccess ? 'Tu cuenta de Kiri Finance ha sido activada. Ya puedes iniciar sesión y empezar a organizar tus finanzas.' : (result.message || 'No se pudo verificar tu cuenta.')}</p>
     ${isSuccess ? `<a href="${kiriUrl}" class="btn">Ir a Kiri Finance →</a>` : ''}
+  </div>
+</body></html>`;
+    res.send(html);
+  }
+
+  @ApiOperation({ summary: 'Verify Shotra user email via link (GET)' })
+  @Public()
+  @Get('verify-shotra')
+  @Header('Content-Type', 'text/html')
+  async verifyShotraViaLink(@Query('email') email: string, @Query('code') code: string, @Res() res: Response) {
+    let result: any;
+    try {
+      result = await this.selfRegistrationService.verifyShotraUser(email, code);
+    } catch (err) {
+      result = { success: false, message: err.message || 'Error de verificación' };
+    }
+    const isSuccess = result.success;
+    const shotraUrl = process.env.SHOTRA_LOGIN_URL || 'https://shotra.cyclonet.com.co/login';
+    const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'} - SHOTRA</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#0e0f11;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1rem}
+  .card{background:#161616;border-radius:20px;padding:3rem 2.5rem;max-width:440px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:1px solid #262626}
+  .icon{width:80px;height:80px;background:${isSuccess ? 'rgba(78,205,196,0.15)' : 'rgba(243,156,18,0.15)'};border-radius:24px;line-height:80px;font-size:40px;margin:0 auto 1.5rem}
+  h1{color:#fff;font-size:1.5rem;margin-bottom:0.75rem;font-weight:800}
+  p{color:#aaa;font-size:0.95rem;margin-bottom:1.5rem;line-height:1.6}
+  .btn{display:inline-block;padding:0.85rem 2.5rem;background:#4ecdc4;color:#04211f;text-decoration:none;border-radius:50px;font-weight:800;font-size:0.95rem}
+</style></head>
+<body>
+  <div class="card">
+    <div class="icon">${isSuccess ? '✅' : '⚠️'}</div>
+    <h1>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'}</h1>
+    <p>${isSuccess ? 'Tu cuenta de SHOTRA ha sido activada. Ya puedes iniciar sesión en la app y empezar a conectar soluciones.' : (result.message || 'No se pudo verificar tu cuenta.')}</p>
+    ${isSuccess ? `<a href="${shotraUrl}" class="btn">Ir a SHOTRA →</a>` : ''}
   </div>
 </body></html>`;
     res.send(html);

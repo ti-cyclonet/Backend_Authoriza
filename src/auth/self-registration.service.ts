@@ -1327,6 +1327,282 @@ export class SelfRegistrationService {
     return { success: true, message: '¡Cuenta verificada! Ya puedes acceder a Kiri Finance.' };
   }
 
+  /**
+   * Registra un usuario de SHOTRA en Authoriza con verificación por email.
+   * Un solo usuario (persona natural). Idempotente por email: si ya existe (por
+   * otra aplicación del ecosistema) NO lo recrea; devuelve alreadyExists para que
+   * el contrato de Shotra se cree al verificar.
+   */
+  async registerShotraUser(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    secondName?: string;
+    firstSurname: string;
+    secondSurname?: string;
+    documentType?: string;
+    documentNumber?: string;
+    phone?: string;
+  }) {
+    if (!data.email || !data.password || !data.firstName || !data.firstSurname) {
+      throw new BadRequestException('Nombre, apellido, email y contraseña son obligatorios.');
+    }
+
+    const existing = await this.userRepository.findOne({
+      where: { strUserName: data.email },
+      relations: ['basicData'],
+    });
+
+    // Usuario ya existe (posiblemente por otra app). No lo recreamos.
+    // Si aún no está verificado, reenviamos código; el contrato de Shotra se
+    // creará al verificar (verifyShotraUser).
+    if (existing) {
+      if (!existing.isVerified) {
+        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const verificationExpires = new Date();
+        verificationExpires.setHours(verificationExpires.getHours() + 24);
+        existing.verificationCode = verificationCode;
+        existing.verificationExpires = verificationExpires;
+        await this.userRepository.save(existing);
+        await this.sendShotraVerificationEmail(data.email, data.firstName, verificationCode);
+        return {
+          success: true,
+          message: 'Ya tienes una cuenta pendiente de verificar. Te reenviamos el correo.',
+          verificationRequired: true,
+          alreadyExists: true,
+          userId: existing.id,
+        };
+      }
+      // Ya verificado: el usuario existe y está activo en el ecosistema.
+      // Creamos directamente el contrato de Shotra (idempotente) sin re-verificar.
+      await this.ensureShotraContractAndRoles(existing.id);
+      return {
+        success: true,
+        message: 'Tu cuenta ya está verificada. Se habilitó el acceso a Shotra.',
+        verificationRequired: false,
+        alreadyExists: true,
+        userId: existing.id,
+      };
+    }
+
+    // Validar unicidad de documento (si viene)
+    const docType = await this.documentTypeRepository.findOne({
+      where: { documentType: data.documentType || 'CC' },
+    });
+    if (data.documentNumber && docType) {
+      const existingDoc = await this.basicDataRepository.findOne({
+        where: { documentTypeId: docType.id, documentNumber: data.documentNumber },
+        relations: ['user'],
+      });
+      if (existingDoc) {
+        throw new ConflictException(
+          `El documento ${data.documentType || 'CC'} ${data.documentNumber} ya está registrado.`,
+        );
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const code = await this.entityCodeService.generateCode('User');
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpires = new Date();
+    verificationExpires.setHours(verificationExpires.getHours() + 24);
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const newUser = manager.create(User, {
+        strUserName: data.email,
+        strPassword: hashedPassword,
+        code,
+        strStatus: 'UNCONFIRMED',
+        isVerified: false,
+        // Persona individual: puede operar sola (sin dependientes)
+        isAuthorizedSigner: true,
+        mustChangePassword: false,
+        lastPasswordChange: new Date(),
+        verificationCode,
+        verificationExpires,
+      });
+      const savedUser = await manager.save(newUser);
+
+      const basicData = manager.create(BasicData, {
+        strPersonType: 'N' as const,
+        strStatus: 'ACTIVE',
+        documentTypeId: docType?.id || null,
+        documentNumber: data.documentNumber || '',
+        user: savedUser,
+      });
+      const savedBasicData = await manager.save(basicData);
+
+      savedUser.basicData = savedBasicData;
+      await manager.save(savedUser);
+
+      const naturalData = manager.create(NaturalPersonData, {
+        firstName: data.firstName,
+        secondName: data.secondName || null,
+        firstSurname: data.firstSurname,
+        secondSurname: data.secondSurname || null,
+        basicData: savedBasicData,
+      });
+      await manager.save(naturalData);
+
+      return savedUser;
+    });
+
+    await this.sendShotraVerificationEmail(data.email, data.firstName, verificationCode);
+
+    return {
+      success: true,
+      message: 'Registro exitoso. Revisa tu correo para verificar tu cuenta.',
+      verificationRequired: true,
+      userId: result.id,
+    };
+  }
+
+  /** Envía el correo de verificación con branding Shotra. */
+  private async sendShotraVerificationEmail(email: string, firstName: string, verificationCode: string) {
+    try {
+      const apiBaseUrl = process.env.VERIFICATION_BASE_URL || process.env.BACKEND_URL || 'http://localhost:3000/api';
+      const verificationUrl = `${apiBaseUrl}/auth/verify-shotra?email=${encodeURIComponent(email)}&code=${verificationCode}`;
+      const year = new Date().getFullYear().toString();
+      await this.notificationsService.sendByTemplate('SHOTRA_VERIFICATION', email, {
+        customerName: firstName,
+        verificationUrl,
+        year,
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to send Shotra verification email: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Verifica el email de un usuario de Shotra. Lo activa y crea el contrato
+   * SHOTRA FREE + roles (userShotra + adminInvoices) sin tocar otras apps.
+   */
+  async verifyShotraUser(email: string, code: string) {
+    const user = await this.userRepository.findOne({ where: { strUserName: email } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    if (!user.isVerified) {
+      if (user.verificationCode !== code) {
+        throw new BadRequestException('Código de verificación inválido.');
+      }
+      if (user.verificationExpires && new Date() > user.verificationExpires) {
+        throw new BadRequestException('El código ha expirado. Solicita uno nuevo.');
+      }
+      user.isVerified = true;
+      user.verificationCode = null;
+      user.verificationExpires = null;
+      user.strStatus = 'ACTIVE';
+      await this.userRepository.save(user);
+    }
+
+    // Crear (idempotente) el contrato de Shotra y asignar roles.
+    await this.ensureShotraContractAndRoles(user.id);
+
+    return { success: true, message: '¡Cuenta verificada! Ya puedes acceder a Shotra.' };
+  }
+
+  /**
+   * Crea el contrato SHOTRA FREE (si el usuario aún no tiene uno) y asigna los
+   * roles userShotra (desde configuration_package) + adminInvoices (FactoNet).
+   * NO toca contratos ni roles de otras aplicaciones. Idempotente.
+   */
+  private async ensureShotraContractAndRoles(userId: string) {
+    const freePkg = await this.packageRepository.findOne({
+      where: { name: 'SHOTRA FREE' },
+      relations: ['usageLimitVariables'],
+    });
+    if (!freePkg) {
+      this.logger.warn('Paquete SHOTRA FREE no encontrado; no se puede crear el contrato de Shotra.');
+      return;
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      // ¿Ya tiene un contrato para un paquete de Shotra? (evitar duplicados)
+      const existingShotraContract = await manager
+        .createQueryBuilder(Contract, 'c')
+        .innerJoin('c.package', 'p')
+        .where('c."userId" = :userId', { userId })
+        .andWhere('p."targetApplication" = :app', { app: 'Shotra' })
+        .getOne();
+
+      let contractId: string;
+
+      if (existingShotraContract) {
+        contractId = existingShotraContract.id;
+        if (existingShotraContract.status !== ContractStatus.ACTIVE) {
+          existingShotraContract.status = ContractStatus.ACTIVE;
+          await manager.save(existingShotraContract);
+        }
+      } else {
+        const contractCode = await this.entityCodeService.generateCode('Contract');
+        const userForPrefix = await manager.findOne(User, {
+          where: { id: userId },
+          relations: ['basicData', 'basicData.naturalPersonData'],
+        });
+        const nameForPrefix =
+          userForPrefix?.basicData?.naturalPersonData?.firstName ||
+          userForPrefix?.strUserName?.split('@')[0] ||
+          'SHOTRA';
+        const codePrefix = await this.generateUniqueCodePrefix(nameForPrefix, manager);
+
+        const contract = manager.create(Contract, {
+          code: contractCode,
+          user: { id: userId } as any,
+          package: { id: freePkg.id } as any,
+          value: 0,
+          mode: PaymentMode.MONTHLY,
+          payday: 1,
+          startDate: new Date(),
+          // SHOTRA FREE es no facturable -> se activa directamente
+          status: ContractStatus.ACTIVE,
+          issuedAt: new Date(),
+          codePrefix,
+          businessSector: 'personal',
+        });
+        const savedContract = await manager.save(contract);
+        contractId = savedContract.id;
+      }
+
+      // Asignar roles del paquete (userShotra) desde configuration_package
+      const packageConfigs = await manager.query(
+        `SELECT cp."rolId" FROM configuration_package cp WHERE cp."packageId" = $1`,
+        [freePkg.id],
+      );
+      for (const config of packageConfigs) {
+        const existingRole = await manager.query(
+          `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 AND "contractId" = $3`,
+          [userId, config.rolId, contractId],
+        );
+        if (!existingRole || existingRole.length === 0) {
+          await manager.query(
+            `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status) VALUES (gen_random_uuid(), $1, $2, $3, 'ACTIVE')`,
+            [userId, config.rolId, contractId],
+          );
+        }
+      }
+
+      // Asignar adminInvoices (FactoNet) para autogestión de facturas
+      const adminInvoicesRole = await manager.findOne(Rol, { where: { strName: 'adminInvoices' } });
+      if (adminInvoicesRole) {
+        const existingFactonet = await manager.query(
+          `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 AND "contractId" = $3`,
+          [userId, adminInvoicesRole.id, contractId],
+        );
+        if (!existingFactonet || existingFactonet.length === 0) {
+          await manager.query(
+            `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status) VALUES (gen_random_uuid(), $1, $2, $3, 'ACTIVE')`,
+            [userId, adminInvoicesRole.id, contractId],
+          );
+        }
+      }
+
+      // Asegurar que el usuario quede ACTIVE
+      await manager.update(User, { id: userId }, { strStatus: 'ACTIVE' });
+    });
+
+    this.logger.log(`Contrato SHOTRA FREE + roles asignados a usuario ${userId}`);
+  }
+
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {
     const { name, email, phone, subject, message } = data;
 
