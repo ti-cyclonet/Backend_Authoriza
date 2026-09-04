@@ -14,6 +14,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    return { id: payload.sub, email: payload.email, tenantId: payload.tenantId };
+    // Conservar rol y contractId para que el scope por-contrato elegido en el login
+    // esté disponible en la sesión (no depender solo de tenantId).
+    return {
+      id: payload.sub,
+      email: payload.email,
+      tenantId: payload.tenantId,
+      rol: payload.rol,
+      contractId: payload.contractId,
+    };
   }
 }

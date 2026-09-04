@@ -287,23 +287,13 @@ export class ContractService {
     });
     if (!contract) throw new NotFoundException(`Contract with id ${id} not found`);
 
-    // Desactivar usuario principal y dependientes antes de eliminar
+    // Desactivar SOLO el acceso ligado a este contrato (no rompe otras apps del usuario)
     if (contract.user) {
-      await this.userRepository.update({ id: contract.user.id }, { strStatus: 'INACTIVE' });
-
-      await this.userRepository
-        .createQueryBuilder()
-        .update(User)
-        .set({ strStatus: 'INACTIVE' })
-        .where(
-          'id IN (SELECT "dependentUserId" FROM user_dependencies WHERE "principalUserId" = :principalId AND status = :status)',
-          { principalId: contract.user.id, status: 'ACTIVE' },
-        )
-        .execute();
+      await this.deactivateContractScope(contract.id, contract.user.id);
 
       await this.logsService.info(
         LogAction.USER_DEACTIVATED,
-        `User ${contract.user.strUserName} and dependents deactivated due to contract deletion`,
+        `Roles for contract ${contract.code} deactivated due to contract deletion`,
         contract.user.id,
         contract.id,
       );
@@ -892,7 +882,13 @@ export class ContractService {
     const savedContract = await this.contractRepository.save(contract);
 
     if (status === ContractStatus.ACTIVE) {
-      // Activate principal user and dependents
+      // Reactivar los roles ligados a ESTE contrato (por si fueron desactivados antes)
+      await this.contractRepository.manager.query(
+        `UPDATE user_roles SET status = 'ACTIVE' WHERE "contractId" = $1`,
+        [contract.id],
+      );
+
+      // Activate principal user and dependents (solo pone ACTIVE; no rompe otras apps)
       await this.userRepository.update({ id: contract.user.id }, { strStatus: 'ACTIVE' });
 
       await this.userRepository
@@ -963,17 +959,11 @@ export class ContractService {
         );
       }
     } else {
-      await this.userRepository.update({ id: contract.user.id }, { strStatus: 'INACTIVE' });
-
-      await this.userRepository
-        .createQueryBuilder()
-        .update(User)
-        .set({ strStatus: 'INACTIVE' })
-        .where(
-          'id IN (SELECT "dependentUserId" FROM user_dependencies WHERE "principalUserId" = :principalId AND status = :status)',
-          { principalId: contract.user.id, status: 'ACTIVE' },
-        )
-        .execute();
+      // Desactivación AISLADA AL CONTRATO: solo se desactivan los roles ligados a
+      // ESTE contrato. El strStatus global del usuario solo cae a INACTIVE si no le
+      // queda ningún otro rol activo (en ninguna otra app/contrato). Así una app no
+      // rompe el acceso a las demás.
+      await this.deactivateContractScope(contract.id, contract.user.id);
 
       await this.logsService.info(
         LogAction.CONTRACT_DEACTIVATED,
@@ -992,6 +982,64 @@ export class ContractService {
     }
 
     return savedContract;
+  }
+
+  /**
+   * Desactiva el acceso ligado a UN contrato específico, sin afectar el acceso
+   * del usuario (ni sus dependientes) a otras aplicaciones/contratos.
+   *
+   * - Marca user_roles.status = 'INACTIVE' SOLO para las filas de este contractId
+   *   (del principal y de los dependientes ligados a ese contrato).
+   * - Recalcula el strStatus global del usuario y de cada dependiente: solo queda
+   *   INACTIVE si NO le queda ningún otro rol ACTIVE en ninguna app/contrato.
+   */
+  private async deactivateContractScope(contractId: string, principalUserId: string): Promise<void> {
+    const manager = this.contractRepository.manager;
+
+    // 1. Usuarios afectados por este contrato: el titular + dependientes con rol en este contrato
+    const affected: Array<{ userId: string }> = await manager.query(
+      `SELECT DISTINCT "userId" FROM user_roles WHERE "contractId" = $1`,
+      [contractId],
+    );
+    const affectedIds = new Set<string>(affected.map((r) => r.userId));
+    affectedIds.add(principalUserId);
+
+    // 2. Desactivar SOLO los roles de este contrato
+    await manager.query(
+      `UPDATE user_roles SET status = 'INACTIVE' WHERE "contractId" = $1`,
+      [contractId],
+    );
+
+    // 3. Recalcular el estado global de cada usuario afectado
+    for (const userId of affectedIds) {
+      await this.recomputeUserGlobalStatus(userId);
+    }
+  }
+
+  /**
+   * Recalcula user.strStatus según sus roles: si tiene al menos un user_roles
+   * ACTIVE, queda 'ACTIVE'; si no le queda ninguno, 'INACTIVE'. No pisa estados
+   * especiales de verificación (UNCONFIRMED).
+   */
+  private async recomputeUserGlobalStatus(userId: string): Promise<void> {
+    const manager = this.contractRepository.manager;
+
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) return;
+    // No tocar usuarios que están en proceso de verificación
+    if (user.strStatus === 'UNCONFIRMED' || user.strStatus === 'CONFIRMED') return;
+
+    const activeRoles: Array<{ cnt: string }> = await manager.query(
+      `SELECT COUNT(*)::int AS cnt FROM user_roles WHERE "userId" = $1 AND status = 'ACTIVE'`,
+      [userId],
+    );
+    const hasActive = Number(activeRoles?.[0]?.cnt || 0) > 0;
+    const newStatus = hasActive ? 'ACTIVE' : 'INACTIVE';
+
+    if (user.strStatus !== newStatus) {
+      await this.userRepository.update({ id: userId }, { strStatus: newStatus });
+      this.logger.log(`User ${userId} global status recomputed to ${newStatus} (activeRoles=${hasActive})`);
+    }
   }
 
   private getCustomerName(contract: Contract): string {
