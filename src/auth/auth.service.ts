@@ -76,27 +76,35 @@ export class AuthService {
     }
 
     // 5. Validar si su rol está dentro de los roles válidos
-    // Buscar roles activos del usuario para la aplicación solicitada
-    const userActiveRoles = user.userRoles?.filter(ur => 
-      ur.status === 'ACTIVE' && 
-      validRoles.includes(ur.role?.strName)
+    // Roles que no habilitan inicio de sesión en aplicaciones (solo administrativos)
+    const blockedRoles = ['accountOwner'];
+
+    // Buscar roles activos del usuario para la aplicación solicitada,
+    // EXCLUYENDO los roles bloqueados. Así, si el usuario tiene accountOwner
+    // PERO también un rol válido (ej. userShotra), no se le bloquea el login:
+    // simplemente se ignora el rol administrativo.
+    const userActiveRoles = user.userRoles?.filter(ur =>
+      ur.status === 'ACTIVE' &&
+      validRoles.includes(ur.role?.strName) &&
+      !blockedRoles.includes(ur.role?.strName)
     ) || [];
 
     if (userActiveRoles.length === 0) {
+      // ¿Tenía solo roles bloqueados (accountOwner) para esta app? Mensaje claro.
+      const hadOnlyBlocked = (user.userRoles || []).some(ur =>
+        ur.status === 'ACTIVE' &&
+        validRoles.includes(ur.role?.strName) &&
+        blockedRoles.includes(ur.role?.strName)
+      );
+      if (hadOnlyBlocked) {
+        throw new UnauthorizedException('This account type cannot log in to applications');
+      }
       throw new UnauthorizedException('UNAUTHORIZED');
     }
 
-    // 5.1 Bloquear roles administrativos (accountOwner no puede iniciar sesión)
-    const blockedRoles = ['accountOwner'];
-    const hasBlockedRole = userActiveRoles.some(ur => 
-      blockedRoles.includes(ur.role?.strName)
-    );
-
-    if (hasBlockedRole) {
-      throw new UnauthorizedException('This account type cannot log in to applications');
-    }
-
-    // Detectar múltiples contratos
+    // Detectar múltiples contratos (para esta app) y forzar selección cuando hay
+    // ambigüedad. Cada contrato representa un "tenant"/plan distinto; el usuario
+    // debe elegir con cuál sesión entrar para que tenantId/rol sean deterministas.
     const uniqueContracts = new Map();
     userActiveRoles.forEach(ur => {
       if (ur.contractId && ur.contract) {
@@ -105,12 +113,14 @@ export class AuthService {
           clientName: ur.contract.user?.basicData?.strPersonType === 'N' 
             ? `${ur.contract.user.basicData.naturalPersonData?.firstName || ''} ${ur.contract.user.basicData.naturalPersonData?.firstSurname || ''}`.trim()
             : ur.contract.user?.basicData?.legalEntityData?.businessName || 'Cliente',
-          packageName: ur.contract.package?.name || 'Paquete'
+          packageName: ur.contract.package?.name || 'Paquete',
+          // Aplicación destino del contrato (para distinguir tenants del mismo titular)
+          targetApplication: ur.contract.package?.targetApplication || applicationName,
         });
       }
     });
 
-    // Si hay múltiples contratos, retornarlos
+    // Si hay múltiples contratos, retornarlos para que el usuario elija (selector)
     if (uniqueContracts.size > 1) {
       const contracts = Array.from(uniqueContracts.values());
       return {
@@ -127,8 +137,12 @@ export class AuthService {
       };
     }
 
-    // Usar el primer rol válido encontrado
-    const activeRole = userActiveRoles[0].role;
+    // Elegir el rol activo de forma DETERMINISTA:
+    // preferir el rol ligado a un contrato (si existe) sobre roles sin contrato,
+    // para que tenantId/codePrefix se deriven de un contrato real y no de [0] arbitrario.
+    const roleWithContract = userActiveRoles.find(ur => ur.contractId && ur.contract);
+    const selectedUserRole = roleWithContract || userActiveRoles[0];
+    const activeRole = selectedUserRole.role;
 
     // 6. Validar si debe cambiar su contraseña
     const mustChangePassword = !!user.mustChangePassword;
@@ -139,11 +153,11 @@ export class AuthService {
     expirationDate.setDate(expirationDate.getDate() + 90);
     const passwordExpired = now > expirationDate;
 
-    // 8. Generar token JWT con tenantId basado en el contrato
+    // 8. Generar token JWT con tenantId basado en el contrato del rol seleccionado
     // El tenantId es el dueño del contrato al que está vinculado el rol activo del usuario
-    const contractOwner = userActiveRoles[0].contract?.user;
+    const contractOwner = selectedUserRole.contract?.user;
     let tenantId = contractOwner?.id || user.id;
-    
+
     // Si el usuario no tiene contrato directo, buscar a través de dependencias
     if (!contractOwner) {
       const dependency = user.principals?.find(p => p.status === 'ACTIVE');
@@ -151,12 +165,16 @@ export class AuthService {
         tenantId = dependency.principalUserId;
       }
     }
-    let codePrefix = userActiveRoles[0].contract?.codePrefix || null;
+    let codePrefix = selectedUserRole.contract?.codePrefix || null;
+    const selectedContractId = selectedUserRole.contractId || null;
 
-    const payload = { 
-      sub: user.id, 
+    const payload = {
+      sub: user.id,
       email: user.strUserName,
       tenantId: tenantId,
+      // Incluir contractId también en el login de un solo contrato, para que las
+      // apps que scopean por contrato tengan el dato disponible.
+      contractId: selectedContractId,
       rol: activeRole.strName
     };
     const token = this.jwtService.sign(payload);
