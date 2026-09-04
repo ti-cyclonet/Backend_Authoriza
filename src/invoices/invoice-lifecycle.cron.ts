@@ -169,19 +169,40 @@ export class InvoiceLifecycleCron {
     // Cancel contract
     await this.contractRepository.update(invoice.contractId, { status: ContractStatus.CANCELLED });
 
-    // Deactivate principal user
-    if (invoice.user) {
-      await this.userRepository.update({ id: invoice.user.id }, { strStatus: 'INACTIVE' });
+    // Desactivar SOLO el acceso ligado a este contrato. NO desactivar al usuario
+    // globalmente: puede tener otras apps/contratos activos (Kiri, Shotra, otro InOut).
+    const manager = this.contractRepository.manager;
 
-      // Deactivate all dependents
-      const dependencies = await this.userDependencyRepository.find({
-        where: { principalUserId: invoice.user.id, status: 'ACTIVE' },
-      });
-      for (const dep of dependencies) {
-        await this.userRepository.update({ id: dep.dependentUserId }, { strStatus: 'INACTIVE' });
+    // Usuarios con rol en este contrato (titular + dependientes de este contrato)
+    const affected: Array<{ userId: string }> = await manager.query(
+      `SELECT DISTINCT "userId" FROM user_roles WHERE "contractId" = $1`,
+      [invoice.contractId],
+    );
+    const affectedIds = new Set<string>(affected.map((r) => r.userId));
+    if (invoice.user?.id) affectedIds.add(invoice.user.id);
+
+    // Desactivar los roles de este contrato
+    await manager.query(
+      `UPDATE user_roles SET status = 'INACTIVE' WHERE "contractId" = $1`,
+      [invoice.contractId],
+    );
+
+    // Recalcular estado global: solo queda INACTIVE quien no tenga ya ningún rol ACTIVE
+    for (const userId of affectedIds) {
+      const rows: Array<{ cnt: string }> = await manager.query(
+        `SELECT COUNT(*)::int AS cnt FROM user_roles WHERE "userId" = $1 AND status = 'ACTIVE'`,
+        [userId],
+      );
+      const hasActive = Number(rows?.[0]?.cnt || 0) > 0;
+      if (!hasActive) {
+        // No pisar estados de verificación
+        const u = await this.userRepository.findOne({ where: { id: userId } });
+        if (u && u.strStatus !== 'UNCONFIRMED' && u.strStatus !== 'CONFIRMED') {
+          await this.userRepository.update({ id: userId }, { strStatus: 'INACTIVE' });
+        }
       }
-
-      this.logger.log(`Contract ${invoice.contractId}: CANCELLED. All users deactivated.`);
     }
+
+    this.logger.log(`Contract ${invoice.contractId}: CANCELLED. Roles de este contrato desactivados (acceso a otras apps intacto).`);
   }
 }

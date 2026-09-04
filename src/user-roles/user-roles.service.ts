@@ -41,8 +41,12 @@ export class UserRolesService {
     });
   }
 
-  async remove(userId: string, roleId: string): Promise<void> {
-    await this.userRoleRepository.delete({ userId, roleId });
+  async remove(userId: string, roleId: string, contractId?: string): Promise<void> {
+    // Si viene contractId, borrar SOLO la fila de ese contrato (aislar por app/contrato).
+    // Sin contractId se mantiene el comportamiento legacy (todas las filas del rol).
+    const where: any = { userId, roleId };
+    if (contractId) where.contractId = contractId;
+    await this.userRoleRepository.delete(where);
   }
 
   async assignRole(dto: CreateUserRoleDto): Promise<UserRole> {
@@ -96,7 +100,7 @@ export class UserRolesService {
     return this.findByUser(userId);
   }
 
-  async removeRole(userId: string, roleId: string): Promise<void> {
+  async removeRole(userId: string, roleId: string, contractId?: string): Promise<void> {
     // Verificar si es el último administrador de Authoriza
     const isAuthorizaAdmin = await this.userRoleRepository.findOne({
       where: { userId, roleId },
@@ -114,7 +118,9 @@ export class UserRolesService {
       }
     }
 
-    // Si se desasigna adminInout de InOut, también desasignar adminInvoices de Factonet
+    // Si se desasigna adminInout de InOut, también desasignar adminInvoices de Factonet.
+    // IMPORTANTE: el cascade se limita al MISMO contrato (contractId). Si el usuario
+    // ganó adminInvoices por otra app/contrato (Kiri Plus, Shotra), esa fila NO se toca.
     const role = await this.rolRepository.findOne({
       where: { id: roleId },
       relations: ['strApplication']
@@ -127,14 +133,13 @@ export class UserRolesService {
       });
 
       if (factonetAdminInvoicesRole && factonetAdminInvoicesRole.strApplication?.strName === 'Factonet') {
-        await this.userRoleRepository.delete({
-          userId,
-          roleId: factonetAdminInvoicesRole.id
-        });
+        const cascadeWhere: any = { userId, roleId: factonetAdminInvoicesRole.id };
+        if (contractId) cascadeWhere.contractId = contractId;
+        await this.userRoleRepository.delete(cascadeWhere);
       }
     }
 
-    return this.remove(userId, roleId);
+    return this.remove(userId, roleId, contractId);
   }
 
   async getAssignedCountByContractAndRole(contractId: string, roleId: string): Promise<number> {
