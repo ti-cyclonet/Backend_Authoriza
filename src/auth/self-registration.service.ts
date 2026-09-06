@@ -757,11 +757,13 @@ export class SelfRegistrationService {
       || user.strUserName.split('@')[0];
     const codePrefix = await this.generateUniqueCodePrefix(userName, this.contractRepository.manager);
 
+    // Paquete no facturable (DEV/FREE) -> valor 0; facturable -> price anual
+    const isNonBillablePkg = (pkg as any).isBillable === false || Number(pkg.price) === 0;
     const contract = this.contractRepository.create({
       code: contractCode,
       user: { id: user.id } as any,
       package: { id: packageId } as any,
-      value: (pkg.price || 0) * 12,
+      value: isNonBillablePkg ? 0 : (pkg.price || 0) * 12,
       mode: PaymentMode.MONTHLY,
       payday: 1,
       startDate: today,
@@ -841,9 +843,10 @@ export class SelfRegistrationService {
       return result;
     }
 
-    // For non-billable or non-Kiri: update the EXISTING contract in place
+    // For non-billable or non-Kiri: update the EXISTING contract in place.
+    // No facturable -> valor 0; facturable -> price anual.
     contract.package = { id: packageId } as any;
-    contract.value = (pkg.price || 0) * 12;
+    contract.value = isBillable ? (pkg.price || 0) * 12 : 0;
     contract.startDate = new Date();
     contract.endDate = (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d; })();
     contract.status = isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE;

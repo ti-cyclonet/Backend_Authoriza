@@ -77,7 +77,20 @@ export class ContractService {
 
     const savedContract = await this.contractRepository.save(entity);
     await this.userRolesService.updateUserToAccountOwner(dto.userId, savedContract.id);
-    
+
+    // Si el contrato se crea directamente ACTIVO (ej. paquetes DEV/FREE creados
+    // desde la gestión de contratos), asignar aquí los roles del paquete —
+    // igual que hace updateStatus — para que el usuario tenga su rol de la app
+    // (ej. adminShotra) y pueda iniciar sesión. Sin esto, el contrato queda
+    // "ACTIVO" pero sin rol, y el login rechaza al usuario.
+    if (savedContract.status === ContractStatus.ACTIVE) {
+      await this.assignPackageRoles(dto.userId, dto.packageId, savedContract.id);
+      // Asegurar que el usuario quede ACTIVE (no pisar estados de verificación)
+      if (user.strStatus !== 'UNCONFIRMED' && user.strStatus !== 'CONFIRMED') {
+        await this.userRepository.update({ id: dto.userId }, { strStatus: 'ACTIVE' });
+      }
+    }
+
     // Notify adminFactonet users about the new contract
     this.notifyAdminFactonet(savedContract, user, pkg).catch(err =>
       this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
@@ -118,17 +131,19 @@ export class ContractService {
       const pkg = await this.packageRepository.findOne({ where: { id: dto.packageId } });
       if (!pkg) throw new BadRequestException('Package not found');
       (contract as any).package = pkg;
+      // Un paquete NO facturable (DEV / FREE) no genera cobro: su contrato debe
+      // quedar en valor 0, sin importar el price del paquete. Solo los paquetes
+      // facturables calculan el valor anual (price * 12).
+      const newIsNonBillable = (pkg as any).isBillable === false || Number(pkg.price) === 0;
       // When the package changes and no explicit value is provided, recalculate
-      // the contract value from the new package price (annual = price * 12).
-      // This ensures free/DEV packages (price 0) reset the value to 0.
+      // the contract value: 0 for non-billable, price*12 for billable.
       if (dto.value === undefined || dto.value === null) {
-        recalculatedValue = (Number(pkg.price) || 0) * 12;
+        recalculatedValue = newIsNonBillable ? 0 : (Number(pkg.price) || 0) * 12;
       }
       // Detect a Kiri downgrade from a billable plan (e.g. KIRI PLUS) to a
       // non-billable one (e.g. KIRI DEV / FREE). In that case the user no longer
       // needs FactoNet self-invoicing access, so it must be revoked.
       const newIsKiri = (pkg as any).targetApplication === 'Kiri';
-      const newIsNonBillable = (pkg as any).isBillable === false || Number(pkg.price) === 0;
       const prevWasBillable = previousPackage
         ? ((previousPackage as any).isBillable !== false && Number(previousPackage.price) > 0)
         : false;
@@ -910,26 +925,8 @@ export class ContractService {
       );
 
       // Asignar los roles configurados en el paquete al usuario del contrato
-      try {
-        const packageConfigs = await this.contractRepository.manager.query(
-          `SELECT cp."rolId" FROM configuration_package cp WHERE cp."packageId" = $1`,
-          [contract.package?.id],
-        );
-        for (const config of packageConfigs) {
-          const existingRole = await this.contractRepository.manager.query(
-            `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 AND "contractId" = $3`,
-            [contract.user.id, config.rolId, contract.id],
-          );
-          if (!existingRole || existingRole.length === 0) {
-            await this.contractRepository.manager.query(
-              `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status) VALUES (gen_random_uuid(), $1, $2, $3, 'ACTIVE')`,
-              [contract.user.id, config.rolId, contract.id],
-            );
-            this.logger.log(`Role ${config.rolId} assigned to user ${contract.user.id} for contract ${contract.code}`);
-          }
-        }
-      } catch (err) {
-        this.logger.warn(`Failed to assign package roles on activation: ${(err as Error).message}`);
+      if (contract.package?.id) {
+        await this.assignPackageRoles(contract.user.id, contract.package.id, contract.id);
       }
 
       await this.logsService.info(
@@ -982,6 +979,36 @@ export class ContractService {
     }
 
     return savedContract;
+  }
+
+  /**
+   * Asigna al usuario del contrato los roles configurados en el paquete
+   * (configuration_package → user_roles), scopeados a ESTE contractId.
+   * Idempotente: no duplica filas existentes. Reutilizado por create() y updateStatus().
+   */
+  private async assignPackageRoles(userId: string, packageId: string, contractId: string): Promise<void> {
+    const manager = this.contractRepository.manager;
+    try {
+      const packageConfigs = await manager.query(
+        `SELECT cp."rolId" FROM configuration_package cp WHERE cp."packageId" = $1`,
+        [packageId],
+      );
+      for (const config of packageConfigs) {
+        const existingRole = await manager.query(
+          `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 AND "contractId" = $3`,
+          [userId, config.rolId, contractId],
+        );
+        if (!existingRole || existingRole.length === 0) {
+          await manager.query(
+            `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status) VALUES (gen_random_uuid(), $1, $2, $3, 'ACTIVE')`,
+            [userId, config.rolId, contractId],
+          );
+          this.logger.log(`Role ${config.rolId} assigned to user ${userId} for contract ${contractId}`);
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to assign package roles: ${(err as Error).message}`);
+    }
   }
 
   /**
