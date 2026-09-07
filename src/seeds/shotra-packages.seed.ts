@@ -10,7 +10,9 @@ import { EntityCode } from '../entity-codes/entities/entity-code.entity';
  * Paquetes de SHOTRA (Short Trades) — marketplace de servicios profesionales.
  * - SHOTRA FREE: uso básico (limitado en solicitudes/propuestas por mes)
  * - SHOTRA PRO: uso ilimitado + features premium (destacados, prioridad, analytics)
- * - SHOTRA DEV: acceso completo para desarrollo/testing
+ *
+ * El acceso admin completo a Shotra para el usuario interno lo otorga el paquete
+ * CYCLON PLUS [+] (cyclon-plus-package.seed.ts), no un paquete SHOTRA DEV.
  */
 export default class ShotraPackagesSeed {
   async run(dataSource: DataSource): Promise<void> {
