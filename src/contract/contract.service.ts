@@ -404,14 +404,28 @@ export class ContractService {
     contract.issuedAt = new Date();
     await this.contractRepository.save(contract);
 
-    // Si el usuario ya verificó su correo, enviar el contrato inmediatamente
-    if (contract.user?.isVerified) {
+    // Si el usuario ya verificó su correo, enviar el contrato inmediatamente.
+    // EXCEPCIÓN: en el flujo "admin firma primero" (Kiri/Shotra), NO se envía
+    // aquí; el correo al cliente se dispara cuando el admin firma (signAsAdmin),
+    // para no invitar al cliente antes de tiempo.
+    if (contract.user?.isVerified && !this.isAdminFirstSigningFlow(contract)) {
       this.sendContractEmail(contract, uploadResult.secure_url).catch((err) =>
         this.logger.error(`Error sending contract email: ${err.message}`),
       );
     }
 
     return uploadResult.secure_url;
+  }
+
+  /**
+   * Indica si el contrato sigue el flujo "el admin firma primero y luego se
+   * invita al cliente a firmar" (planes personales de Kiri y Shotra). En ese
+   * caso el correo CONTRACT_READY se envía tras la firma del admin, no al
+   * emitir el PDF. Los demás (InOut/empresa) mantienen el flujo cliente-primero.
+   */
+  private isAdminFirstSigningFlow(contract: Contract): boolean {
+    const app = (contract.package as any)?.targetApplication;
+    return app === 'Kiri' || app === 'Shotra';
   }
 
   async issueContract(contractId: string): Promise<Contract> {
@@ -426,8 +440,9 @@ export class ContractService {
     contract.issuedAt = new Date();
     const savedContract = await this.contractRepository.save(contract);
 
-    // Send contract to client via email
-    if (contract.user?.strUserName && contract.pdfUrl) {
+    // Send contract to client via email (excepto en flujo admin-primero Kiri/Shotra,
+    // donde el correo se envía tras la firma del admin).
+    if (contract.user?.strUserName && contract.pdfUrl && !this.isAdminFirstSigningFlow(contract)) {
       this.sendContractEmail(contract, contract.pdfUrl).catch((err) =>
         this.logger.error(`Error sending issued contract email: ${err.message}`),
       );
@@ -567,6 +582,15 @@ export class ContractService {
     // If client already signed, activate automatically
     if (saved.clientSignedAt) {
       return this.autoActivateIfBothSigned(saved);
+    }
+
+    // El admin firmó primero: recién ahora se invita al CLIENTE a firmar.
+    // Este es el punto correcto para el correo "contrato listo para revisión"
+    // (antes se enviaba al emitir el PDF, demasiado pronto).
+    if (saved.pdfUrl) {
+      this.sendContractEmail(saved, saved.pdfUrl).catch((err) =>
+        this.logger.error(`Error sending contract-ready email after admin signature: ${err.message}`),
+      );
     }
 
     return saved;
@@ -1100,6 +1124,10 @@ export class ContractService {
     });
 
     if (!contract?.pdfUrl) return; // No hay contrato o no tiene PDF aún
+
+    // En flujo admin-primero (Kiri/Shotra) el correo se envía tras la firma del
+    // admin, no al verificar el correo del usuario.
+    if (this.isAdminFirstSigningFlow(contract)) return;
 
     await this.sendContractEmail(contract, contract.pdfUrl);
   }
