@@ -12,7 +12,7 @@ import InoutFreePackageSeed from './seeds/inout-free-package.seed';
 import InoutProPackageSeed from './seeds/inout-pro-package.seed';
 import InoutEnterprisePackageSeed from './seeds/inout-enterprise-package.seed';
 import KiriPackagesSeed from './seeds/kiri-packages.seed';
-import DevPackagesSeed from './seeds/dev-packages.seed';
+import CyclonPlusPackageSeed from './seeds/cyclon-plus-package.seed';
 import ShotraPackagesSeed from './seeds/shotra-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
 import InoutParametersSeed from './seeds/inout-parameters.seed';
@@ -95,8 +95,8 @@ async function bootstrap() {
   const kiriPackagesSeed = new KiriPackagesSeed();
   await kiriPackagesSeed.run(dataSource);
 
-  const devPackagesSeed = new DevPackagesSeed();
-  await devPackagesSeed.run(dataSource);
+  const cyclonPlusPackageSeed = new CyclonPlusPackageSeed();
+  await cyclonPlusPackageSeed.run(dataSource);
 
   const shotraPackagesSeed = new ShotraPackagesSeed();
   await shotraPackagesSeed.run(dataSource);

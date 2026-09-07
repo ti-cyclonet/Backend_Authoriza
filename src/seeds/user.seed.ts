@@ -131,7 +131,9 @@ export default class UserSeed {
     }
 
     // ========== 4️⃣ ASIGNAR ROL ADMINAUTHORIZA ==========
-    // Los contratos con paquetes DEV se crean en dev-packages.seed.ts (corre después)
+    // El contrato único CYCLON PLUS [+] y sus 5 roles admin se crean en
+    // cyclon-plus-package.seed.ts (corre después). Aquí solo se garantiza que
+    // el usuario tenga el rol adminAuthoriza base para poder entrar a Authoriza.
     const adminRole = await roleRepo.findOne({
       where: { strName: 'adminAuthoriza' },
     });
