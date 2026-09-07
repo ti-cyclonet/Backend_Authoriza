@@ -825,7 +825,7 @@ export class SelfRegistrationService {
     );
 
     const message = isBillable && isKiriApp
-      ? `Plan cambiado a "${pkg.name}". Se ha generado un contrato nuevo pendiente de firma. Puedes seguir usando tu plan actual mientras se completa la firma; al activarse el contrato, tu acceso al nuevo plan se habilitará automáticamente.`
+      ? `Plan cambiado a "${pkg.name}". Se generó un contrato pendiente de firma. Primero lo firmará el administrador de CycloNet; cuando lo haga, recibirás un correo con el enlace para revisarlo y firmarlo tú en FactoNet (billing.cyclonet.com.co). Mientras tanto puedes seguir usando tu plan actual; al firmar ambas partes, tu nuevo plan se activará automáticamente.`
       : `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`;
 
     return { success: true, message };
@@ -894,7 +894,7 @@ export class SelfRegistrationService {
     }
 
     const message = isBillable && isKiriApp
-      ? `Plan cambiado a "${pkg.name}". Se ha generado un contrato pendiente de firma. Puedes seguir usando tu plan actual mientras se completa la firma; al activarse el contrato, tu acceso al nuevo plan se habilitará automáticamente. Se te ha asignado acceso a FactoNet para gestionar tu facturación.`
+      ? `Plan cambiado a "${pkg.name}". Se generó un contrato pendiente de firma. Primero lo firmará el administrador de CycloNet; cuando lo haga, recibirás un correo con el enlace para revisarlo y firmarlo tú en FactoNet (billing.cyclonet.com.co). Puedes seguir usando tu plan actual mientras tanto; al firmar ambas partes, tu nuevo plan se activará automáticamente.`
       : isBillable
         ? `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador. Se te ha asignado acceso a FactoNet para gestionar tu facturación.`
         : `Plan cambiado a "${pkg.name}" exitosamente.`;
