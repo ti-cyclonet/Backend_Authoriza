@@ -1215,7 +1215,19 @@ export class SelfRegistrationService {
       where: { strUserName: data.email },
     });
     if (existing) {
-      // Already exists — sync password and return
+      // Ya existe (posiblemente por otra app del ecosistema).
+      // Si ya está verificado, creamos directamente el contrato KIRI FREE
+      // (idempotente) para habilitar el acceso a Kiri sin re-verificar.
+      if (existing.isVerified) {
+        await this.ensureKiriContractAndRoles(existing.id);
+        return {
+          success: true,
+          message: 'Tu cuenta ya está verificada. Se habilitó el acceso a Kiri.',
+          alreadyExists: true,
+          verificationRequired: false,
+          userId: existing.id,
+        };
+      }
       return { success: true, message: 'Usuario ya existe en Authoriza.', alreadyExists: true, userId: existing.id };
     }
 
@@ -1315,6 +1327,10 @@ export class SelfRegistrationService {
     user.strStatus = 'ACTIVE';
     await this.userRepository.save(user);
 
+    // Crear (idempotente) el contrato KIRI FREE + rol userKiri. Sin esto, el
+    // login a Kiri falla porque el usuario no tiene un contrato de un plan Kiri.
+    await this.ensureKiriContractAndRoles(user.id);
+
     // Notify Kiri to activate the local user
     try {
       const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
@@ -1328,6 +1344,93 @@ export class SelfRegistrationService {
     }
 
     return { success: true, message: '¡Cuenta verificada! Ya puedes acceder a Kiri Finance.' };
+  }
+
+  /**
+   * Crea el contrato KIRI FREE (si el usuario aún no tiene uno de un paquete de
+   * Kiri) y asigna el rol userKiri desde configuration_package. NO asigna
+   * adminInvoices porque el plan FREE de Kiri no es facturable. NO toca
+   * contratos ni roles de otras aplicaciones. Idempotente.
+   */
+  private async ensureKiriContractAndRoles(userId: string) {
+    const freePkg = await this.packageRepository.findOne({
+      where: { name: 'KIRI FREE' },
+    });
+    if (!freePkg) {
+      this.logger.warn('Paquete KIRI FREE no encontrado; no se puede crear el contrato de Kiri.');
+      return;
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      // ¿Ya tiene un contrato para un paquete de Kiri? (evitar duplicados)
+      const existingKiriContract = await manager
+        .createQueryBuilder(Contract, 'c')
+        .innerJoin('c.package', 'p')
+        .where('c."userId" = :userId', { userId })
+        .andWhere('p."targetApplication" = :app', { app: 'Kiri' })
+        .getOne();
+
+      let contractId: string;
+
+      if (existingKiriContract) {
+        contractId = existingKiriContract.id;
+        if (existingKiriContract.status !== ContractStatus.ACTIVE) {
+          existingKiriContract.status = ContractStatus.ACTIVE;
+          await manager.save(existingKiriContract);
+        }
+      } else {
+        const contractCode = await this.entityCodeService.generateCode('Contract');
+        const userForPrefix = await manager.findOne(User, {
+          where: { id: userId },
+          relations: ['basicData', 'basicData.naturalPersonData'],
+        });
+        const nameForPrefix =
+          userForPrefix?.basicData?.naturalPersonData?.firstName ||
+          userForPrefix?.strUserName?.split('@')[0] ||
+          'KIRI';
+        const codePrefix = await this.generateUniqueCodePrefix(nameForPrefix, manager);
+
+        const contract = manager.create(Contract, {
+          code: contractCode,
+          user: { id: userId } as any,
+          package: { id: freePkg.id } as any,
+          value: 0,
+          mode: PaymentMode.MONTHLY,
+          payday: 1,
+          startDate: new Date(),
+          // KIRI FREE es no facturable -> se activa directamente
+          status: ContractStatus.ACTIVE,
+          issuedAt: new Date(),
+          codePrefix,
+          businessSector: 'personal',
+        });
+        const savedContract = await manager.save(contract);
+        contractId = savedContract.id;
+      }
+
+      // Asignar roles del paquete (userKiri) desde configuration_package
+      const packageConfigs = await manager.query(
+        `SELECT cp."rolId" FROM configuration_package cp WHERE cp."packageId" = $1`,
+        [freePkg.id],
+      );
+      for (const config of packageConfigs) {
+        const existingRole = await manager.query(
+          `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 AND "contractId" = $3`,
+          [userId, config.rolId, contractId],
+        );
+        if (!existingRole || existingRole.length === 0) {
+          await manager.query(
+            `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status) VALUES (gen_random_uuid(), $1, $2, $3, 'ACTIVE')`,
+            [userId, config.rolId, contractId],
+          );
+        }
+      }
+
+      // Asegurar que el usuario quede ACTIVE
+      await manager.update(User, { id: userId }, { strStatus: 'ACTIVE' });
+    });
+
+    this.logger.log(`Contrato KIRI FREE + rol userKiri asignados a usuario ${userId}`);
   }
 
   /**
