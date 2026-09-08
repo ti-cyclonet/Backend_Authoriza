@@ -330,15 +330,15 @@ export class ContractService {
   }
 
   async findByTenant(tenantId: string) {
-    const dependency = await this.contractRepository.manager
-      .createQueryBuilder()
-      .select('ud.principalUserId')
-      .from('user_dependencies', 'ud')
-      .where('ud.dependentUserId = :tenantId', { tenantId })
-      .andWhere('ud.status = :status', { status: 'ACTIVE' })
-      .getRawOne();
-
-    const userId = dependency?.principalUserId || tenantId;
+    // Resolver dependiente -> principal con SQL crudo y columnas entre comillas
+    // (ver nota en findTenantLimits: sin comillas Postgres no encuentra las
+    // columnas camelCase y la dependencia no se resolvia).
+    const depRows: Array<{ principalUserId: string }> = await this.contractRepository.manager.query(
+      `SELECT "principalUserId" FROM user_dependencies
+       WHERE "dependentUserId" = $1 AND status = 'ACTIVE' LIMIT 1`,
+      [tenantId],
+    );
+    const userId = depRows[0]?.principalUserId || tenantId;
 
     const contract = await this.contractRepository.findOne({
       where: { user: { id: userId } },
@@ -1174,16 +1174,17 @@ export class ContractService {
   }
 
   async findTenantLimits(tenantId: string, application?: string) {
-    // Reuse findByTenant logic to resolve the active contract for the tenant
-    const dependency = await this.contractRepository.manager
-      .createQueryBuilder()
-      .select('ud.principalUserId')
-      .from('user_dependencies', 'ud')
-      .where('ud.dependentUserId = :tenantId', { tenantId })
-      .andWhere('ud.status = :status', { status: 'ACTIVE' })
-      .getRawOne();
-
-    const userId = dependency?.principalUserId || tenantId;
+    // Si el tenant es un usuario DEPENDIENTE, resolver al usuario PRINCIPAL
+    // (el dueño del contrato). Se usa SQL crudo con los nombres de columna reales
+    // entre comillas: sin comillas, Postgres baja a minusculas ("principaluserid")
+    // y no encuentra las columnas camelCase, por lo que la dependencia nunca se
+    // resolvia y un dependiente terminaba tratado como "sin plan" (FREE).
+    const depRows: Array<{ principalUserId: string }> = await this.contractRepository.manager.query(
+      `SELECT "principalUserId" FROM user_dependencies
+       WHERE "dependentUserId" = $1 AND status = 'ACTIVE' LIMIT 1`,
+      [tenantId],
+    );
+    const userId = depRows[0]?.principalUserId || tenantId;
 
     // Resolve the contract that governs access. Only ACTIVE contracts grant a plan.
     // A PENDING contract (e.g. a plan upgrade awaiting signature) must NOT be
