@@ -1194,14 +1194,49 @@ export class ContractService {
       relations: ['package', 'package.usageLimitVariables'],
     });
 
+    const activeContracts = allContracts.filter((c) => c.status === 'ACTIVE');
+
     if (application) {
-      // ACTIVE contract for the requested application (case-insensitive)
-      contract = allContracts.find(
-        c => c.package?.targetApplication?.toLowerCase() === application.toLowerCase() && c.status === 'ACTIVE'
+      const app = application.toLowerCase();
+
+      // ¿Cuántas variables de ESTA app expone el paquete de un contrato?
+      // Sirve tanto para incluir paquetes maestro cross-app (CYCLON PLUS, cuyo
+      // package.targetApplication es 'Authoriza' pero trae variables de Kiri con
+      // maxValue 1) como para desempatar por cobertura de features.
+      const appVarCount = (c: any) =>
+        (c.package?.usageLimitVariables ?? []).filter(
+          (v: any) => v.targetApplication?.toLowerCase() === app,
+        ).length;
+
+      // Cuántas de esas variables estan HABILITADAS (feature con maxValue >= 1 o
+      // cualquier variable con tope > 0). Un PLUS tendra mas que un FREE, asi que
+      // gana el desempate cuando el usuario tiene varios contratos ACTIVE.
+      const enabledAppVarCount = (c: any) =>
+        (c.package?.usageLimitVariables ?? []).filter(
+          (v: any) => v.targetApplication?.toLowerCase() === app && Number(v.maxValue) >= 1,
+        ).length;
+
+      // Candidatos: contratos ACTIVE cuyo paquete aplica a la app, ya sea por su
+      // targetApplication o por exponer variables de esa app (paquete maestro).
+      const candidates = activeContracts.filter(
+        (c) =>
+          c.package?.targetApplication?.toLowerCase() === app || appVarCount(c) > 0,
       );
+
+      // Seleccion determinista: preferir el que habilita MAS features de la app
+      // (PLUS/maestro sobre FREE); desempate por fecha de inicio mas reciente.
+      candidates.sort((a, b) => {
+        const diff = enabledAppVarCount(b) - enabledAppVarCount(a);
+        if (diff !== 0) return diff;
+        const ad = a.startDate ? new Date(a.startDate).getTime() : 0;
+        const bd = b.startDate ? new Date(b.startDate).getTime() : 0;
+        return bd - ad;
+      });
+
+      contract = candidates[0] ?? null;
     } else {
       // No application specified: any ACTIVE contract
-      contract = allContracts.find(c => c.status === 'ACTIVE');
+      contract = activeContracts[0] ?? null;
     }
 
     if (!contract) {
