@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { Repository, IsNull, Not, In } from 'typeorm';
 import { Contract } from './entities/contract.entity';
 import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
@@ -369,6 +369,9 @@ export class ContractService {
     const [contracts, total] = await this.contractRepository.findAndCount({
       take: limit,
       skip: offset,
+      // Ocultar de la lista los contratos cancelados/eliminados (ej. el FREE
+      // reemplazado al pasar a PLUS). No se borran, solo no ensucian la vista.
+      where: { status: Not(In([ContractStatus.CANCELLED, ContractStatus.DELETED])) },
       relations: [
         'user',
         'user.basicData',
@@ -669,24 +672,49 @@ export class ContractService {
         this.logger.warn(`Failed to send contract activated email: ${err.message}`)
       );
 
-      // Cancel any other contracts for the same user + same application (old plan).
-      // Wrapped in try/catch: a failure here must NOT block the Kiri reactivation
-      // webhook or the welcome email that follow.
-      if (contract.package?.targetApplication) {
+      // Cancelar CUALQUIER otro contrato del usuario para la misma aplicacion
+      // (el plan anterior, ej. KIRI FREE), sin importar su estado previo — el
+      // nuevo contrato firmado lo reemplaza. Antes solo se cancelaban los que
+      // estaban en ACTIVE, por lo que un FREE en otro estado (PENDING, etc.)
+      // quedaba duplicado junto al nuevo PLUS.
+      // Se excluyen los ya CANCELLED (nada que hacer) y el propio contrato nuevo.
+      // Wrapped in try/catch: un fallo aca NO debe bloquear el webhook de
+      // reactivacion de Kiri ni el correo de bienvenida que siguen.
+      if (contract.package?.targetApplication && principalUserId) {
         try {
-          await this.contractRepository
-            .createQueryBuilder()
-            .update(Contract)
-            .set({ status: ContractStatus.CANCELLED })
-            .where('"userId" = :userId', { userId: principalUserId })
-            .andWhere('id != :contractId', { contractId: contract.id })
-            .andWhere(
-              '"packageId" IN (SELECT "id" FROM "package" WHERE "targetApplication" = :app)',
-              { app: contract.package.targetApplication },
-            )
-            .andWhere('status = :activeStatus', { activeStatus: ContractStatus.ACTIVE })
-            .execute();
-          this.logger.log(`Cancelled old contracts for user ${principalUserId} in app ${contract.package.targetApplication}`);
+          // 1. Identificar los contratos viejos de la misma app (a reemplazar).
+          const oldContracts = await this.contractRepository
+            .createQueryBuilder('c')
+            .innerJoin('c.package', 'p')
+            .where('c."userId" = :userId', { userId: principalUserId })
+            .andWhere('c.id != :contractId', { contractId: contract.id })
+            .andWhere('p."targetApplication" = :app', { app: contract.package.targetApplication })
+            .andWhere('c.status != :cancelled', { cancelled: ContractStatus.CANCELLED })
+            .getMany();
+
+          if (oldContracts.length > 0) {
+            const oldIds = oldContracts.map((c) => c.id);
+
+            // 2. Cancelar esos contratos (el nuevo plan los reemplaza).
+            await this.contractRepository
+              .createQueryBuilder()
+              .update(Contract)
+              .set({ status: ContractStatus.CANCELLED })
+              .whereInIds(oldIds)
+              .execute();
+
+            // 3. Desactivar los roles vinculados a esos contratos (ej. userKiri del
+            //    FREE), para que no queden roles del plan viejo activos junto al nuevo.
+            await this.contractRepository.manager.query(
+              `UPDATE user_roles SET status = 'INACTIVE'
+               WHERE "userId" = $1 AND "contractId" = ANY($2::uuid[]) AND status = 'ACTIVE'`,
+              [principalUserId, oldIds],
+            );
+
+            this.logger.log(
+              `Reemplazados ${oldIds.length} contrato(s) viejo(s) de ${contract.package.targetApplication} para el usuario ${principalUserId} (cancelados + roles desactivados).`,
+            );
+          }
         } catch (err) {
           this.logger.warn(`Failed to cancel old contracts for user ${principalUserId}: ${err.message}`);
         }
