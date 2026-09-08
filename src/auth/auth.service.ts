@@ -325,6 +325,7 @@ export class AuthService {
     user: AuthenticatedUser & {
       mustChangePassword?: boolean;
       passwordExpired?: boolean;
+      isAuthorizedSigner?: boolean;
     };
     contract?: {
       codePrefix: string;
@@ -400,6 +401,7 @@ export class AuthService {
     const userWithoutSensitiveData: AuthenticatedUser & {
       mustChangePassword?: boolean;
       passwordExpired?: boolean;
+      isAuthorizedSigner?: boolean;
     } = {
       id: user.id,
       email: user.strUserName,
@@ -407,6 +409,10 @@ export class AuthService {
       name: user.strUserName,
       rol: activeRole.strName,
       rolDescription: activeRole.strDescription1 || '',
+      // Incluir el flag de firmante (igual que el login normal). Sin esto, las
+      // apps que llegan por login/complete (FactoNet) reciben undefined y no
+      // muestran el botón de firmar, aunque el usuario sí sea firmante.
+      isAuthorizedSigner: await this.usersService.isUserAuthorizedSigner(user.id),
       mustChangePassword,
       passwordExpired,
     };
