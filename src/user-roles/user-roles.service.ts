@@ -1,15 +1,18 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserRole } from './entities/user-role.entity';
 import { CreateUserRoleDto } from './dto/create-user-role.dto';
 import { Contract } from '../contract/entities/contract.entity';
+import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { User } from '../users/entities/user.entity';
 import { Rol } from '../roles/entities/rol.entity';
 import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 
 @Injectable()
 export class UserRolesService {
+  private readonly logger = new Logger(UserRolesService.name);
+
   constructor(
     @InjectRepository(UserRole)
     private userRoleRepository: Repository<UserRole>,
@@ -56,13 +59,25 @@ export class UserRolesService {
     }
     
     const userRole = await this.create(dto);
-    
-    // Si se asigna adminInout de InOut, también asignar adminInout de FactoNet
+
+    // Resolver el rol y su aplicación
     const role = await this.rolRepository.findOne({
       where: { id: dto.roleId },
       relations: ['strApplication']
     });
-    
+
+    // ─── Acceso por DEPENDENCIA: cancelar el contrato propio de la app ───────
+    // Si el rol se asigna sobre un contrato que pertenece a OTRO usuario (el
+    // principal, ej. ti.cyclonet@ con CYCLON PLUS), significa que este usuario
+    // accede a esa app a través del principal. Su contrato PROPIO para esa MISMA
+    // aplicación (FREE o PLUS) queda obsoleto y se cancela, para que no quede
+    // colgado ni siga facturando. Los contratos de OTRAS apps no se tocan.
+    const appName = role?.strApplication?.strName;
+    if (dto.contractId && appName) {
+      await this.cancelOwnContractForAppIfViaDependency(dto.userId, dto.contractId, appName);
+    }
+
+    // Si se asigna adminInout de InOut, también asignar adminInout de FactoNet
     if (role?.strName === 'adminInout' && role?.strApplication?.strName === 'Inout') {
       // Buscar el rol adminInvoices de FactoNet
       const factonetAdminInvoicesRole = await this.rolRepository.findOne({
@@ -94,6 +109,71 @@ export class UserRolesService {
     }
     
     return userRole;
+  }
+
+  /**
+   * Cuando a un usuario se le asigna un rol sobre un contrato que pertenece a
+   * OTRO usuario (el principal — acceso por dependencia), su propio contrato para
+   * esa MISMA aplicación queda obsoleto: su acceso a esa app ahora viene del
+   * principal. Se cancela ese contrato propio (FREE o PLUS) y se desactivan sus
+   * user_roles, para que no quede colgado ni siga facturando. Contratos de otras
+   * apps no se tocan. Si el contrato asignado es del propio usuario (asignación
+   * normal, no por dependencia), no hace nada.
+   */
+  private async cancelOwnContractForAppIfViaDependency(
+    userId: string,
+    contractId: string,
+    appName: string,
+  ): Promise<void> {
+    try {
+      // Dueño del contrato sobre el que se asigna el rol.
+      const assignedContract = await this.contractRepository.findOne({
+        where: { id: contractId },
+        relations: ['user'],
+      });
+      const ownerId = assignedContract?.user?.id;
+      // Si el contrato es del mismo usuario, es asignación normal (no dependencia).
+      if (!ownerId || ownerId === userId) return;
+
+      // Contratos PROPIOS del usuario para ESA aplicación, aún vigentes.
+      const ownContracts = await this.contractRepository.find({
+        where: { user: { id: userId } },
+        relations: ['package'],
+      });
+      const app = appName.toLowerCase();
+      const toCancel = ownContracts.filter(
+        (c) =>
+          c.status !== ContractStatus.CANCELLED &&
+          c.status !== ContractStatus.DELETED &&
+          (c.package as any)?.targetApplication?.toLowerCase() === app,
+      );
+      if (toCancel.length === 0) return;
+
+      const ids = toCancel.map((c) => c.id);
+
+      await this.contractRepository
+        .createQueryBuilder()
+        .update(Contract)
+        .set({ status: ContractStatus.CANCELLED })
+        .whereInIds(ids)
+        .execute();
+
+      // Desactivar los user_roles ligados a esos contratos propios (ej. userKiri
+      // del plan FREE, o adminKiri del PLUS propio). El acceso lo da el principal.
+      await this.contractRepository.manager.query(
+        `UPDATE user_roles SET status = 'INACTIVE'
+         WHERE "userId" = $1 AND "contractId" = ANY($2::uuid[]) AND status = 'ACTIVE'`,
+        [userId, ids],
+      );
+
+      this.logger.log(
+        `Cancelado(s) ${ids.length} contrato(s) propio(s) de ${userId} para la app ${appName} (acceso via dependencia del principal).`,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `No se pudo cancelar el contrato propio de ${userId} para ${appName}: ${(err as Error).message}`,
+      );
+    }
   }
 
   async getUserRoles(userId: string): Promise<UserRole[]> {
