@@ -13,16 +13,20 @@ import { EntityCodesModule } from 'src/entity-codes/entity-codes.module';
 import { LogsModule } from '../logs/logs.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ContractModule } from '../contract/contract.module';
+import { BasicData } from 'src/basic-data/entities/basic-data.entity';
+import { Image } from 'src/images/entities/image.entity';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Rol, DocumentType]),
+    TypeOrmModule.forFeature([User, Rol, DocumentType, BasicData, Image]),
     BasicDataModule,
     NaturalPersonDataModule,
     LegalEntityDataModule,
     EntityCodesModule,
     LogsModule,
     NotificationsModule,
+    CloudinaryModule,
     forwardRef(() => ContractModule),
   ],
   controllers: [UsersController],

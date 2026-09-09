@@ -469,6 +469,39 @@ export class SelfRegistrationService {
               );
             }
           }
+
+          // BONUS CycloNet: si el contrato es de InOut, el OPERADOR (dependiente
+          // con adminInout) obtiene acceso gratuito a Shotra (rol userShotra /
+          // plan FREE) para publicar solicitudes de domicilio desde InOut.
+          //
+          // IMPORTANTE: se otorga al DEPENDIENTE, no al principal. En el flujo de
+          // InOut el titular (principal) queda con accountOwner (bloqueado para
+          // login) y NO inicia sesión en las apps; quien gestiona InOut —y por
+          // tanto quien usaría el panel de domicilios— es el dependiente.
+          //
+          // PERMANENTE (contractId = null): sobrevive aunque el contrato de InOut
+          // se cancele, para dejar al operador activo en Shotra (corazón del
+          // ecosistema) haciendo solicitudes. Idempotente.
+          if (contract.package?.targetApplication?.toLowerCase() === 'inout') {
+            const userShotraRole = await manager.findOne(Rol, {
+              where: { strName: 'userShotra' },
+            });
+            if (userShotraRole) {
+              const existingShotraRole = await manager.findOne(UserRole, {
+                where: { userId: dependency.dependentUserId, roleId: userShotraRole.id },
+              });
+              if (!existingShotraRole) {
+                await manager.save(
+                  manager.create(UserRole, {
+                    userId: dependency.dependentUserId,
+                    roleId: userShotraRole.id,
+                    contractId: null,
+                    status: 'ACTIVE',
+                  }),
+                );
+              }
+            }
+          }
         }
 
         // Activate contract only if free package

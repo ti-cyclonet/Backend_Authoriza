@@ -61,4 +61,12 @@ export class BasicData {
   @Column({ name: 'document_number', length: 50, nullable: true })
   @Expose()
   documentNumber: string;
+
+  // Foto de perfil VIGENTE del usuario (avatar). Vive en la identidad central
+  // (BasicData) para que TODAS las apps del ecosistema la sirvan igual. El
+  // histórico/registro de subidas se guarda en la entidad Image (relación
+  // "Photos" del MER); este campo cachea la URL actual para servirla sin joins.
+  @Column({ name: 'avatar_url', type: 'text', nullable: true })
+  @Expose()
+  avatarUrl: string | null;
 }
