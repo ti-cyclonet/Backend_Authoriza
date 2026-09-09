@@ -28,6 +28,18 @@ export class AuthService {
     private readonly logsService: LogsService,
   ) {}
 
+  /**
+   * URL de la foto de perfil a servir en el `user.image` que reciben TODAS las
+   * apps: el avatar centralizado (BasicData.avatarUrl) si existe; si no, el
+   * avatar generado por iniciales como fallback.
+   */
+  private avatarFor(user: any): string {
+    return (
+      user?.basicData?.avatarUrl ||
+      'https://ui-avatars.com/api/?name=' + encodeURIComponent(user?.strUserName || 'U')
+    );
+  }
+
   async validateUser(
     loginDto: LoginDto,
   ): Promise<{
@@ -175,7 +187,8 @@ export class AuthService {
       // Incluir contractId también en el login de un solo contrato, para que las
       // apps que scopean por contrato tengan el dato disponible.
       contractId: selectedContractId,
-      rol: activeRole.strName
+      rol: activeRole.strName,
+      image: this.avatarFor(user)
     };
     const token = this.jwtService.sign(payload);
     
@@ -205,9 +218,7 @@ export class AuthService {
     } = {
       id: user.id,
       email: user.strUserName,
-      image:
-        'https://ui-avatars.com/api/?name=' +
-        encodeURIComponent(user.strUserName),
+      image: this.avatarFor(user),
       name: user.strUserName,
       rol: activeRole.strName,
       rolDescription: activeRole.strDescription1 || '',
@@ -305,12 +316,108 @@ export class AuthService {
     const userData: AuthenticatedUser = {
       id: user.id,
       email: user.strUserName,
-      image: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.strUserName),
+      image: this.avatarFor(user),
       name: user.strUserName,
       rol: 'unconfirmed',
       rolDescription: '',
       firstName: user.basicData?.naturalPersonData?.firstName || '',
       businessName: user.basicData?.legalEntityData?.businessName || '',
+    };
+
+    return { access_token: token, user: userData };
+  }
+
+  /**
+   * Emite un token para OTRA aplicación a partir de una sesión ya autenticada,
+   * SIN pedir contraseña. Pensado para el "cambio de app" dentro del ecosistema:
+   * un usuario logueado en InOut puede obtener un token de Shotra para publicar
+   * solicitudes (bonus CycloNet: rol userShotra otorgado al firmar contrato InOut).
+   *
+   * Seguridad: el userId proviene del JWT vigente (no del body). Solo se emite el
+   * token si el usuario TIENE un rol ACTIVE válido para la app destino. No requiere
+   * contrato en la app destino (el rol userShotra del bonus va con contractId=null).
+   */
+  async switchApplication(
+    userId: string,
+    applicationName: string,
+  ): Promise<{ access_token: string; user: AuthenticatedUser }> {
+    if (!applicationName) {
+      throw new UnauthorizedException('applicationName es requerido');
+    }
+
+    const user = await this.usersService.findEntityById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Validar estado del usuario (igual que el login normal)
+    const allowedStatuses = ['ACTIVE', 'EXPIRING', 'CONFIRMED'];
+    if (!allowedStatuses.includes(user.strStatus?.toUpperCase())) {
+      throw new UnauthorizedException('Inactive or expired user. Access denied.');
+    }
+
+    // Roles válidos para la app destino
+    const validRoles =
+      await this.applicationsService.findRolesByApplicationName(applicationName);
+
+    // Roles administrativos que no habilitan inicio de sesión en apps
+    const blockedRoles = ['accountOwner'];
+
+    // Buscar un rol ACTIVE válido para la app destino (con o sin contrato).
+    const userActiveRoles = (user.userRoles || []).filter(
+      (ur) =>
+        ur.status === 'ACTIVE' &&
+        validRoles.includes(ur.role?.strName) &&
+        !blockedRoles.includes(ur.role?.strName),
+    );
+
+    if (userActiveRoles.length === 0) {
+      throw new UnauthorizedException(
+        `El usuario no tiene acceso activo a ${applicationName}.`,
+      );
+    }
+
+    // Preferir un rol ligado a contrato (determinismo de tenant); si no hay,
+    // usar el primero (ej. el bonus userShotra con contractId=null).
+    const roleWithContract = userActiveRoles.find((ur) => ur.contractId && ur.contract);
+    const selectedUserRole = roleWithContract || userActiveRoles[0];
+    const activeRole = selectedUserRole.role;
+
+    // tenantId: dueño del contrato del rol si existe; si no, el propio usuario.
+    const contractOwner = selectedUserRole.contract?.user;
+    let tenantId = contractOwner?.id || user.id;
+    if (!contractOwner) {
+      const dependency = user.principals?.find((p) => p.status === 'ACTIVE');
+      if (dependency) {
+        tenantId = dependency.principalUserId;
+      }
+    }
+
+    const payload = {
+      sub: user.id,
+      email: user.strUserName,
+      tenantId,
+      contractId: selectedUserRole.contractId || null,
+      rol: activeRole.strName,
+      image: this.avatarFor(user),
+    };
+    const token = this.jwtService.sign(payload);
+
+    await this.logsService.info(
+      LogAction.LOGIN,
+      `User switched application: ${user.strUserName} -> ${applicationName}`,
+      user.id,
+      null,
+      { application: applicationName, role: activeRole.strName },
+    );
+
+    const userData: AuthenticatedUser = {
+      id: user.id,
+      email: user.strUserName,
+      image: this.avatarFor(user),
+      name: user.strUserName,
+      rol: activeRole.strName,
+      rolDescription: activeRole.strDescription1 || '',
     };
 
     return { access_token: token, user: userData };
@@ -379,7 +486,8 @@ export class AuthService {
       email: user.strUserName,
       tenantId: tenantId,
       contractId: contractId,
-      rol: activeRole.strName
+      rol: activeRole.strName,
+      image: this.avatarFor(user)
     };
     const token = this.jwtService.sign(payload);
 
@@ -405,7 +513,7 @@ export class AuthService {
     } = {
       id: user.id,
       email: user.strUserName,
-      image: 'https://ui-avatars.com/api/?name=' + encodeURIComponent(user.strUserName),
+      image: this.avatarFor(user),
       name: user.strUserName,
       rol: activeRole.strName,
       rolDescription: activeRole.strDescription1 || '',

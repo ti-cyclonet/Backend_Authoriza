@@ -27,6 +27,8 @@ import { LogsService } from '../logs/logs.service';
 import { LogAction } from '../logs/entities/log.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ContractService } from '../contract/contract.service';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { Image } from '../images/entities/image.entity';
 
 @Injectable()
 export class UsersService {
@@ -39,12 +41,53 @@ export class UsersService {
   constructor(
     @InjectRepository(User) private readonly userRepository: Repository<User>,
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
+    @InjectRepository(BasicData) private readonly basicDataRepository: Repository<BasicData>,
+    @InjectRepository(Image) private readonly imageRepository: Repository<Image>,
     private readonly entityCodeService: EntityCodeService,
     private readonly logsService: LogsService,
     private readonly notificationsService: NotificationsService,
+    private readonly cloudinaryService: CloudinaryService,
     @Inject(forwardRef(() => ContractService))
     private readonly contractService: ContractService,
   ) {}
+
+  /**
+   * Sube la foto de perfil (avatar) del usuario a Cloudinary y la guarda de forma
+   * CENTRALIZADA en su BasicData (identidad compartida por todo el ecosistema).
+   * - Registra la imagen en la tabla Image (relación "Photos" del MER).
+   * - Cachea la URL vigente en BasicData.avatarUrl para servirla sin joins.
+   * El userId proviene del JWT (no del body). Devuelve { url }.
+   */
+  async uploadAvatar(userId: string, file: Express.Multer.File): Promise<{ url: string }> {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo');
+
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['basicData'],
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (!user.basicData) {
+      throw new BadRequestException('El usuario no tiene datos básicos (BasicData) para asociar la foto');
+    }
+
+    // Subir a Cloudinary (carpeta avatars, con prefijo de entorno del servicio).
+    const uploaded = await this.cloudinaryService.uploadImage(file, 'avatars');
+    const url = uploaded.secure_url;
+
+    // Registro histórico en Image (relación con BasicData).
+    await this.imageRepository.save(
+      this.imageRepository.create({
+        fileName: file.originalname || `avatar_${Date.now()}`,
+        url,
+        basicDataId: user.basicData.id,
+      }),
+    );
+
+    // URL vigente cacheada en BasicData → la sirven todas las apps.
+    await this.basicDataRepository.update({ id: user.basicData.id }, { avatarUrl: url });
+
+    return { url };
+  }
 
   async create(dto: CreateUserDto): Promise<User> {
     const genericPassword = '1234567890';
@@ -330,6 +373,30 @@ export class UsersService {
   async findEntityByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { strUserName: email },
+      withDeleted: true,
+      relations: [
+        'basicData',
+        'basicData.documentType',
+        'basicData.naturalPersonData',
+        'basicData.legalEntityData',
+        'principals',
+        'dependents',
+        'userRoles',
+        'userRoles.role',
+        'userRoles.contract',
+        'userRoles.contract.user',
+        'userRoles.contract.user.basicData',
+        'userRoles.contract.user.basicData.naturalPersonData',
+        'userRoles.contract.user.basicData.legalEntityData',
+        'userRoles.contract.package',
+      ],
+    });
+  }
+
+  /** Igual que findEntityByEmail pero por id (para switch-app: userId viene del JWT). */
+  async findEntityById(id: string): Promise<User | null> {
+    return this.userRepository.findOne({
+      where: { id },
       withDeleted: true,
       relations: [
         'basicData',

@@ -1058,8 +1058,92 @@ export class ContractService {
           this.logger.log(`Role ${config.rolId} assigned to user ${userId} for contract ${contractId}`);
         }
       }
+
+      // BONUS CycloNet: al activar un contrato de InOut, el/los OPERADOR(es) con
+      // adminInout de este contrato obtienen acceso gratuito a Shotra (userShotra
+      // / plan FREE) para publicar solicitudes de domicilio desde InOut.
+      await this.grantShotraBonusIfInout(packageId, contractId);
     } catch (err) {
       this.logger.warn(`Failed to assign package roles: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * BONUS por ser cliente CycloNet: si el contrato activado apunta a InOut, se
+   * otorga el rol `userShotra` (SHOTRA FREE) al/los OPERADOR(es) del contrato —
+   * es decir, quien(es) tienen `adminInout` en ESTE contrato— habilitándolos para
+   * iniciar sesión en Shotra y publicar solicitudes (p. ej. "entrega a domicilio").
+   *
+   * IMPORTANTE — a quién se otorga:
+   *   En el flujo de InOut el TITULAR (dueño del contrato) queda con `accountOwner`,
+   *   que está BLOQUEADO para iniciar sesión en las apps. Quien realmente usa InOut
+   *   es el DEPENDIENTE/operador con `adminInout`. Por eso el bonus va a los
+   *   titulares de `adminInout` del contrato, NO al dueño del contrato.
+   *
+   * - Solo aplica a paquetes cuyo targetApplication sea 'Inout'.
+   * - Rol otorgado: `userShotra` (plan FREE). NO se otorga adminShotra (PRO).
+   * - PERMANENTE: se inserta con contractId = null para que NO se revoque cuando el
+   *   contrato de InOut se desactive/cancele (deactivateContractScope solo afecta
+   *   filas ligadas a un contractId concreto).
+   * - Idempotente: no duplica si el operador ya tiene userShotra. Un rol Shotra
+   *   ACTIVE basta para acceder a Shotra (el login no exige contrato de Shotra).
+   */
+  private async grantShotraBonusIfInout(packageId: string, contractId: string): Promise<void> {
+    const manager = this.contractRepository.manager;
+    try {
+      // 1. Verificar que el paquete apunte a InOut.
+      const pkgRows = await manager.query(
+        `SELECT "targetApplication" FROM package WHERE id = $1`,
+        [packageId],
+      );
+      const targetApplication: string | undefined = pkgRows?.[0]?.targetApplication;
+      if (!targetApplication || targetApplication.toLowerCase() !== 'inout') return;
+
+      // 2. Resolver el rol userShotra.
+      const roleRows = await manager.query(
+        `SELECT id FROM rol WHERE "strName" = 'userShotra' LIMIT 1`,
+      );
+      const userShotraRoleId: string | undefined = roleRows?.[0]?.id;
+      if (!userShotraRoleId) {
+        this.logger.warn(`No se encontró el rol userShotra; no se otorgó el bonus Shotra (contrato ${contractId}).`);
+        return;
+      }
+
+      // 3. Identificar al/los operador(es) del contrato: usuarios con adminInout
+      //    ligado a ESTE contrato. Ellos son quienes usan InOut (no el titular).
+      const operators: Array<{ userId: string }> = await manager.query(
+        `SELECT ur."userId"
+           FROM user_roles ur
+           JOIN rol r ON r.id = ur."roleId"
+          WHERE ur."contractId" = $1
+            AND r."strName" = 'adminInout'
+            AND ur.status = 'ACTIVE'`,
+        [contractId],
+      );
+      if (!operators || operators.length === 0) {
+        // Aún no hay operador con adminInout (p. ej. contrato pagado activado antes
+        // de asignar el rol al dependiente). Se otorgará en verifyRegistration.
+        return;
+      }
+
+      // 4. Otorgar userShotra PERMANENTE (contractId = null) a cada operador que
+      //    no lo tenga ya. Idempotente.
+      for (const op of operators) {
+        const existing = await manager.query(
+          `SELECT id FROM user_roles WHERE "userId" = $1 AND "roleId" = $2 LIMIT 1`,
+          [op.userId, userShotraRoleId],
+        );
+        if (existing && existing.length > 0) continue;
+
+        await manager.query(
+          `INSERT INTO user_roles (id, "userId", "roleId", "contractId", status)
+           VALUES (gen_random_uuid(), $1, $2, NULL, 'ACTIVE')`,
+          [op.userId, userShotraRoleId],
+        );
+        this.logger.log(`Bonus CycloNet: rol userShotra (Shotra FREE) otorgado al operador ${op.userId} por contrato de InOut ${contractId}.`);
+      }
+    } catch (err) {
+      this.logger.warn(`No se pudo otorgar el bonus Shotra (contrato ${contractId}): ${(err as Error).message}`);
     }
   }
 

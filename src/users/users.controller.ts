@@ -17,7 +17,12 @@ import {
   NotFoundException,
   DefaultValuePipe,
   ParseIntPipe,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Response } from 'express';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -57,6 +62,18 @@ export class UsersController {
   @ApiOperation({ summary: 'Create an user' })
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
+  }
+
+  /**
+   * Sube la foto de perfil del usuario autenticado. Vive en Authoriza (BasicData)
+   * y queda disponible para TODAS las apps del ecosistema. userId del JWT.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post('me/avatar')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 8 * 1024 * 1024 } }))
+  @ApiOperation({ summary: 'Upload the authenticated user avatar (shared across apps)' })
+  async uploadAvatar(@Request() req, @UploadedFile() file: Express.Multer.File) {
+    return this.usersService.uploadAvatar(req.user.id, file);
   }
 
   @Post('full')

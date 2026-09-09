@@ -47,6 +47,19 @@ export class AuthController {
     return req.user;
   }
 
+  @ApiOperation({
+    summary: 'Switch to another app token using the current session (no password)',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post('switch-app')
+  async switchApp(
+    @Request() req,
+    @Body() body: { applicationName: string },
+  ) {
+    // El userId proviene del JWT vigente (req.user.id = payload.sub), no del body.
+    return this.authService.switchApplication(req.user.id, body.applicationName);
+  }
+
   @ApiOperation({ summary: 'Check if email exists in the system' })
   @Public()
   @Post('check-email')
