@@ -1258,24 +1258,31 @@ export class ContractService {
   }
 
   async findTenantLimits(tenantId: string, application?: string) {
-    // Si el tenant es un usuario DEPENDIENTE, resolver al usuario PRINCIPAL
-    // (el dueño del contrato). Se usa SQL crudo con los nombres de columna reales
-    // entre comillas: sin comillas, Postgres baja a minusculas ("principaluserid")
-    // y no encuentra las columnas camelCase, por lo que la dependencia nunca se
-    // resolvia y un dependiente terminaba tratado como "sin plan" (FREE).
+    // Resolver TODOS los usuarios cuyos contratos pueden gobernar el acceso de
+    // este tenant: el propio usuario + TODOS sus principales activos (un
+    // dependiente puede depender de varios principales, p. ej. uno con CYCLON
+    // PLUS que da Kiri y otro con un plan FREE de InOut). Antes se tomaba UN solo
+    // principal con LIMIT 1 sin orden: si Postgres devolvia el principal
+    // equivocado (el que NO cubre la app pedida), el usuario quedaba "sin plan"
+    // (404) aunque otro principal si le diera acceso. Ahora se consideran todos y
+    // la seleccion por cobertura de features (mas abajo) elige el correcto.
+    // SQL crudo con columnas entre comillas: sin comillas Postgres las baja a
+    // minusculas y no encuentra las camelCase.
     const depRows: Array<{ principalUserId: string }> = await this.contractRepository.manager.query(
       `SELECT "principalUserId" FROM user_dependencies
-       WHERE "dependentUserId" = $1 AND status = 'ACTIVE' LIMIT 1`,
+       WHERE "dependentUserId" = $1 AND status = 'ACTIVE'`,
       [tenantId],
     );
-    const userId = depRows[0]?.principalUserId || tenantId;
+    const ownerIds = Array.from(
+      new Set<string>([tenantId, ...depRows.map((r) => r.principalUserId)]),
+    );
 
     // Resolve the contract that governs access. Only ACTIVE contracts grant a plan.
     // A PENDING contract (e.g. a plan upgrade awaiting signature) must NOT be
     // returned, so the app keeps applying the previous/free plan until it activates.
     let contract: any = null;
     const allContracts = await this.contractRepository.find({
-      where: { user: { id: userId } },
+      where: { user: { id: In(ownerIds) } },
       relations: ['package', 'package.usageLimitVariables'],
     });
 
