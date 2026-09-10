@@ -8,8 +8,23 @@ import { EntityCode } from '../entity-codes/entities/entity-code.entity';
 
 /**
  * Paquetes de SHOTRA (Short Trades) — marketplace de servicios profesionales.
- * - SHOTRA FREE: uso básico (limitado en solicitudes/propuestas por mes)
- * - SHOTRA PRO: uso ilimitado + features premium (destacados, prioridad, analytics)
+ *
+ * ENFOQUE DE PLANES (revisado): el negocio vive de la COMISIÓN por transacción,
+ * así que el VOLUMEN de la actividad (solicitudes, propuestas, mensajería,
+ * contratos) es ILIMITADO para TODOS — limitarlo mataría el corazón transaccional
+ * de la app. Los planes NO se venden capando volumen, sino por "beneficios de
+ * impacto" que hacen que el ofertante gane más, más rápido y con más confianza:
+ *
+ * - SHOTRA FREE: volumen ilimitado + funciones base. Comisión estándar (10%).
+ * - SHOTRA PRO ($25.000/mes): volumen ilimitado + beneficios de impacto
+ *   (perfil destacado, matching prioritario, insignia verificado, analytics,
+ *   portafolio ampliado) + COMISIÓN REDUCIDA (5%). El ahorro de comisión por sí
+ *   solo paga la mensualidad a partir de ~$500.000/mes facturados.
+ *
+ * NOTA: nSolicitudes / nPropuestas se conservan como variables informativas con
+ * valor "ilimitado" (99999) en AMBOS planes. NO deben usarse como tope de
+ * bloqueo en Shotra. La diferencia PRO vs FREE está en las features de impacto
+ * y en la tasa de comisión (CommissionRule en el backend de Shotra).
  *
  * El acceso admin completo a Shotra para el usuario interno lo otorga el paquete
  * CYCLON PLUS [+] (cyclon-plus-package.seed.ts), no un paquete SHOTRA DEV.
@@ -36,7 +51,7 @@ export default class ShotraPackagesSeed {
         code,
         displayName: 'SHOTRA FREE',
         description:
-          'Acceso básico al marketplace. Publica solicitudes y recibe propuestas con límites mensuales.',
+          'Marketplace completo y sin límites. Publica solicitudes y envía propuestas ilimitadas. Comisión estándar del 10% por servicio completado.',
         price: 0,
         isBillable: false,
         showInLanding: true,
@@ -49,24 +64,35 @@ export default class ShotraPackagesSeed {
       await packageRepo.save(freePkg);
       console.log('✅ Paquete SHOTRA FREE creado:', freePkg.id);
     } else {
-      console.log('⚠️ Paquete SHOTRA FREE ya existe con ID:', freePkg.id);
+      // Ya existe: sincronizar textos comerciales del nuevo enfoque.
+      freePkg.description =
+        'Marketplace completo y sin límites. Publica solicitudes y envía propuestas ilimitadas. Comisión estándar del 10% por servicio completado.';
+      freePkg.price = 0;
+      freePkg.isBillable = false;
+      await packageRepo.save(freePkg);
+      console.log('⚠️ Paquete SHOTRA FREE ya existe, textos sincronizados:', freePkg.id);
     }
 
     // Variables del plan FREE
+    // VOLUMEN ILIMITADO para todos (el negocio vive de la comisión por
+    // transacción; no se capa la actividad). Solo cambian los beneficios de
+    // impacto y la comisión.
     const freeVariables = [
-      // Límites de uso (cantidad por mes)
-      { variableName: 'nSolicitudes', displayName: 'Solicitudes por mes', maxValue: 5, limitType: 'quantity' },
-      { variableName: 'nPropuestas', displayName: 'Propuestas por mes', maxValue: 10, limitType: 'quantity' },
-      // Features habilitadas
-      { variableName: 'basicMessaging', displayName: 'Mensajería básica', maxValue: 1, limitType: 'feature' },
-      { variableName: 'basicProfile', displayName: 'Perfil básico', maxValue: 1, limitType: 'feature' },
+      // Volumen: ilimitado (informativo, NO usar como tope de bloqueo)
+      { variableName: 'nSolicitudes', displayName: 'Solicitudes ilimitadas', maxValue: 99999, limitType: 'quantity' },
+      { variableName: 'nPropuestas', displayName: 'Propuestas ilimitadas', maxValue: 99999, limitType: 'quantity' },
+      // Features base (incluidas para todos)
+      { variableName: 'basicMessaging', displayName: 'Mensajería', maxValue: 1, limitType: 'feature' },
+      { variableName: 'basicProfile', displayName: 'Perfil profesional', maxValue: 1, limitType: 'feature' },
       { variableName: 'ratings', displayName: 'Evaluaciones', maxValue: 1, limitType: 'feature' },
-      // Features NO incluidas
+      { variableName: 'unlimitedProposals', displayName: 'Propuestas ilimitadas', maxValue: 1, limitType: 'feature' },
+      // Beneficios de impacto (exclusivos de PRO → deshabilitados en FREE)
       { variableName: 'priorityMatching', displayName: 'Matching prioritario', maxValue: 0, limitType: 'feature' },
       { variableName: 'featuredProvider', displayName: 'Perfil destacado', maxValue: 0, limitType: 'feature' },
       { variableName: 'analytics', displayName: 'Analytics de rendimiento', maxValue: 0, limitType: 'feature' },
-      { variableName: 'unlimitedProposals', displayName: 'Propuestas ilimitadas', maxValue: 0, limitType: 'feature' },
       { variableName: 'verifiedBadge', displayName: 'Insignia verificado', maxValue: 0, limitType: 'feature' },
+      { variableName: 'portfolioShowcase', displayName: 'Portafolio ampliado', maxValue: 0, limitType: 'feature' },
+      { variableName: 'reducedCommission', displayName: 'Comisión reducida (5%)', maxValue: 0, limitType: 'feature' },
     ];
 
     for (const varData of freeVariables) {
@@ -107,7 +133,7 @@ export default class ShotraPackagesSeed {
         code,
         displayName: 'SHOTRA PRO',
         description:
-          'Marketplace sin límites. Propuestas ilimitadas, matching prioritario, perfil destacado y analytics.',
+          'Más visibilidad, más confianza y menor comisión. Perfil destacado, matching prioritario, insignia de verificado, analytics de rendimiento y portafolio ampliado. Comisión reducida del 5% (la mitad): el ahorro paga la mensualidad desde ~$500.000/mes facturados.',
         price: 25000,
         isBillable: true,
         showInLanding: true,
@@ -120,21 +146,35 @@ export default class ShotraPackagesSeed {
       await packageRepo.save(proPkg);
       console.log('✅ Paquete SHOTRA PRO creado:', proPkg.id);
     } else {
-      console.log('⚠️ Paquete SHOTRA PRO ya existe con ID:', proPkg.id);
+      // Ya existe: sincronizar textos comerciales del nuevo enfoque.
+      proPkg.description =
+        'Más visibilidad, más confianza y menor comisión. Perfil destacado, matching prioritario, insignia de verificado, analytics de rendimiento y portafolio ampliado. Comisión reducida del 5% (la mitad): el ahorro paga la mensualidad desde ~$500.000/mes facturados.';
+      proPkg.price = 25000;
+      proPkg.isBillable = true;
+      proPkg.isHighlighted = true;
+      await packageRepo.save(proPkg);
+      console.log('⚠️ Paquete SHOTRA PRO ya existe, textos sincronizados:', proPkg.id);
     }
 
-    // Variables del plan PRO (todo habilitado + sin límites de cantidad)
+    // Variables del plan PRO. VOLUMEN ilimitado (igual que FREE: no se capa la
+    // actividad). La diferencia real de PRO son los BENEFICIOS DE IMPACTO
+    // (todos habilitados) y la comisión reducida.
     const proVariables = [
-      { variableName: 'nSolicitudes', displayName: 'Solicitudes por mes', maxValue: 99999, limitType: 'quantity' },
-      { variableName: 'nPropuestas', displayName: 'Propuestas por mes', maxValue: 99999, limitType: 'quantity' },
-      { variableName: 'basicMessaging', displayName: 'Mensajería básica', maxValue: 1, limitType: 'feature' },
-      { variableName: 'basicProfile', displayName: 'Perfil básico', maxValue: 1, limitType: 'feature' },
+      // Volumen: ilimitado (igual que FREE)
+      { variableName: 'nSolicitudes', displayName: 'Solicitudes ilimitadas', maxValue: 99999, limitType: 'quantity' },
+      { variableName: 'nPropuestas', displayName: 'Propuestas ilimitadas', maxValue: 99999, limitType: 'quantity' },
+      // Features base
+      { variableName: 'basicMessaging', displayName: 'Mensajería', maxValue: 1, limitType: 'feature' },
+      { variableName: 'basicProfile', displayName: 'Perfil profesional', maxValue: 1, limitType: 'feature' },
       { variableName: 'ratings', displayName: 'Evaluaciones', maxValue: 1, limitType: 'feature' },
+      { variableName: 'unlimitedProposals', displayName: 'Propuestas ilimitadas', maxValue: 1, limitType: 'feature' },
+      // Beneficios de impacto (exclusivos de PRO)
       { variableName: 'priorityMatching', displayName: 'Matching prioritario', maxValue: 1, limitType: 'feature' },
       { variableName: 'featuredProvider', displayName: 'Perfil destacado', maxValue: 1, limitType: 'feature' },
       { variableName: 'analytics', displayName: 'Analytics de rendimiento', maxValue: 1, limitType: 'feature' },
-      { variableName: 'unlimitedProposals', displayName: 'Propuestas ilimitadas', maxValue: 1, limitType: 'feature' },
       { variableName: 'verifiedBadge', displayName: 'Insignia verificado', maxValue: 1, limitType: 'feature' },
+      { variableName: 'portfolioShowcase', displayName: 'Portafolio ampliado', maxValue: 1, limitType: 'feature' },
+      { variableName: 'reducedCommission', displayName: 'Comisión reducida (5%)', maxValue: 1, limitType: 'feature' },
     ];
 
     for (const varData of proVariables) {
