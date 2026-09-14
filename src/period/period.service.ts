@@ -75,10 +75,18 @@ export class PeriodService {
     return await this.entityCodeService.generateCode('Period');
   }
 
-  findAll() {
+  findAll(tenantId?: string) {
     // Validar vigencia antes de retornar los periodos
     this.periodValidationService.validateActivePeriodExpiry();
-    return this.periodRepository.find();
+
+    // Sin tenantId: comportamiento histórico (todos los periodos), usado por
+    // llamadas internas que no distinguen tenant (p. ej. InOut).
+    if (tenantId === undefined) {
+      return this.periodRepository.find();
+    }
+
+    const actualTenantId = tenantId === 'null' ? null : tenantId;
+    return this.periodRepository.find({ where: { tenantId: actualTenantId } });
   }
 
   async findOne(id: string) {
