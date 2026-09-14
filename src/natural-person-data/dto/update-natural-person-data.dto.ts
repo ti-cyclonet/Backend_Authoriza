@@ -1,4 +1,5 @@
 import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class UpdateNaturalPersonDataDto {
   @IsOptional()
@@ -18,6 +19,7 @@ export class UpdateNaturalPersonDataDto {
   secondSurname?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
   @IsDateString()
   birthDate?: string;
 

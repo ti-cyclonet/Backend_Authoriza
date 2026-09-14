@@ -246,7 +246,6 @@ export class UsersController {
   @Put(':id')
   @ApiOperation({ summary: 'Update user data' })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
-    console.log(`PUT /users/${id} - Updating user with data:`, JSON.stringify(dto, null, 2));
     return this.usersService.update(id, dto);
   }
 

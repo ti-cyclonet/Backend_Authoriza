@@ -418,19 +418,19 @@ export class UsersService {
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<User> {
-    console.log(`UsersService.update - ID: ${id}, DTO:`, JSON.stringify(dto, null, 2));
-    
     const user = await this.userRepository.findOne({
       where: { id },
-      relations: ['basicData'],
+      relations: [
+        'basicData',
+        'basicData.naturalPersonData',
+        'basicData.legalEntityData',
+      ],
       withDeleted: true,
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
-
-    console.log('Current user before update:', JSON.stringify(user, null, 2));
 
     if (dto.strUserName) user.strUserName = dto.strUserName;
     if (dto.strStatus) {
@@ -456,31 +456,25 @@ export class UsersService {
 
     // Actualizar campos de documento en BasicData
     if (dto.basicData && user.basicData) {
-      console.log('Updating basicData with:', dto.basicData);
       if (dto.basicData.documentTypeId) {
         user.basicData.documentTypeId = dto.basicData.documentTypeId;
       }
       if (dto.basicData.documentNumber) {
         user.basicData.documentNumber = dto.basicData.documentNumber;
       }
-      const savedBasicData = await this.userRepository.manager.save(BasicData, user.basicData);
-      console.log('BasicData saved:', savedBasicData);
+      await this.userRepository.manager.save(BasicData, user.basicData);
     }
 
     // Actualizar naturalPersonData si existe
     if (dto.naturalPersonData && user.basicData?.naturalPersonData) {
-      console.log('Updating naturalPersonData with:', dto.naturalPersonData);
       Object.assign(user.basicData.naturalPersonData, dto.naturalPersonData);
-      const savedNaturalPersonData = await this.userRepository.manager.save(NaturalPersonData, user.basicData.naturalPersonData);
-      console.log('NaturalPersonData saved:', savedNaturalPersonData);
+      await this.userRepository.manager.save(NaturalPersonData, user.basicData.naturalPersonData);
     }
 
     // Actualizar legalEntityData si existe
     if (dto.legalEntityData && user.basicData?.legalEntityData) {
-      console.log('Updating legalEntityData with:', dto.legalEntityData);
       Object.assign(user.basicData.legalEntityData, dto.legalEntityData);
-      const savedLegalEntityData = await this.userRepository.manager.save(LegalEntityData, user.basicData.legalEntityData);
-      console.log('LegalEntityData saved:', savedLegalEntityData);
+      await this.userRepository.manager.save(LegalEntityData, user.basicData.legalEntityData);
     }
 
     if (dto.dependentOnId) {
@@ -490,8 +484,6 @@ export class UsersService {
 
     user.dtmLatestUpdateDate = new Date();
 
-    console.log('User before save:', JSON.stringify(user, null, 2));
-    
     // Crear una copia del usuario sin basicData para evitar conflictos
     const userToSave = {
       id: user.id,
@@ -506,12 +498,9 @@ export class UsersService {
       deletedAt: user.deletedAt,
       // dependentOnId y rolId removidos - ahora se manejan con UserDependency y UserRole
     };
-    
-    console.log('UserToSave:', JSON.stringify(userToSave, null, 2));
-    
+
     try {
       const savedUser = await this.userRepository.save(userToSave);
-      console.log('User saved successfully:', savedUser.id);
       // Notify Kiri if status changed
       if (dto.strStatus) {
         const allowed = dto.strStatus === 'ACTIVE' || dto.strStatus === 'CONFIRMED';
@@ -519,7 +508,7 @@ export class UsersService {
       }
       return savedUser;
     } catch (error) {
-      console.error('Error saving user:', error);
+      console.error(`Error saving user ${id}:`, error);
       throw error;
     }
   }
