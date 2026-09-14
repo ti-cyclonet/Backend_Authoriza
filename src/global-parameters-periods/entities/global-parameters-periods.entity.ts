@@ -17,7 +17,7 @@ export class GlobalParametersPeriods {
   @Column()
   value: string;
 
-  @Column({ default: 'active' })
+  @Column({ default: 'ACTIVE' })
   status: string;
 
   @Column({ name: 'operation_type', default: 'add' })

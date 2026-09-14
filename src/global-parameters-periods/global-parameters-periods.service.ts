@@ -17,7 +17,7 @@ export class GlobalParametersPeriodsService {
       globalParameter: { id: dto.globalParameterId },
       period: { id: dto.periodId },
       value: dto.value,
-      status: dto.status || 'active',
+      status: dto.status || 'ACTIVE',
     });
     return this.repo.save(entity);
   }
@@ -37,7 +37,9 @@ export class GlobalParametersPeriodsService {
     const result = await this.repo.createQueryBuilder('gpp')
       .leftJoinAndSelect('gpp.globalParameter', 'gp')
       .leftJoinAndSelect('gpp.period', 'p')
-      .where('gpp.status = :status', { status: 'ACTIVE' })
+      // UPPER() por compatibilidad con filas antiguas guardadas como 'active' (el
+      // default de la entidad era minúscula y nunca coincidía con este filtro).
+      .where('UPPER(gpp.status) = :status', { status: 'ACTIVE' })
       .getMany();
     
     return result;
