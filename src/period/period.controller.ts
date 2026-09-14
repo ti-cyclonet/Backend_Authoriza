@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { PeriodService } from './period.service';
 import { CreatePeriodDto } from './dto/create-period.dto';
 import { UpdatePeriodDto } from './dto/update-period.dto';
@@ -27,8 +27,8 @@ export class PeriodController {
   }
 
   @Get()
-  findAll() {
-    return this.periodService.findAll();
+  findAll(@Query('tenantId') tenantId?: string) {
+    return this.periodService.findAll(tenantId);
   }
 
   @Get('active/current')
