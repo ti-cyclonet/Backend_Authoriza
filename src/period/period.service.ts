@@ -23,23 +23,27 @@ export class PeriodService {
   }
 
   async createSubperiod(dto: any) {
-    // Generar código automático para subperíodo
-    const code = await this.generateSubperiodCode(dto.parentPeriodId);
-    
+    const parentPeriod = await this.findOne(dto.parentPeriodId);
+
+    // El subperiodo hereda tenantId y source del padre en vez de confiar en lo
+    // que mande el caller: evita que un periodo de una app quede anidado bajo
+    // el periodo de otra app o de otro tenant (ver caso "amor y amistad").
+    const code = await this.generateSubperiodCode(parentPeriod);
+
     const subperiod = this.periodRepository.create({
       name: dto.name,
       code,
       startDate: new Date(dto.startDate),
       endDate: new Date(dto.endDate),
       status: 'INACTIVE',
-      parentPeriodId: dto.parentPeriodId,
-      tenantId: dto.tenantId || null
+      parentPeriodId: parentPeriod.id,
+      tenantId: parentPeriod.tenantId,
+      source: parentPeriod.source,
     });
     return this.periodRepository.save(subperiod);
   }
 
-  private async generateSubperiodCode(parentPeriodId: string): Promise<string> {
-    const parentPeriod = await this.findOne(parentPeriodId);
+  private async generateSubperiodCode(parentPeriod: Period): Promise<string> {
     let nextNumber = 1;
     let codeExists = true;
     
@@ -75,18 +79,25 @@ export class PeriodService {
     return await this.entityCodeService.generateCode('Period');
   }
 
-  findAll(tenantId?: string) {
+  findAll(tenantId?: string, source?: string) {
     // Validar vigencia antes de retornar los periodos
     this.periodValidationService.validateActivePeriodExpiry();
 
-    // Sin tenantId: comportamiento histórico (todos los periodos), usado por
-    // llamadas internas que no distinguen tenant (p. ej. InOut).
-    if (tenantId === undefined) {
+    const where: { tenantId?: string | null; source?: string } = {};
+    if (tenantId !== undefined) {
+      where.tenantId = tenantId === 'null' ? null : tenantId;
+    }
+    if (source) {
+      where.source = source;
+    }
+
+    // Sin tenantId ni source: comportamiento histórico (todos los periodos),
+    // usado solo por llamadas internas que no distinguen tenant/app.
+    if (Object.keys(where).length === 0) {
       return this.periodRepository.find();
     }
 
-    const actualTenantId = tenantId === 'null' ? null : tenantId;
-    return this.periodRepository.find({ where: { tenantId: actualTenantId } });
+    return this.periodRepository.find({ where });
   }
 
   async findOne(id: string) {
@@ -223,13 +234,19 @@ export class PeriodService {
       }
     }
     
-    // Desactivar períodos activos del mismo tenantId solamente
+    // Desactivar períodos activos del mismo tenantId Y de la misma app (source)
+    // solamente: un periodo de FactoNet no debe apagar el periodo activo de
+    // InOut para ese mismo tenant, ni viceversa.
     if (!period.parentPeriodId) {
       // Para períodos principales, desactivar otros períodos del mismo tenant
-      const whereCondition = period.tenantId === null 
-        ? { tenantId: null, status: 'ACTIVE' as const }
-        : { tenantId: period.tenantId, status: 'ACTIVE' as const };
-      
+      const whereCondition: { tenantId: string | null; status: 'ACTIVE'; source?: string } = {
+        tenantId: period.tenantId ?? null,
+        status: 'ACTIVE',
+      };
+      if (period.source) {
+        whereCondition.source = period.source;
+      }
+
       await this.periodRepository.update(whereCondition, { status: 'INACTIVE' });
     } else {
       // Para subperíodos, desactivar solo otros subperíodos del mismo período padre
@@ -255,11 +272,15 @@ export class PeriodService {
   /**
    * Obtiene el periodo activo por tenantId
    */
-  async getActivePeriodByTenant(tenantId: string | null): Promise<Period | null> {
-    const whereCondition = tenantId === null 
-      ? { status: 'ACTIVE' as const, tenantId: null }
-      : { status: 'ACTIVE' as const, tenantId: tenantId };
-      
+  async getActivePeriodByTenant(tenantId: string | null, source?: string): Promise<Period | null> {
+    const whereCondition: { status: 'ACTIVE'; tenantId: string | null; source?: string } = {
+      status: 'ACTIVE',
+      tenantId,
+    };
+    if (source) {
+      whereCondition.source = source;
+    }
+
     const period = await this.periodRepository.findOne({
       where: whereCondition
     });

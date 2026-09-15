@@ -35,6 +35,12 @@ export class Period {
   @Column({ name: 'tenant_id', nullable: true })
   tenantId: string;
 
+  // App propietaria del periodo ('FACTONET' | 'INOUT'). La tabla es compartida
+  // entre apps; sin esto, periodos de apps distintas con el mismo tenantId se
+  // mezclan (ver migracion AddSourceToPeriods).
+  @Column({ type: 'varchar', nullable: true })
+  source: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
