@@ -13,5 +13,7 @@ export const AppDataSource = new DataSource({
   synchronize: false,
   logging: true,
   entities: ["src/**/*.entity{.ts,.js}"],
-  migrations: [],
+  migrations: ["src/migrations/*{.ts,.js}"],
+  // Igual que app.module.ts: la RDS de produccion exige SSL (DB_SSL=true).
+  ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
 });
