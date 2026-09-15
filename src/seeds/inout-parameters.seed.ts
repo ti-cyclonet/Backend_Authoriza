@@ -62,6 +62,12 @@ export default class InoutParametersSeed {
         dataType: 'number',
       },
       {
+        code: 'PORCENTAJE_DESCUENTO',
+        name: 'Descuento (%)',
+        description: 'Porcentaje de descuento que se aplica automáticamente a las ventas del periodo (p. ej. una promoción por tiempo limitado). Queda limitado por "Descuento Máximo Permitido (%)".',
+        dataType: 'number',
+      },
+      {
         code: 'PENALIZACION_MORA',
         name: 'Penalización por Mora (%)',
         description: 'Porcentaje de penalización diaria por pago tardío',
