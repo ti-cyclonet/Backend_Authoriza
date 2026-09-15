@@ -13,4 +13,8 @@ export class CreatePeriodDto {
   @IsOptional()
   @IsString()
   tenantId?: string;
+
+  @IsOptional()
+  @IsString()
+  source?: string;
 }

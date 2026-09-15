@@ -27,8 +27,8 @@ export class PeriodController {
   }
 
   @Get()
-  findAll(@Query('tenantId') tenantId?: string) {
-    return this.periodService.findAll(tenantId);
+  findAll(@Query('tenantId') tenantId?: string, @Query('source') source?: string) {
+    return this.periodService.findAll(tenantId, source);
   }
 
   @Get('active/current')
@@ -37,9 +37,9 @@ export class PeriodController {
   }
 
   @Get('active/tenant/:tenantId')
-  async getActivePeriodByTenant(@Param('tenantId') tenantId: string) {
+  async getActivePeriodByTenant(@Param('tenantId') tenantId: string, @Query('source') source?: string) {
     const actualTenantId = tenantId === 'null' ? null : tenantId;
-    return this.periodService.getActivePeriodByTenant(actualTenantId);
+    return this.periodService.getActivePeriodByTenant(actualTenantId, source);
   }
 
   @Get('validation/check-active')
