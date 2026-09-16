@@ -25,6 +25,16 @@ export class PeriodService {
   async createSubperiod(dto: any) {
     const parentPeriod = await this.findOne(dto.parentPeriodId);
 
+    // Rechazar explícitamente si la app que llama (dto.source) no es la misma
+    // dueña del periodo padre, en vez de re-etiquetar en silencio: evita que
+    // InOut (o cualquier otra app) anide un subperiodo bajo un periodo de
+    // FactoNet solo porque compartía tenantId (ver caso "amor y amistad").
+    if (dto.source && parentPeriod.source && dto.source !== parentPeriod.source) {
+      throw new BadRequestException(
+        `El periodo padre "${parentPeriod.name}" pertenece a ${parentPeriod.source}, no a ${dto.source}. No se puede crear un subperiodo de otra aplicación bajo él.`
+      );
+    }
+
     // El subperiodo hereda tenantId y source del padre en vez de confiar en lo
     // que mande el caller: evita que un periodo de una app quede anidado bajo
     // el periodo de otra app o de otro tenant (ver caso "amor y amistad").
