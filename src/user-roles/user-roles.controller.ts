@@ -1,9 +1,14 @@
-import { Controller, Get, Post, Body, Param, Delete, Put, Patch, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Put, Patch, Request, Query, UseGuards } from '@nestjs/common';
 import { UserRolesService } from './user-roles.service';
 import { CreateUserRoleDto } from './dto/create-user-role.dto';
 import { TransferAdminRoleDto } from './dto/transfer-admin-role.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+// Sin guard, cualquiera sin sesion podia asignarse a si mismo cualquier rol
+// (p. ej. adminInout) bajo el contrato de otro cliente (el guard global de
+// main.ts esta deshabilitado y este controller nunca aplico el suyo propio).
 @Controller('user-roles')
+@UseGuards(JwtAuthGuard)
 export class UserRolesController {
   constructor(private readonly userRolesService: UserRolesService) {}
 

@@ -60,21 +60,25 @@ export class SelfRegistrationService {
     if (principalExists)
       throw new ConflictException('El email del propietario ya está registrado');
 
-    const dependentExists = await this.userRepository.findOne({
-      where: { strUserName: dto.dependent.email },
-    });
-    if (dependentExists)
-      throw new ConflictException('El email del operador ya está registrado');
+    if (dto.dependent) {
+      const dependentExists = await this.userRepository.findOne({
+        where: { strUserName: dto.dependent.email },
+      });
+      if (dependentExists)
+        throw new ConflictException('El email del operador ya está registrado');
+    }
 
     // 3. Resolve document type IDs
     const principalDocType = await this.documentTypeRepository.findOne({
       where: { documentType: dto.principal.documentType },
     });
 
-    const dependentDocTypeCode = dto.dependent.documentType || 'CC';
-    const dependentDocType = await this.documentTypeRepository.findOne({
-      where: { documentType: dependentDocTypeCode },
-    });
+    const dependentDocTypeCode = dto.dependent?.documentType || 'CC';
+    const dependentDocType = dto.dependent
+      ? await this.documentTypeRepository.findOne({
+          where: { documentType: dependentDocTypeCode },
+        })
+      : null;
 
     // 3.1 Validate document number uniqueness
     if (dto.principal.documentNumber && principalDocType) {
@@ -99,7 +103,7 @@ export class SelfRegistrationService {
       }
     }
 
-    if (dto.dependent?.documentNumber && dependentDocType) {
+    if (dto.dependent && dto.dependent.documentNumber && dependentDocType) {
       const existingDepDocument = await this.basicDataRepository.findOne({
         where: {
           documentTypeId: dependentDocType.id,
@@ -174,50 +178,59 @@ export class SelfRegistrationService {
         await manager.save(legalData);
       }
 
-      // 4.4 Create dependent user
-      const dependentCode = await this.entityCodeService.generateCode('User');
-      const depVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const depVerificationExpires = new Date();
-      depVerificationExpires.setHours(depVerificationExpires.getHours() + 24);
+      // 4.4 Create dependent user — OPCIONAL. Nueva politica de registro: se
+      // crea una sola cuenta (el principal), que recibe todos los roles
+      // operativos (accountOwner, adminInout, adminInvoices, userShotra). El
+      // operador/dependiente ya no se crea automaticamente aqui; el propio
+      // principal puede crearlo despues desde el modulo "Usuarios". Se
+      // conserva este bloque, guardado tras `if (dto.dependent)`, para no
+      // afectar el flujo anterior si algun caller sigue enviando `dependent`.
+      let savedDependent: User | null = null;
+      if (dto.dependent) {
+        const dependentCode = await this.entityCodeService.generateCode('User');
+        const depVerificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+        const depVerificationExpires = new Date();
+        depVerificationExpires.setHours(depVerificationExpires.getHours() + 24);
 
-      const dependentUser = manager.create(User, {
-        strUserName: dto.dependent.email,
-        strPassword: hashedPassword,
-        code: dependentCode,
-        strStatus: 'UNCONFIRMED',
-        isVerified: false,
-        mustChangePassword: true,
-        lastPasswordChange: new Date(),
-        verificationCode: depVerificationCode,
-        verificationExpires: depVerificationExpires,
-      });
-      const savedDependent = await manager.save(dependentUser);
+        const dependentUser = manager.create(User, {
+          strUserName: dto.dependent.email,
+          strPassword: hashedPassword,
+          code: dependentCode,
+          strStatus: 'UNCONFIRMED',
+          isVerified: false,
+          mustChangePassword: true,
+          lastPasswordChange: new Date(),
+          verificationCode: depVerificationCode,
+          verificationExpires: depVerificationExpires,
+        });
+        savedDependent = await manager.save(dependentUser);
 
-      // 4.5 Create BasicData for dependent
-      const depBasicData = manager.create(BasicData, {
-        strPersonType: 'N',
-        strStatus: 'ACTIVE',
-        documentTypeId: dependentDocType?.id || null,
-        documentNumber: dto.dependent.documentNumber || '',
-        user: savedDependent,
-      });
-      const savedDepBasicData = await manager.save(depBasicData);
+        // 4.5 Create BasicData for dependent
+        const depBasicData = manager.create(BasicData, {
+          strPersonType: 'N',
+          strStatus: 'ACTIVE',
+          documentTypeId: dependentDocType?.id || null,
+          documentNumber: dto.dependent.documentNumber || '',
+          user: savedDependent,
+        });
+        const savedDepBasicData = await manager.save(depBasicData);
 
-      // Update dependent user with basicData reference
-      savedDependent.basicData = savedDepBasicData;
-      await manager.save(savedDependent);
+        // Update dependent user with basicData reference
+        savedDependent.basicData = savedDepBasicData;
+        await manager.save(savedDependent);
 
-      const depNaturalData = manager.create(NaturalPersonData, {
-        firstName: dto.dependent.firstName,
-        secondName: dto.dependent.secondName || null,
-        firstSurname: dto.dependent.firstSurname,
-        secondSurname: dto.dependent.secondSurname || null,
-        birthDate: dto.dependent.birthdate ? new Date(dto.dependent.birthdate) : null,
-        sex: dto.dependent.gender || null,
-        maritalStatus: dto.dependent.civilStatus || null,
-        basicData: savedDepBasicData,
-      });
-      await manager.save(depNaturalData);
+        const depNaturalData = manager.create(NaturalPersonData, {
+          firstName: dto.dependent.firstName,
+          secondName: dto.dependent.secondName || null,
+          firstSurname: dto.dependent.firstSurname,
+          secondSurname: dto.dependent.secondSurname || null,
+          birthDate: dto.dependent.birthdate ? new Date(dto.dependent.birthdate) : null,
+          sex: dto.dependent.gender || null,
+          maritalStatus: dto.dependent.civilStatus || null,
+          basicData: savedDepBasicData,
+        });
+        await manager.save(depNaturalData);
+      }
 
       // 4.6 Create contract
       const contractCode = await this.entityCodeService.generateCode('Contract');
@@ -251,14 +264,17 @@ export class SelfRegistrationService {
       });
       const savedContract = await manager.save(contract);
 
-      // 4.7 Create user dependency (admin is auto-designated as authorized signer)
-      const dependency = manager.create(UserDependency, {
-        principalUserId: savedPrincipal.id,
-        dependentUserId: savedDependent.id,
-        status: 'ACTIVE',
-        isAuthorizedSigner: true,
-      });
-      await manager.save(dependency);
+      // 4.7 Create user dependency (solo si se creo un operador; admin queda
+      // auto-designado como firmante autorizado)
+      if (savedDependent) {
+        const dependency = manager.create(UserDependency, {
+          principalUserId: savedPrincipal.id,
+          dependentUserId: savedDependent.id,
+          status: 'ACTIVE',
+          isAuthorizedSigner: true,
+        });
+        await manager.save(dependency);
+      }
 
       // 4.8 Assign accountOwner role to principal
       const accountOwnerRole = await manager.findOne(Rol, {
@@ -302,18 +318,20 @@ export class SelfRegistrationService {
       this.logger.warn(`Failed to send verification email to principal: ${err.message}`);
     }
 
-    // 5.2 Email to dependent
-    try {
-      const depName = dto.dependent.firstName || 'Operador';
-      const depVerificationUrl = `${apiBaseUrl}/auth/verify-registration?email=${encodeURIComponent(dto.dependent.email)}&code=${result.dependentUser.verificationCode}`;
+    // 5.2 Email to dependent (solo si se registro un operador)
+    if (dto.dependent && result.dependentUser) {
+      try {
+        const depName = dto.dependent.firstName || 'Operador';
+        const depVerificationUrl = `${apiBaseUrl}/auth/verify-registration?email=${encodeURIComponent(dto.dependent.email)}&code=${result.dependentUser.verificationCode}`;
 
-      await this.notificationsService.sendByTemplate(
-        'USER_VERIFICATION',
-        dto.dependent.email,
-        { customerName: depName, verificationUrl: depVerificationUrl, year, applicationName },
-      );
-    } catch (err) {
-      this.logger.warn(`Failed to send verification email to dependent: ${err.message}`);
+        await this.notificationsService.sendByTemplate(
+          'USER_VERIFICATION',
+          dto.dependent.email,
+          { customerName: depName, verificationUrl: depVerificationUrl, year, applicationName },
+        );
+      } catch (err) {
+        this.logger.warn(`Failed to send verification email to dependent: ${err.message}`);
+      }
     }
 
     // 5.3 Notify adminFactonet users about the new contract
@@ -328,11 +346,13 @@ export class SelfRegistrationService {
 
     return {
       success: true,
-      message: 'Registro exitoso. Ambos correos deben ser confirmados para activar el contrato.',
+      message: result.dependentUser
+        ? 'Registro exitoso. Ambos correos deben ser confirmados para activar el contrato.'
+        : 'Registro exitoso. Confirma tu correo para activar tu contrato.',
       verificationRequired: true,
       data: {
         principalUserId: result.principalUser.id,
-        dependentUserId: result.dependentUser.id,
+        dependentUserId: result.dependentUser?.id ?? null,
         contractId: result.contract.id,
       },
     };
@@ -399,6 +419,10 @@ export class SelfRegistrationService {
         if (dependency) {
           const depUser = await manager.findOne(User, { where: { id: dependency.dependentUserId } });
           dependentVerified = !!depUser?.isVerified;
+        } else {
+          // Registro de una sola cuenta (sin operador automatico): no hay a
+          // quien esperar, el principal recibe directamente todos los roles.
+          dependentVerified = true;
         }
       } else {
         // Current user is the dependent
@@ -421,85 +445,83 @@ export class SelfRegistrationService {
 
       // When both verified: assign roles (always) and activate contract (if free)
       if (bothVerified) {
-        // Assign adminInout + adminInvoices roles to dependent
-        if (dependency) {
-          const adminInoutRole = await manager.findOne(Rol, {
-            where: { strName: 'adminInout' },
+        // Destinatario de los roles operativos: el dependiente si existe
+        // (flujo anterior de dos cuentas), o el propio principal si el
+        // registro es de una sola cuenta (nueva politica: el principal queda
+        // con accountOwner + adminInout + adminInvoices + userShotra).
+        const operationalUserId = dependency ? dependency.dependentUserId : principalUserId;
+
+        const adminInoutRole = await manager.findOne(Rol, {
+          where: { strName: 'adminInout' },
+        });
+        if (adminInoutRole) {
+          const existingRole = await manager.findOne(UserRole, {
+            where: {
+              userId: operationalUserId,
+              roleId: adminInoutRole.id,
+              contractId: contract.id,
+            },
           });
-          if (adminInoutRole) {
-            const existingRole = await manager.findOne(UserRole, {
-              where: {
-                userId: dependency.dependentUserId,
+          if (!existingRole) {
+            await manager.save(
+              manager.create(UserRole, {
+                userId: operationalUserId,
                 roleId: adminInoutRole.id,
                 contractId: contract.id,
-              },
-            });
-            if (!existingRole) {
-              await manager.save(
-                manager.create(UserRole, {
-                  userId: dependency.dependentUserId,
-                  roleId: adminInoutRole.id,
-                  contractId: contract.id,
-                  status: 'ACTIVE',
-                }),
-              );
-            }
+                status: 'ACTIVE',
+              }),
+            );
           }
+        }
 
-          // Also assign adminInvoices role from Factonet
-          const adminInvoicesRole = await manager.findOne(Rol, {
-            where: { strName: 'adminInvoices' },
+        // Also assign adminInvoices role from Factonet
+        const adminInvoicesRole = await manager.findOne(Rol, {
+          where: { strName: 'adminInvoices' },
+        });
+        if (adminInvoicesRole) {
+          const existingFactonetRole = await manager.findOne(UserRole, {
+            where: {
+              userId: operationalUserId,
+              roleId: adminInvoicesRole.id,
+              contractId: contract.id,
+            },
           });
-          if (adminInvoicesRole) {
-            const existingFactonetRole = await manager.findOne(UserRole, {
-              where: {
-                userId: dependency.dependentUserId,
+          if (!existingFactonetRole) {
+            await manager.save(
+              manager.create(UserRole, {
+                userId: operationalUserId,
                 roleId: adminInvoicesRole.id,
                 contractId: contract.id,
-              },
+                status: 'ACTIVE',
+              }),
+            );
+          }
+        }
+
+        // BONUS CycloNet: si el contrato es de InOut, quien opera InOut
+        // (operationalUserId) obtiene acceso gratuito a Shotra (rol userShotra
+        // / plan FREE) para publicar solicitudes de domicilio desde InOut.
+        //
+        // PERMANENTE (contractId = null): sobrevive aunque el contrato de InOut
+        // se cancele, para dejar al operador activo en Shotra (corazón del
+        // ecosistema) haciendo solicitudes. Idempotente.
+        if (contract.package?.targetApplication?.toLowerCase() === 'inout') {
+          const userShotraRole = await manager.findOne(Rol, {
+            where: { strName: 'userShotra' },
+          });
+          if (userShotraRole) {
+            const existingShotraRole = await manager.findOne(UserRole, {
+              where: { userId: operationalUserId, roleId: userShotraRole.id },
             });
-            if (!existingFactonetRole) {
+            if (!existingShotraRole) {
               await manager.save(
                 manager.create(UserRole, {
-                  userId: dependency.dependentUserId,
-                  roleId: adminInvoicesRole.id,
-                  contractId: contract.id,
+                  userId: operationalUserId,
+                  roleId: userShotraRole.id,
+                  contractId: null,
                   status: 'ACTIVE',
                 }),
               );
-            }
-          }
-
-          // BONUS CycloNet: si el contrato es de InOut, el OPERADOR (dependiente
-          // con adminInout) obtiene acceso gratuito a Shotra (rol userShotra /
-          // plan FREE) para publicar solicitudes de domicilio desde InOut.
-          //
-          // IMPORTANTE: se otorga al DEPENDIENTE, no al principal. En el flujo de
-          // InOut el titular (principal) queda con accountOwner (bloqueado para
-          // login) y NO inicia sesión en las apps; quien gestiona InOut —y por
-          // tanto quien usaría el panel de domicilios— es el dependiente.
-          //
-          // PERMANENTE (contractId = null): sobrevive aunque el contrato de InOut
-          // se cancele, para dejar al operador activo en Shotra (corazón del
-          // ecosistema) haciendo solicitudes. Idempotente.
-          if (contract.package?.targetApplication?.toLowerCase() === 'inout') {
-            const userShotraRole = await manager.findOne(Rol, {
-              where: { strName: 'userShotra' },
-            });
-            if (userShotraRole) {
-              const existingShotraRole = await manager.findOne(UserRole, {
-                where: { userId: dependency.dependentUserId, roleId: userShotraRole.id },
-              });
-              if (!existingShotraRole) {
-                await manager.save(
-                  manager.create(UserRole, {
-                    userId: dependency.dependentUserId,
-                    roleId: userShotraRole.id,
-                    contractId: null,
-                    status: 'ACTIVE',
-                  }),
-                );
-              }
             }
           }
         }

@@ -1,8 +1,13 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards } from '@nestjs/common';
 import { UserDependenciesService } from './user-dependencies.service';
 import { CreateUserDependencyDto } from './dto/create-user-dependency.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+// Sin guard, cualquiera sin sesion podia forjar/borrar/listar relaciones de
+// dependencia de cualquier cuenta (el guard global de main.ts esta
+// deshabilitado y este controller nunca aplico el suyo propio).
 @Controller('user-dependencies')
+@UseGuards(JwtAuthGuard)
 export class UserDependenciesController {
   constructor(private readonly userDependenciesService: UserDependenciesService) {}
 
