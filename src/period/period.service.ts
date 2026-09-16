@@ -298,6 +298,16 @@ export class PeriodService {
   }
 
   /**
+   * Obtiene el periodo activo de una app sin filtrar por tenant. Para
+   * FactoNet, los periodos son globales (solo adminFactonet los crea) y
+   * todos los clientes se rigen por el mismo periodo activo, sin importar
+   * el tenantId de quien pregunta.
+   */
+  async getActivePeriodBySource(source: string): Promise<Period | null> {
+    return this.periodRepository.findOne({ where: { status: 'ACTIVE', source } });
+  }
+
+  /**
    * Verifica si existe un periodo activo válido
    */
   async hasValidActivePeriod(): Promise<boolean> {
