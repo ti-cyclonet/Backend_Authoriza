@@ -418,7 +418,7 @@ export default class InitialApplicationsSeed {
       {
         strName: 'Shotra',
         strDescription: 'Marketplace de servicios profesionales - Short Trades',
-        strUrlImage: '/assets/img/default.jpg',
+        strUrlImage: 'https://res.cloudinary.com/dn8ki4idz/image/upload/v1789576124/shotra_placa_lqyu6y.png',
         strSlug: 'shotra app',
         strTags: ['marketplace', 'services', 'professional', 'delivery', 'trades'],
         roles: [
