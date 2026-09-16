@@ -69,10 +69,15 @@ export class SelfRegisterDto {
   @Type(() => SelfRegisterPrincipalDto)
   principal: SelfRegisterPrincipalDto;
 
-  @IsNotEmpty()
+  // Opcional: si no se envia, se registra una sola cuenta (el principal) con
+  // todos los roles operativos (accountOwner, adminInout, adminInvoices,
+  // userShotra). El dependiente se puede crear despues desde el modulo
+  // "Usuarios" de la aplicacion. Se mantiene por compatibilidad con el
+  // flujo anterior de dos cuentas (principal + operador).
+  @IsOptional()
   @ValidateNested()
   @Type(() => SelfRegisterDependentDto)
-  dependent: SelfRegisterDependentDto;
+  dependent?: SelfRegisterDependentDto;
 }
 
 export class VerifyRegistrationDto {
