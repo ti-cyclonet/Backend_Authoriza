@@ -16,6 +16,8 @@ import { ContractModule } from '../contract/contract.module';
 import { BasicData } from 'src/basic-data/entities/basic-data.entity';
 import { Image } from 'src/images/entities/image.entity';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { UserRolesModule } from '../user-roles/user-roles.module';
+import { UserDependenciesModule } from '../user-dependencies/user-dependencies.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
     NotificationsModule,
     CloudinaryModule,
     forwardRef(() => ContractModule),
+    UserRolesModule,
+    UserDependenciesModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, UserCleanupService],
