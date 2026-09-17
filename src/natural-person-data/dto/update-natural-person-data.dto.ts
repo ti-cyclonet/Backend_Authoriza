@@ -30,4 +30,8 @@ export class UpdateNaturalPersonDataDto {
   @IsOptional()
   @IsString()
   sex?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }

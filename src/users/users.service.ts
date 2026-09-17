@@ -305,6 +305,7 @@ export class UsersService {
           birthDate: dto.naturalPersonData.birthDate ? new Date(dto.naturalPersonData.birthDate) : null,
           sex: dto.naturalPersonData.sex || null,
           maritalStatus: dto.naturalPersonData.maritalStatus || null,
+          phone: dto.naturalPersonData.phone || null,
           basicData: savedBasicData,
         });
         await manager.save(naturalData);

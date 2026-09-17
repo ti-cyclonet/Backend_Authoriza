@@ -163,6 +163,7 @@ export class SelfRegistrationService {
           birthDate: dto.principal.birthdate ? new Date(dto.principal.birthdate) : null,
           sex: dto.principal.gender || null,
           maritalStatus: dto.principal.civilStatus || null,
+          phone: dto.principal.phone || null,
           basicData: savedBasicData,
         });
         await manager.save(naturalData);
@@ -227,6 +228,7 @@ export class SelfRegistrationService {
           birthDate: dto.dependent.birthdate ? new Date(dto.dependent.birthdate) : null,
           sex: dto.dependent.gender || null,
           maritalStatus: dto.dependent.civilStatus || null,
+          phone: dto.dependent.phone || null,
           basicData: savedDepBasicData,
         });
         await manager.save(depNaturalData);
@@ -1265,6 +1267,10 @@ export class SelfRegistrationService {
     secondSurname?: string;
     documentType?: string;
     documentNumber?: string;
+    phone?: string;
+    birthdate?: string;
+    gender?: string;
+    civilStatus?: string;
   }) {
     const existing = await this.userRepository.findOne({
       where: { strUserName: data.email },
@@ -1331,6 +1337,10 @@ export class SelfRegistrationService {
         secondName: data.secondName || null,
         firstSurname: data.firstSurname,
         secondSurname: data.secondSurname || null,
+        birthDate: data.birthdate ? new Date(data.birthdate) : null,
+        sex: data.gender || null,
+        maritalStatus: data.civilStatus || null,
+        phone: data.phone || null,
         basicData: savedBasicData,
       });
       await manager.save(naturalData);
@@ -1504,6 +1514,9 @@ export class SelfRegistrationService {
     documentType?: string;
     documentNumber?: string;
     phone?: string;
+    birthdate?: string;
+    gender?: string;
+    civilStatus?: string;
   }) {
     if (!data.email || !data.password || !data.firstName || !data.firstSurname) {
       throw new BadRequestException('Nombre, apellido, email y contraseña son obligatorios.');
@@ -1601,6 +1614,10 @@ export class SelfRegistrationService {
         secondName: data.secondName || null,
         firstSurname: data.firstSurname,
         secondSurname: data.secondSurname || null,
+        birthDate: data.birthdate ? new Date(data.birthdate) : null,
+        sex: data.gender || null,
+        maritalStatus: data.civilStatus || null,
+        phone: data.phone || null,
         basicData: savedBasicData,
       });
       await manager.save(naturalData);

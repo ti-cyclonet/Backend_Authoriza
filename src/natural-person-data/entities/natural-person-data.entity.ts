@@ -33,6 +33,9 @@ export class NaturalPersonData {
   @Column({ nullable: true })
   sex: string;
 
+  @Column({ nullable: true })
+  phone: string;
+
   @OneToOne(() => BasicData, (basicData) => basicData.naturalPersonData, {
     onDelete: 'CASCADE',
   })

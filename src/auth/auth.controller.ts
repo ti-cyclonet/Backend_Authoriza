@@ -199,6 +199,7 @@ export class AuthController {
   async registerKiri(@Body() body: {
     email: string; password: string; firstName: string; secondName?: string;
     firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string;
+    phone?: string; birthdate?: string; gender?: string; civilStatus?: string;
   }) {
     return this.selfRegistrationService.registerKiriUser(body);
   }
@@ -209,6 +210,7 @@ export class AuthController {
   async registerShotra(@Body() body: {
     email: string; password: string; firstName: string; secondName?: string;
     firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string; phone?: string;
+    birthdate?: string; gender?: string; civilStatus?: string;
   }) {
     return this.selfRegistrationService.registerShotraUser(body);
   }
