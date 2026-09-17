@@ -12,6 +12,7 @@ import { User } from './entities/user.entity';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { CreateFullUserDto } from './dto/CreateFullUserDto';
+import { CreateDependentUserDto } from './dto/create-dependent-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Rol } from 'src/roles/entities/rol.entity';
 import { PaginationDto } from './dto/pagination.dto';
@@ -29,6 +30,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { ContractService } from '../contract/contract.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Image } from '../images/entities/image.entity';
+import { UserRolesService } from '../user-roles/user-roles.service';
+import { UserDependenciesService } from '../user-dependencies/user-dependencies.service';
 
 @Injectable()
 export class UsersService {
@@ -49,6 +52,8 @@ export class UsersService {
     private readonly cloudinaryService: CloudinaryService,
     @Inject(forwardRef(() => ContractService))
     private readonly contractService: ContractService,
+    private readonly userRolesService: UserRolesService,
+    private readonly userDependenciesService: UserDependenciesService,
   ) {}
 
   /**
@@ -214,6 +219,152 @@ export class UsersService {
     );
 
     return savedUser;
+  }
+
+  /**
+   * Crea un usuario dependiente del tenant en sesión (equipo interno de una app,
+   * ej. InOut): mismo proceso de Authoriza que createFullUser (User + BasicData +
+   * datos de persona), pero además lo deja vinculado como UserDependency del
+   * principal y le asigna un rol validado contra el cupo del plan contratado
+   * (mismo camino que assignRole: valida cupo y aplica la cascada
+   * adminInout -> adminInvoices de FactoNet). Si la dependencia o el rol
+   * fallan tras crear el usuario, se revierte el usuario para no dejar
+   * huérfanos sin acceso ni vínculo.
+   */
+  async createDependentUser(
+    dto: CreateDependentUserDto,
+    principalUserId: string,
+    contractId: string,
+  ): Promise<{ id: string; message: string }> {
+    // 1. Validar cupo ANTES de crear nada (rol permitido por la app + plan).
+    await this.userRolesService.validateRoleAvailability(contractId, dto.roleId);
+
+    // 2. Unicidad de correo y documento.
+    const existingUser = await this.userRepository.findOne({
+      where: { strUserName: dto.email },
+    });
+    if (existingUser) {
+      throw new ConflictException('Ya existe un usuario registrado con ese correo.');
+    }
+
+    const documentTypeRecord = await this.userRepository.manager.findOne(DocumentType, {
+      where: { documentType: dto.documentType },
+    });
+    if (!documentTypeRecord) {
+      throw new BadRequestException(`Tipo de documento ${dto.documentType} no encontrado`);
+    }
+
+    const existingDoc = await this.userRepository.manager.findOne(BasicData, {
+      where: {
+        documentTypeId: documentTypeRecord.id,
+        documentNumber: dto.documentNumber,
+      },
+    });
+    if (existingDoc) {
+      throw new ConflictException(
+        `El documento ${dto.documentType} ${dto.documentNumber} ya está registrado en la plataforma.`,
+      );
+    }
+
+    // 3. Crear User + BasicData + datos de persona en una transacción.
+    const hashedPassword = await bcrypt.hash('1234567890', await bcrypt.genSalt());
+    const code = await this.entityCodeService.generateCode('User');
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const verificationExpires = new Date();
+    verificationExpires.setHours(verificationExpires.getHours() + 24);
+
+    const savedUser = await this.userRepository.manager.transaction(async (manager) => {
+      const user = manager.create(User, {
+        strUserName: dto.email,
+        strPassword: hashedPassword,
+        code,
+        strStatus: 'UNCONFIRMED',
+        isVerified: false,
+        mustChangePassword: true,
+        lastPasswordChange: new Date(),
+        verificationCode,
+        verificationExpires,
+      });
+      const newUser = await manager.save(user);
+
+      const basicData = manager.create(BasicData, {
+        strPersonType: dto.personType as 'N' | 'J',
+        strStatus: 'ACTIVE',
+        documentTypeId: documentTypeRecord.id,
+        documentNumber: dto.documentNumber,
+        user: newUser,
+      });
+      const savedBasicData = await manager.save(basicData);
+
+      if (dto.personType === 'N' && dto.naturalPersonData) {
+        const naturalData = manager.create(NaturalPersonData, {
+          firstName: dto.naturalPersonData.firstName,
+          secondName: dto.naturalPersonData.secondName || null,
+          firstSurname: dto.naturalPersonData.firstSurname,
+          secondSurname: dto.naturalPersonData.secondSurname || null,
+          birthDate: dto.naturalPersonData.birthDate ? new Date(dto.naturalPersonData.birthDate) : null,
+          sex: dto.naturalPersonData.sex || null,
+          maritalStatus: dto.naturalPersonData.maritalStatus || null,
+          basicData: savedBasicData,
+        });
+        await manager.save(naturalData);
+      } else if (dto.personType === 'J' && dto.legalEntityData) {
+        const legalData = manager.create(LegalEntityData, {
+          businessName: dto.legalEntityData.businessName,
+          webSite: dto.legalEntityData.webSite || null,
+          contactName: dto.legalEntityData.contactName,
+          contactEmail: dto.legalEntityData.contactEmail,
+          contactPhone: dto.legalEntityData.contactPhone,
+          basicData: savedBasicData,
+        });
+        await manager.save(legalData);
+      }
+
+      newUser.basicData = savedBasicData;
+      await manager.save(newUser);
+      return newUser;
+    });
+
+    // 4. Vincular como dependiente del admin en sesión y asignar el rol
+    // (valida cupo de nuevo y aplica cascada adminInout -> adminInvoices).
+    try {
+      await this.userDependenciesService.create({
+        principalUserId,
+        dependentUserId: savedUser.id,
+        status: 'ACTIVE',
+      } as any);
+
+      await this.userRolesService.assignRole({
+        userId: savedUser.id,
+        roleId: dto.roleId,
+        contractId,
+        status: 'ACTIVE',
+      } as any);
+    } catch (err) {
+      // No dejar usuarios huérfanos (sin dependencia ni rol): revertir.
+      await this.userRepository.delete(savedUser.id);
+      throw err;
+    }
+
+    await this.logsService.info(
+      LogAction.USER_CREATED,
+      `Dependent user created: ${savedUser.strUserName} (principal ${principalUserId})`,
+      savedUser.id,
+      null,
+      {
+        userCode: savedUser.code,
+        email: savedUser.strUserName,
+        personType: dto.personType,
+        roleId: dto.roleId,
+        principalUserId,
+      },
+    );
+
+    this.sendVerificationEmail(savedUser.id).catch((err) =>
+      console.warn(`Verification email failed for ${savedUser.strUserName}: ${err.message}`),
+    );
+
+    return { id: savedUser.id, message: 'Usuario dependiente creado correctamente.' };
   }
 
   async findAll(

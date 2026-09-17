@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Patch, Query, UseGuards } from '@nestjs/common';
 import { UserDependenciesService } from './user-dependencies.service';
 import { CreateUserDependencyDto } from './dto/create-user-dependency.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,6 +24,14 @@ export class UserDependenciesController {
   @Get('principal/:principalUserId')
   findDependentsByPrincipal(@Param('principalUserId') principalUserId: string) {
     return this.userDependenciesService.findDependentsByPrincipal(principalUserId);
+  }
+
+  @Get('principal/:principalUserId/roles')
+  findDependentsWithRoles(
+    @Param('principalUserId') principalUserId: string,
+    @Query('contractId') contractId?: string,
+  ) {
+    return this.userDependenciesService.findDependentsWithRoles(principalUserId, contractId);
   }
 
   @Get('dependent/:dependentUserId')

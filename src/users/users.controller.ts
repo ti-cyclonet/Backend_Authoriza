@@ -41,6 +41,7 @@ import {
 import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CreateFullUserDto } from './dto/CreateFullUserDto';
+import { CreateDependentUserDto } from './dto/create-dependent-user.dto';
 import { BasicDataService } from 'src/basic-data/basic-data.service';
 import { NaturalPersonDataService } from 'src/natural-person-data/natural-person-data.service';
 import { LegalEntityDataService } from 'src/legal-entity-data/legal-entity-data.service';
@@ -48,8 +49,14 @@ import { IndependentUsersDto } from 'src/common/dtos/independent-user.dto';
 import { PaginatedResponse } from 'src/common/dtos/paginated-response';
 import { Public } from '../auth/decorators/public.decorator';
 
+// Guard a nivel de controller: sin el, cualquiera sin sesion podia crear
+// usuarios "full", asignarles roles o borrar/restaurar cuentas (el guard
+// global de main.ts esta deshabilitado y este controller nunca aplico el
+// suyo propio). verify-email queda @Public() porque se abre desde el correo
+// sin sesion.
 @ApiTags('Users')
 @Controller('users')
+@UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
@@ -85,6 +92,26 @@ export class UsersController {
       id: user.id,
       message: 'User created successfully',
     };
+  }
+
+  /**
+   * Crea un usuario dependiente del tenant en sesión (ej. desde el módulo
+   * "Usuarios" de InOut) con un rol asignado. principalUserId y contractId
+   * se toman del JWT del admin autenticado (tenantId/contractId), nunca del
+   * body, para que no se pueda crear una dependencia sobre otro tenant.
+   */
+  @Post('dependents')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Create a dependent user of the session tenant, with a role assigned' })
+  async createDependentUser(@Request() req, @Body() dto: CreateDependentUserDto) {
+    const principalUserId = req.user?.tenantId;
+    const contractId = req.user?.contractId;
+    if (!principalUserId || !contractId) {
+      throw new BadRequestException(
+        'No se pudo determinar el contrato de la sesión. Vuelve a iniciar sesión e intenta de nuevo.',
+      );
+    }
+    return this.usersService.createDependentUser(dto, principalUserId, contractId);
   }
 
   @Get()

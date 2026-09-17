@@ -3,12 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserDependency } from './entities/user-dependency.entity';
 import { CreateUserDependencyDto } from './dto/create-user-dependency.dto';
+import { UserRole } from '../user-roles/entities/user-role.entity';
 
 @Injectable()
 export class UserDependenciesService {
   constructor(
     @InjectRepository(UserDependency)
     private userDependencyRepository: Repository<UserDependency>,
+    @InjectRepository(UserRole)
+    private userRoleRepository: Repository<UserRole>,
   ) {}
 
   async create(createUserDependencyDto: CreateUserDependencyDto): Promise<UserDependency> {
@@ -38,6 +41,66 @@ export class UserDependenciesService {
       where: { principalUserId },
       relations: ['dependentUser', 'dependentUser.basicData']
     });
+  }
+
+  /**
+   * Dependientes activos de un principal, con su rol vigente para un
+   * contrato (ej. el contrato de InOut del admin en sesión). Usado por el
+   * módulo "Usuarios" de cada app para listar el equipo real (no clientes
+   * de venta) del tenant en sesión.
+   */
+  async findDependentsWithRoles(principalUserId: string, contractId?: string) {
+    const dependencies = await this.userDependencyRepository.find({
+      where: { principalUserId, status: 'ACTIVE' },
+      relations: [
+        'dependentUser',
+        'dependentUser.basicData',
+        'dependentUser.basicData.naturalPersonData',
+        'dependentUser.basicData.legalEntityData',
+        'dependentUser.basicData.documentType',
+      ],
+    });
+
+    const result = [];
+    for (const dep of dependencies) {
+      const user = dep.dependentUser;
+      if (!user) continue;
+
+      const roleWhere: any = { userId: dep.dependentUserId, status: 'ACTIVE' };
+      if (contractId) roleWhere.contractId = contractId;
+      const roles = await this.userRoleRepository.find({
+        where: roleWhere,
+        relations: ['role'],
+      });
+
+      const basicData = user.basicData;
+      result.push({
+        dependencyId: dep.id,
+        userId: user.id,
+        email: user.strUserName,
+        code: user.code,
+        isActive: user.strStatus === 'ACTIVE',
+        status: user.strStatus,
+        isAuthorizedSigner: dep.isAuthorizedSigner,
+        personType: basicData?.strPersonType || null,
+        documentType: basicData?.documentType?.documentType || null,
+        documentNumber: basicData?.documentNumber || null,
+        firstName: basicData?.naturalPersonData?.firstName || null,
+        secondName: basicData?.naturalPersonData?.secondName || null,
+        firstSurname: basicData?.naturalPersonData?.firstSurname || null,
+        secondSurname: basicData?.naturalPersonData?.secondSurname || null,
+        phone: basicData?.legalEntityData?.contactPhone || null,
+        businessName: basicData?.legalEntityData?.businessName || null,
+        createdAt: dep.createdAt,
+        roles: roles.map((r) => ({
+          id: r.roleId,
+          name: r.role?.strName,
+          description: r.role?.strDescription1,
+        })),
+      });
+    }
+
+    return result;
   }
 
   async findPrincipalsByDependent(dependentUserId: string): Promise<UserDependency[]> {
