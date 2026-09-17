@@ -24,6 +24,10 @@ export class CreateNaturalPersonDataDto {
   @IsString()
   sex: string;
 
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
   @IsString()
   basicDataId: string;
 }

@@ -73,6 +73,10 @@ class NaturalPersonDto {
   @IsOptional()
   @IsString()
   sex?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }
 
 class LegalEntityDto {
