@@ -24,4 +24,7 @@ export class NaturalPersonDataResponseDto {
 
   @Expose()
   sex: string;
+
+  @Expose()
+  phone: string;
 }
