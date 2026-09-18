@@ -1513,13 +1513,13 @@ export class SelfRegistrationService {
     secondSurname?: string;
     documentType?: string;
     documentNumber?: string;
-    phone?: string;
+    phone: string;
     birthdate?: string;
     gender?: string;
     civilStatus?: string;
   }) {
-    if (!data.email || !data.password || !data.firstName || !data.firstSurname) {
-      throw new BadRequestException('Nombre, apellido, email y contraseña son obligatorios.');
+    if (!data.email || !data.password || !data.firstName || !data.firstSurname || !data.phone) {
+      throw new BadRequestException('Nombre, apellido, teléfono, email y contraseña son obligatorios.');
     }
 
     const existing = await this.userRepository.findOne({

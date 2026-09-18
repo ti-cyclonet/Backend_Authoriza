@@ -209,7 +209,7 @@ export class AuthController {
   @Post('register-shotra')
   async registerShotra(@Body() body: {
     email: string; password: string; firstName: string; secondName?: string;
-    firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string; phone?: string;
+    firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string; phone: string;
     birthdate?: string; gender?: string; civilStatus?: string;
   }) {
     return this.selfRegistrationService.registerShotraUser(body);
