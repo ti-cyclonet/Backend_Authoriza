@@ -32,6 +32,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { Image } from '../images/entities/image.entity';
 import { UserRolesService } from '../user-roles/user-roles.service';
 import { UserDependenciesService } from '../user-dependencies/user-dependencies.service';
+import { UpdateNaturalPersonDataDto } from 'src/natural-person-data/dto/update-natural-person-data.dto';
 
 @Injectable()
 export class UsersService {
@@ -663,6 +664,29 @@ export class UsersService {
       console.error(`Error saving user ${id}:`, error);
       throw error;
     }
+  }
+
+  /**
+   * Autoservicio: el propio usuario autenticado actualiza sus datos de
+   * persona natural (fecha de nacimiento, sexo, estado civil, teléfono,
+   * nombres). userId viene del JWT (nunca del body), así que un usuario
+   * jamás puede editar los datos de otro. Requiere que el usuario ya tenga
+   * NaturalPersonData (creado en su registro inicial).
+   */
+  async updateMyProfile(userId: string, dto: UpdateNaturalPersonDataDto): Promise<UserResponseDto> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['basicData', 'basicData.naturalPersonData'],
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (user.basicData?.strPersonType !== 'N' || !user.basicData?.naturalPersonData) {
+      throw new BadRequestException('Este usuario no tiene datos de persona natural para actualizar.');
+    }
+
+    Object.assign(user.basicData.naturalPersonData, dto);
+    await this.userRepository.manager.save(NaturalPersonData, user.basicData.naturalPersonData);
+
+    return this.findOne(userId);
   }
 
   async changePassword(

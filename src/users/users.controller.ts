@@ -42,6 +42,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { FindUsersDto } from './dto/find-users.dto';
 import { CreateFullUserDto } from './dto/CreateFullUserDto';
 import { CreateDependentUserDto } from './dto/create-dependent-user.dto';
+import { UpdateNaturalPersonDataDto } from 'src/natural-person-data/dto/update-natural-person-data.dto';
 import { BasicDataService } from 'src/basic-data/basic-data.service';
 import { NaturalPersonDataService } from 'src/natural-person-data/natural-person-data.service';
 import { LegalEntityDataService } from 'src/legal-entity-data/legal-entity-data.service';
@@ -81,6 +82,31 @@ export class UsersController {
   @ApiOperation({ summary: 'Upload the authenticated user avatar (shared across apps)' })
   async uploadAvatar(@Request() req, @UploadedFile() file: Express.Multer.File) {
     return this.usersService.uploadAvatar(req.user.id, file);
+  }
+
+  /**
+   * Perfil del usuario autenticado (para pantallas de "editar mi perfil" en
+   * cualquier app, ej. Shotra). El id viene del JWT, nunca del cliente.
+   */
+  @Get('me')
+  @ApiOperation({ summary: 'Get the authenticated user own profile' })
+  async getMe(@Request() req) {
+    return this.usersService.findOne(req.user.id);
+  }
+
+  /**
+   * Autoservicio: el usuario autenticado actualiza sus propios datos de
+   * persona natural (fecha de nacimiento, sexo, estado civil, teléfono,
+   * nombres). Sin esto, esos datos solo se podían corregir desde el panel
+   * de administración de Authoriza. Solo aplica a personas naturales, y
+   * solo si el usuario ya tiene un registro de NaturalPersonData (creado en
+   * su registro inicial).
+   */
+  @Patch('me')
+  @UsePipes(new ValidationPipe({ whitelist: true, transform: true }))
+  @ApiOperation({ summary: 'Update the authenticated user own natural person data (self-service)' })
+  async updateMe(@Request() req, @Body() dto: UpdateNaturalPersonDataDto) {
+    return this.usersService.updateMyProfile(req.user.id, dto);
   }
 
   @Post('full')
