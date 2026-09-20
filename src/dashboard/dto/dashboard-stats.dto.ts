@@ -30,6 +30,7 @@ export class DashboardStatsDto {
   principalUsers: PrincipalUserStats;
   applications: ApplicationStats;
   packages: PackageStats;
+  contracts: ContractStats;
   lastUpdated: Date;
 }
 
@@ -47,5 +48,6 @@ export interface ContractStats {
   total: number;
   active: number;
   expired: number;
+  pendingSignature: number;
   byStatus: { status: string; count: number }[];
 }
