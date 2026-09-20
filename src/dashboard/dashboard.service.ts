@@ -24,11 +24,12 @@ export class DashboardService {
   ) {}
 
   async getStats(): Promise<DashboardStatsDto> {
-    const [userStats, principalUserStats, applicationStats, packageStats] = await Promise.all([
+    const [userStats, principalUserStats, applicationStats, packageStats, contractStats] = await Promise.all([
       this.getUserStats(),
       this.getPrincipalUserStats(),
       this.getApplicationStats(),
       this.getPackageStats(),
+      this.getContractStats(),
     ]);
 
     return {
@@ -36,6 +37,7 @@ export class DashboardService {
       principalUsers: principalUserStats,
       applications: applicationStats,
       packages: packageStats,
+      contracts: contractStats,
       lastUpdated: new Date(),
     };
   }
@@ -138,6 +140,42 @@ export class DashboardService {
         contractCount: parseInt(pkg.contractCount),
         roleCount: parseInt(pkg.roleCount)
       }))
+    };
+  }
+
+  /**
+   * "Pendiente por firma" = contrato aún en DRAFT/PENDING al que le falta al
+   * menos una de las dos firmas (cliente y/o admin). Una vez ambas firmas
+   * están puestas, contract.service.ts pasa el contrato a ACTIVE, así que no
+   * hace falta filtrar por firmas en los demás estados.
+   */
+  private async getContractStats(): Promise<ContractStats> {
+    const total = await this.contractRepository.count();
+    const active = await this.contractRepository.count({ where: { status: ContractStatus.ACTIVE } });
+    const expired = await this.contractRepository.count({ where: { status: ContractStatus.EXPIRED } });
+
+    const pendingSignature = await this.contractRepository
+      .createQueryBuilder('contract')
+      .where('contract.status IN (:...statuses)', { statuses: [ContractStatus.DRAFT, ContractStatus.PENDING] })
+      .andWhere('(contract.clientSignedAt IS NULL OR contract.adminSignedAt IS NULL)')
+      .getCount();
+
+    const byStatus = await this.contractRepository
+      .createQueryBuilder('contract')
+      .select('contract.status', 'status')
+      .addSelect('COUNT(contract.id)', 'count')
+      .groupBy('contract.status')
+      .getRawMany();
+
+    return {
+      total,
+      active,
+      expired,
+      pendingSignature,
+      byStatus: byStatus.map(item => ({
+        status: item.status,
+        count: parseInt(item.count),
+      })),
     };
   }
 
