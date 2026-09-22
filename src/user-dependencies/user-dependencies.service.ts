@@ -89,7 +89,7 @@ export class UserDependenciesService {
         secondName: basicData?.naturalPersonData?.secondName || null,
         firstSurname: basicData?.naturalPersonData?.firstSurname || null,
         secondSurname: basicData?.naturalPersonData?.secondSurname || null,
-        phone: basicData?.legalEntityData?.contactPhone || null,
+        phone: basicData?.legalEntityData?.contactPhone || basicData?.naturalPersonData?.phone || null,
         businessName: basicData?.legalEntityData?.businessName || null,
         createdAt: dep.createdAt,
         roles: roles.map((r) => ({

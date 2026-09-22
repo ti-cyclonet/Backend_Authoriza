@@ -99,6 +99,23 @@ export default class InoutProPackageSeed {
       }
     }
 
+    const clienteInoutRole = await rolRepo.findOne({ where: { strName: 'clienteInout' } });
+    if (clienteInoutRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: clienteInoutRole.id } },
+      });
+      if (!existingConfig) {
+        const config = configRepo.create({
+          price: 0,
+          totalAccount: 999999,
+          package: pkg,
+          rol: clienteInoutRole,
+        });
+        await configRepo.save(config);
+        console.log('  ✅ Rol clienteInout (ilimitado) asignado');
+      }
+    }
+
     // ========== VARIABLES DE LÍMITE ==========
     const variables = [
       { variableName: 'nDiasUso', displayName: 'Límite Temporal de Uso (días)', maxValue: 0, targetApplication: 'Inout', limitType: 'quantity' },

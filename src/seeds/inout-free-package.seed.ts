@@ -91,6 +91,20 @@ export default class InoutFreePackageSeed {
       }
     }
 
+    // Clientes: no es un cupo de colaborador, es cuántos clientes puede
+    // registrar el negocio — no debe ser un limitante del plan gratuito.
+    const clienteInoutRole = await rolRepo.findOne({ where: { strName: 'clienteInout' } });
+    if (clienteInoutRole) {
+      const existingConfig = await configRepo.findOne({
+        where: { package: { id: pkg.id }, rol: { id: clienteInoutRole.id } },
+      });
+      if (!existingConfig) {
+        const config = configRepo.create({ price: 0, totalAccount: 999999, package: pkg, rol: clienteInoutRole });
+        await configRepo.save(config);
+        console.log('  ✅ Rol clienteInout (ilimitado) asignado al paquete FREE');
+      }
+    }
+
     // ========== VARIABLES DE LÍMITE ==========
     // Mismos límites que el plan PRO, pero con 30 días de vigencia
     const variables = [
