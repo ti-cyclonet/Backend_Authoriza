@@ -25,6 +25,17 @@ export class PotentialUser {
   @Column({ name: 'document_number', nullable: true })
   documentNumber: string;
 
+  @Column({ nullable: true })
+  phone: string;
+
+  /**
+   * Tenant (Authoriza userId del dueño del negocio) del que salió este lead,
+   * ej. el tenant de la tienda de InOut Marketplace donde se hizo el
+   * checkout de invitado. No hay FK real: es otra app/servicio.
+   */
+  @Column({ name: 'source_tenant_id', nullable: true })
+  sourceTenantId: string;
+
   @Column({
     type: 'enum',
     enum: PotentialUserStatus,

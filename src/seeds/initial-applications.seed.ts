@@ -218,6 +218,16 @@ export default class InitialApplicationsSeed {
               { strName: 'productsViewerInout', strDescription: 'Productos', strUrl: '/products', strIcon: 'box', strType: 'main_menu', ingOrder: 3 },
             ],
           },
+          {
+            // Cliente de un tenant de InOut: solo un registro de cuenta (para
+            // validarse igual que cualquier usuario de Authoriza y quedar
+            // disponible en ventas/pedidos/indicadores), no un colaborador —
+            // por eso sin menuOptions: no debe ver el panel interno de InOut.
+            strName: 'clienteInout',
+            strDescription1: 'Cliente',
+            strDescription2: 'Cliente del negocio, usado en ventas, pedidos e indicadores. Sin acceso al panel interno.',
+            menuOptions: [],
+          },
         ],
       },
       // FactoNet

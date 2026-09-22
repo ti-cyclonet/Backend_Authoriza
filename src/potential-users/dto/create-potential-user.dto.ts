@@ -18,4 +18,12 @@ export class CreatePotentialUserDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceTenantId?: string;
 }
