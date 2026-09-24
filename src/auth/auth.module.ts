@@ -5,6 +5,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { SelfRegistrationService } from './self-registration.service';
+import { MarketplaceClientService } from './marketplace-client.service';
+import { UserConsent } from '../consents/entities/user-consent.entity';
+import { NaturalPersonData } from '../natural-person-data/entities/natural-person-data.entity';
+import { ContractModule } from '../contract/contract.module';
+import { UserRolesModule } from '../user-roles/user-roles.module';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ApplicationsModule } from 'src/applications/applications.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -34,6 +39,8 @@ import { DocumentType } from '../document-types/entities/document-type.entity';
     LogsModule,
     EntityCodesModule,
     NotificationsModule,
+    ContractModule,
+    UserRolesModule,
     TypeOrmModule.forFeature([
       User,
       Contract,
@@ -43,10 +50,12 @@ import { DocumentType } from '../document-types/entities/document-type.entity';
       Rol,
       BasicData,
       DocumentType,
+      NaturalPersonData,
+      UserConsent,
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SelfRegistrationService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, SelfRegistrationService, MarketplaceClientService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

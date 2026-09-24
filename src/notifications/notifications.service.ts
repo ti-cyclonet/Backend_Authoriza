@@ -541,6 +541,48 @@ export class NotificationsService {
       this.logger.log('SHOTRA_VERIFICATION template seeded');
     }
 
+    // Código de confirmación de correo para clientes del MarketPlace de InOut
+    const marketplaceClientTpl = await this.templateRepo.findOne({ where: { code: 'MARKETPLACE_CLIENT_VERIFICATION' } });
+    if (!marketplaceClientTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'MARKETPLACE_CLIENT_VERIFICATION',
+          subject: '{{verificationCode}} es tu código para confirmar tu correo - {{businessName}}',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:24px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,0.08);">
+    <tr>
+      <td style="background:#1f2a44;padding:28px 32px;text-align:center;">
+        <h1 style="color:#ffffff;margin:0;font-size:22px;font-weight:800;">CycloNet <span style="color:#e04e39;">Market</span></h1>
+        <p style="color:rgba(255,255,255,0.7);margin:6px 0 0;font-size:13px;">{{businessName}}</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:36px 36px 28px;">
+        <p style="color:#333;line-height:1.7;margin:0 0 12px;font-size:15px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#333;line-height:1.7;margin:0 0 24px;font-size:15px;">Usa este código para confirmar tu correo y activar tu cuenta de cliente en <strong>{{businessName}}</strong>:</p>
+        <div style="text-align:center;margin:28px 0;">
+          <span style="display:inline-block;background:#fff4e5;color:#b45309;letter-spacing:10px;padding:16px 28px;border-radius:12px;font-size:32px;font-weight:800;font-family:Consolas,monospace;">{{verificationCode}}</span>
+        </div>
+        <p style="color:#777;font-size:12px;text-align:center;margin:20px 0 6px;">El código vence en <strong>30 minutos</strong>.</p>
+        <p style="color:#999;font-size:12px;text-align:center;margin:0;">Si no solicitaste esta cuenta, ignora este mensaje.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f4f5f7;padding:16px 32px;">
+        <p style="color:#999;margin:0;font-size:11px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — CycloNet Market</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('MARKETPLACE_CLIENT_VERIFICATION template seeded');
+    }
+
     // Kiri Plus welcome (paid plan activated)
     const kiriPlusWelcomeTpl = await this.templateRepo.findOne({ where: { code: 'KIRI_PLUS_WELCOME' } });
     if (!kiriPlusWelcomeTpl) {
