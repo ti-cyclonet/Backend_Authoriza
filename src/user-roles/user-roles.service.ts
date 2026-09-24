@@ -228,10 +228,31 @@ export class UserRolesService {
     });
   }
 
+  /**
+   * Roles cuyo cupo también está acotado por una variable de consumo del
+   * paquete (la que la app muestra en "Consumos"). Sin esto, el cupo del rol
+   * (totalAccount, p. ej. 999999) y el límite de consumo (p. ej. nClientes =
+   * 50) eran independientes y el límite de clientes nunca se hacía cumplir.
+   */
+  private static readonly ROLE_USAGE_LIMITS: Record<string, string> = {
+    clienteInout: 'nClientes',
+  };
+
+  /** Cupo efectivo de un rol en el contrato: el menor entre totalAccount y su variable de consumo. */
+  private effectiveRoleTotal(contract: any, config: any): number {
+    const variableName = UserRolesService.ROLE_USAGE_LIMITS[config.rol?.strName];
+    if (!variableName) return config.totalAccount;
+    const limit = (contract.package?.usageLimitVariables ?? []).find(
+      (v: any) => v.variableName === variableName,
+    );
+    if (!limit) return config.totalAccount;
+    return Math.min(Number(config.totalAccount), Math.max(0, Number(limit.maxValue) || 0));
+  }
+
   async validateRoleAvailability(contractId: string, roleId: string): Promise<void> {
     const contract = await this.contractRepository.findOne({
       where: { id: contractId },
-      relations: ['package', 'package.configurations', 'package.configurations.rol']
+      relations: ['package', 'package.configurations', 'package.configurations.rol', 'package.usageLimitVariables']
     });
 
     if (!contract) {
@@ -244,16 +265,17 @@ export class UserRolesService {
     }
 
     const assigned = await this.getAssignedCountByContractAndRole(contractId, roleId);
-    
-    if (assigned >= config.totalAccount) {
-      throw new BadRequestException(`No hay cupos disponibles para este rol. Total: ${config.totalAccount}, Asignados: ${assigned}`);
+    const total = this.effectiveRoleTotal(contract, config);
+
+    if (assigned >= total) {
+      throw new BadRequestException(`No hay cupos disponibles para este rol. Total: ${total}, Asignados: ${assigned}`);
     }
   }
 
   async getRoleAvailability(contractId: string): Promise<any[]> {
     const contract = await this.contractRepository.findOne({
       where: { id: contractId },
-      relations: ['package', 'package.configurations', 'package.configurations.rol']
+      relations: ['package', 'package.configurations', 'package.configurations.rol', 'package.usageLimitVariables']
     });
 
     if (!contract) {
@@ -263,11 +285,12 @@ export class UserRolesService {
     const availability = [];
     for (const config of contract.package.configurations) {
       const assigned = await this.getAssignedCountByContractAndRole(contractId, config.rol.id);
+      const total = this.effectiveRoleTotal(contract, config);
       availability.push({
         role: config.rol,
-        total: config.totalAccount,
+        total,
         assigned,
-        available: config.totalAccount - assigned,
+        available: Math.max(0, total - assigned),
         price: config.price
       });
     }
