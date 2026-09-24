@@ -19,6 +19,7 @@ import { BasicData } from '../basic-data/entities/basic-data.entity';
 import { NaturalPersonData } from '../natural-person-data/entities/natural-person-data.entity';
 import { DocumentType } from '../document-types/entities/document-type.entity';
 import { UserConsent } from '../consents/entities/user-consent.entity';
+import { PotentialUser, PotentialUserStatus } from '../potential-users/potential-user.entity';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ContractService } from '../contract/contract.service';
@@ -29,6 +30,8 @@ const CLIENT_ROLE = 'clienteInout';
 const APPLICATION = 'Inout';
 const ALLOWED_LOGIN_STATUSES = ['ACTIVE', 'EXPIRING', 'CONFIRMED'];
 const MAX_CODE_ATTEMPTS = 5;
+/** Tipos de documento de persona natural admitidos (catálogo document_types de Authoriza). */
+const PERSON_DOCUMENT_TYPES = ['CC', 'CE', 'PP'];
 
 export interface ConsentInput {
   acceptTerms: boolean;
@@ -47,7 +50,9 @@ export interface MarketplaceRegisterInput extends ConsentInput {
   email: string;
   password: string;
   firstName?: string;
+  secondName?: string;
   firstSurname?: string;
+  secondSurname?: string;
   documentType?: string;
   documentNumber?: string;
   phone?: string;
@@ -82,6 +87,7 @@ export class MarketplaceClientService {
     @InjectRepository(BasicData) private readonly basicDataRepository: Repository<BasicData>,
     @InjectRepository(DocumentType) private readonly documentTypeRepository: Repository<DocumentType>,
     @InjectRepository(UserConsent) private readonly consentRepository: Repository<UserConsent>,
+    @InjectRepository(PotentialUser) private readonly potentialUserRepository: Repository<PotentialUser>,
     private readonly dataSource: DataSource,
     private readonly entityCodeService: EntityCodeService,
     private readonly notificationsService: NotificationsService,
@@ -125,21 +131,31 @@ export class MarketplaceClientService {
     }
 
     // Cuenta nueva
+    // Mismos requisitos de identidad que una cuenta de Authoriza: nombre,
+    // apellido, documento (tipo + número) y teléfono.
+    const documentType = (input.documentType || '').trim().toUpperCase();
+    const documentNumber = (input.documentNumber || '').replace(/[\s.]/g, '');
     if (!input.firstName?.trim() || !input.firstSurname?.trim() || !input.phone?.trim()) {
       throw new BadRequestException({ code: 'MISSING_FIELDS', message: 'Nombre, apellido y teléfono son obligatorios.' });
+    }
+    if (!PERSON_DOCUMENT_TYPES.includes(documentType) || !/^[A-Za-z0-9-]{4,20}$/.test(documentNumber)) {
+      throw new BadRequestException({ code: 'INVALID_DOCUMENT', message: 'Indica un tipo y número de documento válidos.' });
     }
     // El negocio debe tener cupo de clientes ANTES de crear la cuenta
     await this.userRolesService.validateRoleAvailability(tenant.contractId, role.id);
 
-    const docType = await this.documentTypeRepository.findOne({ where: { documentType: input.documentType || 'CC' } });
-    if (input.documentNumber && docType) {
+    const docType = await this.documentTypeRepository.findOne({ where: { documentType } });
+    if (!docType) {
+      throw new BadRequestException({ code: 'INVALID_DOCUMENT', message: 'Tipo de documento no válido.' });
+    }
+    {
       const existingDoc = await this.basicDataRepository.findOne({
-        where: { documentTypeId: docType.id, documentNumber: input.documentNumber },
+        where: { documentTypeId: docType.id, documentNumber },
       });
       if (existingDoc) {
         throw new ConflictException({
           code: 'DOCUMENT_ALREADY_REGISTERED',
-          message: `El documento ${input.documentType || 'CC'} ${input.documentNumber} ya está registrado con otra cuenta.`,
+          message: `El documento ${documentType} ${documentNumber} ya está registrado con otra cuenta. Si es tuyo, inicia sesión.`,
         });
       }
     }
@@ -163,8 +179,8 @@ export class MarketplaceClientService {
       const basicData = await manager.save(manager.create(BasicData, {
         strPersonType: 'N' as const,
         strStatus: 'ACTIVE',
-        documentTypeId: docType?.id || null,
-        documentNumber: input.documentNumber || '',
+        documentTypeId: docType.id,
+        documentNumber,
         user: savedUser,
       }));
       savedUser.basicData = basicData;
@@ -172,7 +188,9 @@ export class MarketplaceClientService {
 
       await manager.save(manager.create(NaturalPersonData, {
         firstName: input.firstName!.trim(),
+        secondName: input.secondName?.trim() || null,
         firstSurname: input.firstSurname!.trim(),
+        secondSurname: input.secondSurname?.trim() || null,
         phone: input.phone!.trim(),
         basicData,
       }));
@@ -180,6 +198,7 @@ export class MarketplaceClientService {
     });
 
     await this.recordConsents(user.id, email, input.tenantId, input, 'MARKETPLACE_REGISTER', meta);
+    await this.markPotentialUserConverted(email);
     await this.issueVerificationCode(user, tenant.businessName, input.firstName);
 
     return { verificationRequired: true, email, message: 'Te enviamos un código para confirmar tu correo.' };
@@ -394,7 +413,40 @@ export class MarketplaceClientService {
     // Contraseña o código ya validados por el llamador: se emite el token
     // del contrato de InOut del negocio (tenantId = dueño del contrato).
     const result = await this.authService.completeLoginWithContract(email, APPLICATION, contractId);
-    return { access_token: result.access_token, user: result.user };
+    return { access_token: result.access_token, user: result.user, profile: await this.getProfile(email) };
+  }
+
+  /** Datos guardados del cliente para precargar el formulario del pedido. */
+  private async getProfile(email: string) {
+    const user = await this.userRepository.findOne({
+      where: { strUserName: email },
+      relations: ['basicData', 'basicData.naturalPersonData', 'basicData.documentType'],
+    });
+    const bd: any = user?.basicData;
+    const np: any = bd?.naturalPersonData;
+    return {
+      email,
+      firstName: np?.firstName || null,
+      secondName: np?.secondName || null,
+      firstSurname: np?.firstSurname || null,
+      secondSurname: np?.secondSurname || null,
+      phone: np?.phone || null,
+      documentType: bd?.documentType?.documentType || null,
+      documentNumber: bd?.documentNumber || null,
+    };
+  }
+
+  /** Un invitado que compró antes (cliente potencial) y ahora crea su cuenta. */
+  private async markPotentialUserConverted(email: string) {
+    try {
+      const lead = await this.potentialUserRepository.findOne({ where: { email } });
+      if (lead && lead.status !== PotentialUserStatus.CONVERTED) {
+        lead.status = PotentialUserStatus.CONVERTED;
+        await this.potentialUserRepository.save(lead);
+      }
+    } catch (err) {
+      this.logger.warn(`No se pudo marcar como convertido el cliente potencial ${email}: ${(err as Error).message}`);
+    }
   }
 
   private async issueVerificationCode(user: User, businessName?: string, firstName?: string) {
