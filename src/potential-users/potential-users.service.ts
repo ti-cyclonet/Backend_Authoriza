@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PotentialUser, PotentialUserStatus } from './potential-user.entity';
@@ -12,15 +12,24 @@ export class PotentialUsersService {
   ) {}
 
   /**
-   * Upsert por email: `email` es único en la tabla, así que un segundo
-   * checkout de invitado con el mismo correo (mismo negocio u otro) debe
-   * actualizar el lead existente en vez de fallar por violación de unicidad.
-   * No pisa un registro ya CONVERTED (ya es un usuario real).
+   * Upsert del lead: por email si viene (es único en la tabla); si el
+   * invitado solo dio teléfono, por (teléfono, tenant de origen). Un segundo
+   * checkout actualiza el lead existente en vez de duplicarlo o fallar por
+   * unicidad. No pisa un registro ya CONVERTED (ya es un usuario real).
    */
   async create(createPotentialUserDto: CreatePotentialUserDto): Promise<PotentialUser> {
-    const existing = await this.potentialUsersRepository.findOne({
-      where: { email: createPotentialUserDto.email },
-    });
+    const email = createPotentialUserDto.email?.trim().toLowerCase() || null;
+    const phone = createPotentialUserDto.phone?.trim() || null;
+    if (!email && !phone) {
+      throw new BadRequestException('Se requiere correo o teléfono del cliente potencial.');
+    }
+    createPotentialUserDto = { ...createPotentialUserDto, email: email ?? undefined, phone: phone ?? undefined };
+
+    const existing = email
+      ? await this.potentialUsersRepository.findOne({ where: { email } })
+      : await this.potentialUsersRepository.findOne({
+          where: { phone, sourceTenantId: createPotentialUserDto.sourceTenantId ?? undefined },
+        });
 
     if (existing) {
       if (existing.status === PotentialUserStatus.CONVERTED) {
@@ -33,6 +42,7 @@ export class PotentialUsersService {
         name: createPotentialUserDto.name ?? existing.name,
         phone: createPotentialUserDto.phone ?? existing.phone,
         sourceTenantId: createPotentialUserDto.sourceTenantId ?? existing.sourceTenantId,
+        address: createPotentialUserDto.address ?? existing.address,
       });
       return await this.potentialUsersRepository.save(existing);
     }

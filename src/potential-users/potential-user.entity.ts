@@ -10,8 +10,9 @@ export class PotentialUser {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ unique: true })
-  email: string;
+  /** Opcional: un invitado puede comprar solo con teléfono. Único cuando existe. */
+  @Column({ unique: true, nullable: true })
+  email: string | null;
 
   @Column({ name: 'source_application' })
   sourceApplication: string;
@@ -27,6 +28,10 @@ export class PotentialUser {
 
   @Column({ nullable: true })
   phone: string;
+
+  /** Última dirección de entrega que dio el invitado. */
+  @Column({ nullable: true })
+  address: string;
 
   /**
    * Tenant (Authoriza userId del dueño del negocio) del que salió este lead,

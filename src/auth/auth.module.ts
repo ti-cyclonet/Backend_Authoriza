@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { SelfRegistrationService } from './self-registration.service';
 import { MarketplaceClientService } from './marketplace-client.service';
 import { UserConsent } from '../consents/entities/user-consent.entity';
+import { PotentialUser } from '../potential-users/potential-user.entity';
 import { NaturalPersonData } from '../natural-person-data/entities/natural-person-data.entity';
 import { ContractModule } from '../contract/contract.module';
 import { UserRolesModule } from '../user-roles/user-roles.module';
@@ -52,6 +53,7 @@ import { DocumentType } from '../document-types/entities/document-type.entity';
       DocumentType,
       NaturalPersonData,
       UserConsent,
+      PotentialUser,
     ]),
   ],
   controllers: [AuthController],

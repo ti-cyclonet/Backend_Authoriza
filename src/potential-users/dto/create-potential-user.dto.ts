@@ -1,8 +1,10 @@
 import { IsEmail, IsString, IsOptional } from 'class-validator';
 
 export class CreatePotentialUserDto {
+  /** Opcional si viene teléfono (checkout de invitado sin correo). */
+  @IsOptional()
   @IsEmail()
-  email: string;
+  email?: string;
 
   @IsString()
   sourceApplication: string;
@@ -26,4 +28,8 @@ export class CreatePotentialUserDto {
   @IsOptional()
   @IsString()
   sourceTenantId?: string;
+
+  @IsOptional()
+  @IsString()
+  address?: string;
 }
