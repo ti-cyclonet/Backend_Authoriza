@@ -73,7 +73,12 @@ export class UserRolesService {
     // aplicación (FREE o PLUS) queda obsoleto y se cancela, para que no quede
     // colgado ni siga facturando. Los contratos de OTRAS apps no se tocan.
     const appName = role?.strApplication?.strName;
-    if (dto.contractId && appName) {
+    // Un rol de CLIENTE (clienteInout) en el contrato de otro negocio no
+    // reemplaza el acceso propio del usuario: el dueño de un negocio en InOut
+    // puede ser a la vez cliente de otro. Sin esta excepción se le cancelaba
+    // su propio contrato de InOut.
+    const isCustomerRole = role?.strName === 'clienteInout';
+    if (dto.contractId && appName && !isCustomerRole) {
       await this.cancelOwnContractForAppIfViaDependency(dto.userId, dto.contractId, appName);
     }
 

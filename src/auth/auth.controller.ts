@@ -1,10 +1,11 @@
-import { Controller, Post, Body, Request, UseGuards, Get, Query, Res, Header } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Post, Body, Request, UseGuards, Get, Query, Res, Header, Req } from '@nestjs/common';
+import { Response, Request as ExpressRequest } from 'express';
 import { AuthenticatedUser, AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
 import { SelfRegistrationService } from './self-registration.service';
+import { MarketplaceClientService, MarketplaceRegisterInput, RequestMeta } from './marketplace-client.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 
@@ -14,7 +15,46 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly selfRegistrationService: SelfRegistrationService,
+    private readonly marketplaceClientService: MarketplaceClientService,
   ) {}
+
+  // ─── Clientes del MarketPlace de InOut (rol clienteInout del tenant) ───
+
+  private requestMeta(req: ExpressRequest): RequestMeta {
+    const forwarded = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
+    return {
+      ipAddress: forwarded || req.ip || null,
+      userAgent: (req.headers['user-agent'] as string | undefined) || null,
+    };
+  }
+
+  @ApiOperation({ summary: 'MarketPlace: registrar (o vincular con su contraseña) un cliente del tenant; exige términos + habeas data' })
+  @Public()
+  @Post('marketplace/client/register')
+  registerMarketplaceClient(@Body() body: MarketplaceRegisterInput, @Req() req: ExpressRequest) {
+    return this.marketplaceClientService.register(body, this.requestMeta(req));
+  }
+
+  @ApiOperation({ summary: 'MarketPlace: confirmar el correo con el código de 6 dígitos y vincular al tenant' })
+  @Public()
+  @Post('marketplace/client/verify')
+  verifyMarketplaceClient(@Body() body: { tenantId: string; email: string; code: string }) {
+    return this.marketplaceClientService.verify(body);
+  }
+
+  @ApiOperation({ summary: 'MarketPlace: iniciar sesión como cliente de un tenant específico' })
+  @Public()
+  @Post('marketplace/client/login')
+  loginMarketplaceClient(@Body() body: { tenantId: string; email: string; password: string }) {
+    return this.marketplaceClientService.login(body);
+  }
+
+  @ApiOperation({ summary: 'MarketPlace: reenviar el código de confirmación de correo' })
+  @Public()
+  @Post('marketplace/client/resend-code')
+  resendMarketplaceClientCode(@Body() body: { tenantId: string; email: string }) {
+    return this.marketplaceClientService.resendCode(body);
+  }
 
   @ApiOperation({ summary: 'Login user and return access token' })
   @Public()
