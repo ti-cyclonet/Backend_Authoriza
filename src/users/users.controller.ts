@@ -85,6 +85,20 @@ export class UsersController {
   }
 
   /**
+   * Resumen de identidad (nombre/documento) de un usuario existente por
+   * email, para precargar el formulario de "nuevo usuario" de otra app
+   * (ej. InOut) cuando la persona ya está registrada en Authoriza y solo
+   * falta asignarle un rol nuevo. Requiere sesión (guard de la clase):
+   * expone datos personales, a diferencia de POST /auth/check-email.
+   */
+  @Get('lookup-by-email')
+  @ApiOperation({ summary: 'Get an existing user identity summary by email (authenticated)' })
+  async lookupByEmail(@Query('email') email: string) {
+    if (!email) throw new BadRequestException('Email requerido');
+    return this.usersService.getUserSummaryByEmail(email);
+  }
+
+  /**
    * Perfil del usuario autenticado (para pantallas de "editar mi perfil" en
    * cualquier app, ej. Shotra). El id viene del JWT, nunca del cliente.
    */

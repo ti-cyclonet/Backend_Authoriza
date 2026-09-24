@@ -523,6 +523,62 @@ export class UsersService {
     });
   }
 
+  /**
+   * Resumen de identidad de un usuario existente por email, para que otras
+   * apps (ej. InOut al crear un usuario) puedan precargar sus datos y
+   * ofrecer solo "asignar rol" en vez de volver a pedir toda la info
+   * personal. Requiere sesión (ver guard del controller): a diferencia de
+   * POST /auth/check-email (público, solo exists/userId), esto expone
+   * datos personales y NUNCA debe quedar sin autenticación.
+   */
+  async getUserSummaryByEmail(email: string): Promise<{
+    exists: boolean;
+    userId?: string;
+    basicData?: { strPersonType: 'J' | 'N' };
+    documentType?: { strDocumentType: string | null; strDocumentNumber: string | null };
+    naturalPersonData?: {
+      firstName: string; secondName?: string; firstSurname: string; secondSurname?: string;
+      birthDate: Date | null; maritalStatus: string | null; sex: string | null; phone: string | null;
+    } | null;
+    legalEntityData?: {
+      businessName: string; webSite?: string; contactName: string; contactEmail: string; contactPhone: string;
+    } | null;
+  }> {
+    const user = await this.findEntityByEmail(email);
+    if (!user) return { exists: false };
+
+    const basicData = user.basicData;
+    return {
+      exists: true,
+      userId: user.id,
+      basicData: basicData ? { strPersonType: basicData.strPersonType } : undefined,
+      documentType: basicData
+        ? { strDocumentType: basicData.documentType?.documentType ?? null, strDocumentNumber: basicData.documentNumber ?? null }
+        : undefined,
+      naturalPersonData: basicData?.naturalPersonData
+        ? {
+            firstName: basicData.naturalPersonData.firstName,
+            secondName: basicData.naturalPersonData.secondName,
+            firstSurname: basicData.naturalPersonData.firstSurname,
+            secondSurname: basicData.naturalPersonData.secondSurname,
+            birthDate: basicData.naturalPersonData.birthDate,
+            maritalStatus: basicData.naturalPersonData.maritalStatus,
+            sex: basicData.naturalPersonData.sex,
+            phone: basicData.naturalPersonData.phone,
+          }
+        : null,
+      legalEntityData: basicData?.legalEntityData
+        ? {
+            businessName: basicData.legalEntityData.businessName,
+            webSite: basicData.legalEntityData.webSite,
+            contactName: basicData.legalEntityData.contactName,
+            contactEmail: basicData.legalEntityData.contactEmail,
+            contactPhone: basicData.legalEntityData.contactPhone,
+          }
+        : null,
+    };
+  }
+
   async findEntityByEmail(email: string): Promise<User | null> {
     return this.userRepository.findOne({
       where: { strUserName: email },
