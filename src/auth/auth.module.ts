@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { SelfRegistrationService } from './self-registration.service';
 import { MarketplaceClientService } from './marketplace-client.service';
 import { UserConsent } from '../consents/entities/user-consent.entity';
+import { ConsentsService } from '../consents/consents.service';
 import { PotentialUser } from '../potential-users/potential-user.entity';
 import { NaturalPersonData } from '../natural-person-data/entities/natural-person-data.entity';
 import { ContractModule } from '../contract/contract.module';
@@ -57,7 +58,7 @@ import { DocumentType } from '../document-types/entities/document-type.entity';
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SelfRegistrationService, MarketplaceClientService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, SelfRegistrationService, MarketplaceClientService, ConsentsService, JwtStrategy, JwtAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

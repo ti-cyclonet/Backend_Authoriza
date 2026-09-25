@@ -1,6 +1,7 @@
 import * as bcrypt from 'bcrypt';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { jwtConstants } from './constants';
 import { LoginDto } from './dto/login.dto';
 import { ApplicationsService } from 'src/applications/applications.service';
 import { UsersService } from 'src/users/users.service';
@@ -58,6 +59,8 @@ export class AuthService {
       clientName: string;
       packageName: string;
     }>;
+    /** Solo con contracts[]: requerido por POST /auth/login/complete. */
+    selectionToken?: string;
   }> {
     const { email, password, applicationName } = loginDto;
 
@@ -137,6 +140,8 @@ export class AuthService {
       const contracts = Array.from(uniqueContracts.values());
       return {
         access_token: '',
+        // Prueba de que la contraseña ya se validó: login/complete la exige
+        selectionToken: this.signContractSelectionToken(user.id, user.strUserName, applicationName),
         user: {
           id: user.id,
           email: user.strUserName,
@@ -299,34 +304,6 @@ export class AuthService {
     return { exists: true, allowed, status, isVerified, reason };
   }
 
-  async loginAfterVerification(email: string): Promise<{ access_token: string; user: AuthenticatedUser }> {
-    const user = await this.usersService.findEntityByEmail(email);
-    if (!user) throw new UnauthorizedException('User not found');
-    if (!user.isVerified) throw new UnauthorizedException('Email not verified');
-    if (user.strStatus !== 'CONFIRMED') throw new UnauthorizedException('User is not in CONFIRMED status');
-
-    const payload = {
-      sub: user.id,
-      email: user.strUserName,
-      tenantId: user.id,
-      rol: 'unconfirmed',
-    };
-    const token = this.jwtService.sign(payload, { expiresIn: '10m' });
-
-    const userData: AuthenticatedUser = {
-      id: user.id,
-      email: user.strUserName,
-      image: this.avatarFor(user),
-      name: user.strUserName,
-      rol: 'unconfirmed',
-      rolDescription: '',
-      firstName: user.basicData?.naturalPersonData?.firstName || '',
-      businessName: user.basicData?.legalEntityData?.businessName || '',
-    };
-
-    return { access_token: token, user: userData };
-  }
-
   /**
    * Emite un token para OTRA aplicación a partir de una sesión ya autenticada,
    * SIN pedir contraseña. Pensado para el "cambio de app" dentro del ecosistema:
@@ -421,6 +398,53 @@ export class AuthService {
     };
 
     return { access_token: token, user: userData };
+  }
+
+  /**
+   * Token de un solo propósito para el selector de contrato (usuario con
+   * varios contratos para la app). Se firma con una clave DERIVADA del
+   * secreto de sesión, así que JwtStrategy lo rechaza: no sirve como token de
+   * acceso en ningún endpoint protegido, solo en login/complete.
+   */
+  private static readonly SELECTION_PURPOSE = 'contract-selection';
+
+  private selectionSecret(): string {
+    return `${jwtConstants.secret}#${AuthService.SELECTION_PURPOSE}`;
+  }
+
+  private signContractSelectionToken(userId: string, email: string, applicationName: string): string {
+    return this.jwtService.sign(
+      { sub: userId, email, app: applicationName, purpose: AuthService.SELECTION_PURPOSE },
+      { secret: this.selectionSecret(), expiresIn: '5m' },
+    );
+  }
+
+  /**
+   * POST /auth/login/complete: antes emitía un token de sesión solo con
+   * email + contractId (sin contraseña). Ahora exige el selectionToken que
+   * devuelve el login tras validar la contraseña, para el mismo correo y app.
+   */
+  async completeLoginWithSelection(body: {
+    email: string;
+    applicationName: string;
+    contractId: string;
+    selectionToken?: string;
+  }) {
+    if (!body?.selectionToken) {
+      throw new UnauthorizedException('Inicia sesión de nuevo para elegir el cliente.');
+    }
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(body.selectionToken, { secret: this.selectionSecret() });
+    } catch {
+      throw new UnauthorizedException('La selección de cliente expiró. Inicia sesión de nuevo.');
+    }
+    const sameEmail = (payload?.email || '').toLowerCase() === (body.email || '').toLowerCase();
+    const sameApp = (payload?.app || '').toLowerCase() === (body.applicationName || '').toLowerCase();
+    if (payload?.purpose !== AuthService.SELECTION_PURPOSE || !sameEmail || !sameApp) {
+      throw new UnauthorizedException('Selección de cliente no válida. Inicia sesión de nuevo.');
+    }
+    return this.completeLoginWithContract(payload.email, body.applicationName, body.contractId);
   }
 
   async completeLoginWithContract(
