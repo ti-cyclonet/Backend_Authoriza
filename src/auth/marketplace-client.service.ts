@@ -431,7 +431,9 @@ export class MarketplaceClientService {
   private async issueToken(email: string, contractId: string) {
     // Contraseña o código ya validados por el llamador: se emite el token
     // del contrato de InOut del negocio (tenantId = dueño del contrato).
-    const result = await this.authService.completeLoginWithContract(email, APPLICATION, contractId);
+    // Pide explícitamente el rol de cliente: el usuario puede ser además
+    // Administrador (u otro rol de staff) en el mismo contrato.
+    const result = await this.authService.completeLoginWithContract(email, APPLICATION, contractId, CLIENT_ROLE);
     return { access_token: result.access_token, user: result.user, profile: await this.getProfile(email) };
   }
 
