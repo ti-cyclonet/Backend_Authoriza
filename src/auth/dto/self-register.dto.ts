@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsIn, ValidateNested } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsIn, ValidateNested, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SelfRegisterPrincipalDto {
@@ -78,6 +78,22 @@ export class SelfRegisterDto {
   @ValidateNested()
   @Type(() => SelfRegisterDependentDto)
   dependent?: SelfRegisterDependentDto;
+
+  // Aceptación de los Términos del Servicio y de la autorización de
+  // tratamiento de datos de CycloNet (se valida true en el servicio).
+  @IsBoolean()
+  acceptTerms: boolean;
+
+  @IsBoolean()
+  acceptHabeasData: boolean;
+
+  @IsString()
+  @IsNotEmpty()
+  termsVersion: string;
+
+  @IsString()
+  @IsNotEmpty()
+  habeasDataVersion: string;
 }
 
 export class VerifyRegistrationDto {

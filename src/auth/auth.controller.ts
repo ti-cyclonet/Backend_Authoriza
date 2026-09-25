@@ -5,7 +5,8 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
 import { SelfRegistrationService } from './self-registration.service';
-import { MarketplaceClientService, MarketplaceRegisterInput, RequestMeta } from './marketplace-client.service';
+import { MarketplaceClientService, MarketplaceRegisterInput } from './marketplace-client.service';
+import { ConsentInput, requestMetaFrom } from '../consents/consents.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 
@@ -20,12 +21,8 @@ export class AuthController {
 
   // ─── Clientes del MarketPlace de InOut (rol clienteInout del tenant) ───
 
-  private requestMeta(req: ExpressRequest): RequestMeta {
-    const forwarded = (req.headers['x-forwarded-for'] as string | undefined)?.split(',')[0]?.trim();
-    return {
-      ipAddress: forwarded || req.ip || null,
-      userAgent: (req.headers['user-agent'] as string | undefined) || null,
-    };
+  private requestMeta(req: ExpressRequest) {
+    return requestMetaFrom(req);
   }
 
   @ApiOperation({ summary: 'MarketPlace: registrar (o vincular con su contraseña) un cliente del tenant; exige términos + habeas data' })
@@ -65,20 +62,14 @@ export class AuthController {
     return this.authService.validateUser(loginDto);
   }
 
-  @ApiOperation({ summary: 'Auto login after email verification' })
-  @Public()
-  @Get('login-verified')
-  async loginAfterVerification(@Query('email') email: string) {
-    return this.authService.loginAfterVerification(email);
-  }
-
   @ApiOperation({ summary: 'Complete login with selected contract' })
   @Public()
   @Post('login/complete')
   async completeLogin(
-    @Body() body: { email: string; applicationName: string; contractId: string },
+    @Body() body: { email: string; applicationName: string; contractId: string; selectionToken?: string },
   ) {
-    return this.authService.completeLoginWithContract(body.email, body.applicationName, body.contractId);
+    // Exige el selectionToken emitido por /auth/login tras validar la contraseña
+    return this.authService.completeLoginWithSelection(body);
   }
 
   @ApiOperation({ summary: 'Get user profile' })
@@ -128,8 +119,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Self-register a new account (principal + dependent)' })
   @Public()
   @Post('self-register')
-  async selfRegister(@Body() dto: SelfRegisterDto) {
-    return this.selfRegistrationService.register(dto);
+  async selfRegister(@Body() dto: SelfRegisterDto, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.register(dto, this.requestMeta(req));
   }
 
   @ApiOperation({ summary: 'Verify registration email with code' })
@@ -222,8 +213,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Upgrade plan for existing user' })
   @Public()
   @Post('upgrade-plan')
-  async upgradePlan(@Body() body: { email: string; password: string; packageId: string }) {
-    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId);
+  async upgradePlan(@Body() body: { email: string; password: string; packageId: string } & ConsentInput, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.requestMeta(req));
   }
 
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })
@@ -251,8 +242,8 @@ export class AuthController {
     email: string; password: string; firstName: string; secondName?: string;
     firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string; phone: string;
     birthdate?: string; gender?: string; civilStatus?: string;
-  }) {
-    return this.selfRegistrationService.registerShotraUser(body);
+  } & ConsentInput, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.registerShotraUser(body, this.requestMeta(req));
   }
 
   @ApiOperation({ summary: 'Verify Shotra user email (POST, para clientes móviles)' })

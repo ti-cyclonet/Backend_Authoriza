@@ -18,7 +18,7 @@ import { Rol } from '../roles/entities/rol.entity';
 import { BasicData } from '../basic-data/entities/basic-data.entity';
 import { NaturalPersonData } from '../natural-person-data/entities/natural-person-data.entity';
 import { DocumentType } from '../document-types/entities/document-type.entity';
-import { UserConsent } from '../consents/entities/user-consent.entity';
+import { ConsentsService, ConsentInput, RequestMeta } from '../consents/consents.service';
 import { PotentialUser, PotentialUserStatus } from '../potential-users/potential-user.entity';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -33,17 +33,7 @@ const MAX_CODE_ATTEMPTS = 5;
 /** Tipos de documento de persona natural admitidos (catálogo document_types de Authoriza). */
 const PERSON_DOCUMENT_TYPES = ['CC', 'CE', 'PP'];
 
-export interface ConsentInput {
-  acceptTerms: boolean;
-  acceptHabeasData: boolean;
-  termsVersion: string;
-  habeasDataVersion: string;
-}
-
-export interface RequestMeta {
-  ipAddress?: string | null;
-  userAgent?: string | null;
-}
+export type { ConsentInput, RequestMeta } from '../consents/consents.service';
 
 export interface MarketplaceRegisterInput extends ConsentInput {
   tenantId: string;
@@ -86,7 +76,6 @@ export class MarketplaceClientService {
     @InjectRepository(Rol) private readonly rolRepository: Repository<Rol>,
     @InjectRepository(BasicData) private readonly basicDataRepository: Repository<BasicData>,
     @InjectRepository(DocumentType) private readonly documentTypeRepository: Repository<DocumentType>,
-    @InjectRepository(UserConsent) private readonly consentRepository: Repository<UserConsent>,
     @InjectRepository(PotentialUser) private readonly potentialUserRepository: Repository<PotentialUser>,
     private readonly dataSource: DataSource,
     private readonly entityCodeService: EntityCodeService,
@@ -94,6 +83,7 @@ export class MarketplaceClientService {
     private readonly contractService: ContractService,
     private readonly userRolesService: UserRolesService,
     private readonly authService: AuthService,
+    private readonly consentsService: ConsentsService,
   ) {}
 
   // ─────────────────────────── Endpoints ───────────────────────────
@@ -299,15 +289,7 @@ export class MarketplaceClientService {
   }
 
   private assertConsents(input: ConsentInput) {
-    if (input.acceptTerms !== true || input.acceptHabeasData !== true) {
-      throw new BadRequestException({
-        code: 'CONSENT_REQUIRED',
-        message: 'Debes aceptar los Términos y Condiciones y autorizar el tratamiento de tus datos personales.',
-      });
-    }
-    if (!input.termsVersion || !input.habeasDataVersion) {
-      throw new BadRequestException({ code: 'CONSENT_VERSION_REQUIRED', message: 'Falta la versión de los documentos aceptados.' });
-    }
+    this.consentsService.assertAccepted(input);
   }
 
   private async recordConsents(
@@ -318,24 +300,11 @@ export class MarketplaceClientService {
     source: string,
     meta: RequestMeta,
   ) {
-    const base = {
-      userId,
-      email,
-      tenantId,
-      application: APPLICATION,
-      source,
-      ipAddress: meta.ipAddress?.slice(0, 64) || null,
-      userAgent: meta.userAgent?.slice(0, 500) || null,
-    };
-    await this.consentRepository.save([
-      this.consentRepository.create({ ...base, consentType: 'TERMS_CONDITIONS', documentVersion: input.termsVersion }),
-      this.consentRepository.create({ ...base, consentType: 'HABEAS_DATA', documentVersion: input.habeasDataVersion }),
-    ]);
+    await this.consentsService.record({ userId, email, tenantId, application: APPLICATION, source, consents: input, meta });
   }
 
   private async assertConsentGiven(userId: string, tenantId: string) {
-    const consent = await this.consentRepository.findOne({ where: { userId, tenantId, consentType: 'HABEAS_DATA' } });
-    if (!consent) {
+    if (!(await this.consentsService.hasHabeasDataFor(userId, tenantId))) {
       throw new ForbiddenException({
         code: 'CONSENT_REQUIRED',
         message: 'Debes autorizar el tratamiento de tus datos ante este negocio antes de continuar.',

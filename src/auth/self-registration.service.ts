@@ -25,6 +25,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { LogsService } from '../logs/logs.service';
 import { LogAction } from '../logs/entities/log.entity';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
+import { ConsentsService, ConsentInput, RequestMeta } from '../consents/consents.service';
 
 @Injectable()
 export class SelfRegistrationService {
@@ -43,9 +44,13 @@ export class SelfRegistrationService {
     private entityCodeService: EntityCodeService,
     private notificationsService: NotificationsService,
     private logsService: LogsService,
+    private consentsService: ConsentsService,
   ) {}
 
-  async register(dto: SelfRegisterDto) {
+  async register(dto: SelfRegisterDto, meta: RequestMeta = {}) {
+    // Contratar un paquete exige aceptar los Términos del Servicio y la
+    // autorización de tratamiento de datos de CycloNet (responsable).
+    this.consentsService.assertAccepted(dto);
     // 1. Validate package exists
     const pkg = await this.packageRepository.findOne({
       where: { id: dto.packageId },
@@ -345,6 +350,16 @@ export class SelfRegistrationService {
         this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
       );
     }
+
+    await this.consentsService.record({
+      userId: result.principalUser.id,
+      email: dto.principal.email,
+      tenantId: null,
+      application: pkg.targetApplication || 'Inout',
+      source: 'LANDING_REGISTER',
+      consents: dto,
+      meta,
+    });
 
     return {
       success: true,
@@ -709,7 +724,7 @@ export class SelfRegistrationService {
     return !existing;
   }
 
-  async upgradePlan(email: string, password: string, packageId: string) {
+  async upgradePlan(email: string, password: string, packageId: string, consents: ConsentInput = {}, meta: RequestMeta = {}) {
     // 1. Find user and validate password
     const user = await this.userRepository.findOne({
       where: { strUserName: email },
@@ -725,6 +740,15 @@ export class SelfRegistrationService {
       relations: ['usageLimitVariables'],
     });
     if (!pkg) throw new BadRequestException('Paquete no encontrado');
+
+    // Aceptación de términos/datos al contratar el nuevo plan (opcional aquí:
+    // Kiri también usa este endpoint y aún no la envía)
+    if (this.consentsService.hasConsents(consents)) {
+      await this.consentsService.record({
+        userId: user.id, email: user.strUserName, tenantId: null,
+        application: pkg.targetApplication || 'Inout', source: 'LANDING_UPGRADE', consents, meta,
+      });
+    }
 
     // 3. Validate not downgrading from paid to free
     const newPackageIsFree = Number(pkg.price) === 0 || (pkg as any).isBillable === false;
@@ -1517,10 +1541,19 @@ export class SelfRegistrationService {
     birthdate?: string;
     gender?: string;
     civilStatus?: string;
-  }) {
+  } & ConsentInput, meta: RequestMeta = {}) {
     if (!data.email || !data.password || !data.firstName || !data.firstSurname || !data.phone) {
       throw new BadRequestException('Nombre, apellido, teléfono, email y contraseña son obligatorios.');
     }
+    // Términos de Shotra + autorización de datos de CycloNet: obligatorios
+    this.consentsService.assertAccepted(data);
+    // Solo mayores de edad (la autorización de un menor requiere a su representante)
+    if (data.birthdate && this.ageFrom(data.birthdate) < 18) {
+      throw new BadRequestException('Debes ser mayor de 18 años para registrarte en SHOTRA.');
+    }
+    const recordShotraConsents = (userId: string) => this.consentsService.record({
+      userId, email: data.email, tenantId: null, application: 'Shotra', source: 'SHOTRA_REGISTER', consents: data, meta,
+    });
 
     const existing = await this.userRepository.findOne({
       where: { strUserName: data.email },
@@ -1538,6 +1571,7 @@ export class SelfRegistrationService {
         existing.verificationCode = verificationCode;
         existing.verificationExpires = verificationExpires;
         await this.userRepository.save(existing);
+        await recordShotraConsents(existing.id);
         await this.sendShotraVerificationEmail(data.email, data.firstName, verificationCode);
         return {
           success: true,
@@ -1549,6 +1583,7 @@ export class SelfRegistrationService {
       }
       // Ya verificado: el usuario existe y está activo en el ecosistema.
       // Creamos directamente el contrato de Shotra (idempotente) sin re-verificar.
+      await recordShotraConsents(existing.id);
       await this.ensureShotraContractAndRoles(existing.id);
       return {
         success: true,
@@ -1625,6 +1660,7 @@ export class SelfRegistrationService {
       return savedUser;
     });
 
+    await recordShotraConsents(result.id);
     await this.sendShotraVerificationEmail(data.email, data.firstName, verificationCode);
 
     return {
@@ -1633,6 +1669,17 @@ export class SelfRegistrationService {
       verificationRequired: true,
       userId: result.id,
     };
+  }
+
+  /** Edad cumplida a hoy para una fecha AAAA-MM-DD (NaN si es inválida). */
+  private ageFrom(birthdate: string): number {
+    const b = new Date(`${birthdate}T00:00:00`);
+    if (isNaN(b.getTime())) return NaN;
+    const now = new Date();
+    let age = now.getFullYear() - b.getFullYear();
+    const m = now.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+    return age;
   }
 
   /** Envía el correo de verificación con branding Shotra. */
