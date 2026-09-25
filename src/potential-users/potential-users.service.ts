@@ -51,9 +51,17 @@ export class PotentialUsersService {
     return await this.potentialUsersRepository.save(potentialUser);
   }
 
-  async findBySource(sourceApplication: string): Promise<PotentialUser[]> {
+  async findBySource(sourceApplication: string, sourceTenantId: string): Promise<PotentialUser[]> {
     return await this.potentialUsersRepository.find({
-      where: { sourceApplication },
+      where: { sourceApplication, sourceTenantId },
+    });
+  }
+
+  /** Leads de un negocio, los más recientes primero. */
+  async findBySourceTenant(sourceTenantId: string): Promise<PotentialUser[]> {
+    return await this.potentialUsersRepository.find({
+      where: { sourceTenantId },
+      order: { updatedAt: 'DESC' },
     });
   }
 
