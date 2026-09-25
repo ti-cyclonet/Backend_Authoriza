@@ -32,6 +32,9 @@ const ALLOWED_LOGIN_STATUSES = ['ACTIVE', 'EXPIRING', 'CONFIRMED'];
 const MAX_CODE_ATTEMPTS = 5;
 /** Tipos de documento de persona natural admitidos (catálogo document_types de Authoriza). */
 const PERSON_DOCUMENT_TYPES = ['CC', 'CE', 'PP'];
+/** Mismos códigos que el registro de InOut (landing) y de Shotra. */
+const SEX_CODES = ['M', 'F', 'O'];
+const MARITAL_STATUS_CODES = ['S', 'C', 'U', 'D', 'V'];
 
 export type { ConsentInput, RequestMeta } from '../consents/consents.service';
 
@@ -43,6 +46,9 @@ export interface MarketplaceRegisterInput extends ConsentInput {
   secondName?: string;
   firstSurname?: string;
   secondSurname?: string;
+  birthdate?: string;
+  gender?: string;
+  civilStatus?: string;
   documentType?: string;
   documentNumber?: string;
   phone?: string;
@@ -128,6 +134,18 @@ export class MarketplaceClientService {
     if (!input.firstName?.trim() || !input.firstSurname?.trim() || !input.phone?.trim()) {
       throw new BadRequestException({ code: 'MISSING_FIELDS', message: 'Nombre, apellido y teléfono son obligatorios.' });
     }
+    // Datos de persona natural que exige Authoriza (CreateNaturalPersonDataDto)
+    const birthdate = (input.birthdate || '').trim();
+    const age = this.ageFrom(birthdate);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthdate) || isNaN(age)) {
+      throw new BadRequestException({ code: 'INVALID_BIRTHDATE', message: 'Indica una fecha de nacimiento válida.' });
+    }
+    if (age < 18) {
+      throw new BadRequestException({ code: 'UNDERAGE', message: 'Debes ser mayor de 18 años para crear una cuenta.' });
+    }
+    if (!SEX_CODES.includes(input.gender || '') || !MARITAL_STATUS_CODES.includes(input.civilStatus || '')) {
+      throw new BadRequestException({ code: 'MISSING_FIELDS', message: 'Selecciona tu sexo y tu estado civil.' });
+    }
     if (!PERSON_DOCUMENT_TYPES.includes(documentType) || !/^[A-Za-z0-9-]{4,20}$/.test(documentNumber)) {
       throw new BadRequestException({ code: 'INVALID_DOCUMENT', message: 'Indica un tipo y número de documento válidos.' });
     }
@@ -181,6 +199,9 @@ export class MarketplaceClientService {
         secondName: input.secondName?.trim() || null,
         firstSurname: input.firstSurname!.trim(),
         secondSurname: input.secondSurname?.trim() || null,
+        birthDate: new Date(`${birthdate}T00:00:00`),
+        sex: input.gender,
+        maritalStatus: input.civilStatus,
         phone: input.phone!.trim(),
         basicData,
       }));
@@ -279,6 +300,17 @@ export class MarketplaceClientService {
   }
 
   // ─────────────────────────── Helpers ───────────────────────────
+
+  /** Edad cumplida a hoy para AAAA-MM-DD (NaN si la fecha no es válida). */
+  private ageFrom(birthdate: string): number {
+    const b = new Date(`${birthdate}T00:00:00`);
+    if (isNaN(b.getTime())) return NaN;
+    const now = new Date();
+    let age = now.getFullYear() - b.getFullYear();
+    const m = now.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) age--;
+    return age;
+  }
 
   private normalizeEmail(email: string): string {
     const value = (email || '').trim().toLowerCase();
