@@ -46,6 +46,13 @@ export class AuthController {
     return this.marketplaceClientService.login(body);
   }
 
+  @ApiOperation({ summary: 'MarketPlace: perfil del cliente en sesión' })
+  @UseGuards(JwtAuthGuard)
+  @Get('marketplace/client/me')
+  marketplaceClientProfile(@Request() req) {
+    return this.marketplaceClientService.me(req.user);
+  }
+
   @ApiOperation({ summary: 'MarketPlace: reenviar el código de confirmación de correo' })
   @Public()
   @Post('marketplace/client/resend-code')
