@@ -285,7 +285,25 @@ export class MarketplaceClientService {
       });
     }
 
+    // Clientes creados por el negocio (módulo Usuarios) nunca aceptaron los
+    // términos/datos de la tienda: se les piden UNA vez, al iniciar sesión
+    // (el frontend reusa el paso de "unirse", que las registra).
+    if (!(await this.consentsService.hasHabeasDataFor(user.id, input.tenantId))) {
+      throw new ForbiddenException({
+        code: 'CONSENT_REQUIRED',
+        message: `Para comprar en ${tenant.businessName} acepta sus Términos y la autorización de tratamiento de datos.`,
+      });
+    }
+
     return { verificationRequired: false, ...(await this.issueToken(email, tenant.contractId)) };
+  }
+
+  /** Perfil del cliente en sesión (para precargar el checkout). */
+  async me(user: { email?: string; rol?: string; tenantId?: string }) {
+    if (user?.rol !== CLIENT_ROLE || !user?.email) {
+      throw new ForbiddenException({ code: 'NOT_A_CLIENT', message: 'Solo cuentas de cliente.' });
+    }
+    return this.getProfile(user.email);
   }
 
   /** Reenvía el código. Respuesta genérica para no revelar si el correo existe. */
