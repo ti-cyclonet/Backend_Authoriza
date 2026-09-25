@@ -157,8 +157,8 @@ export class AuthService {
     // Elegir el rol activo de forma DETERMINISTA:
     // preferir el rol ligado a un contrato (si existe) sobre roles sin contrato,
     // para que tenantId/codePrefix se deriven de un contrato real y no de [0] arbitrario.
-    const roleWithContract = userActiveRoles.find(ur => ur.contractId && ur.contract);
-    const selectedUserRole = roleWithContract || userActiveRoles[0];
+    const roleWithContract = AuthService.preferStaffRole(userActiveRoles.filter(ur => ur.contractId && ur.contract));
+    const selectedUserRole = roleWithContract || AuthService.preferStaffRole(userActiveRoles);
     const activeRole = selectedUserRole.role;
 
     // 6. Validar si debe cambiar su contraseña
@@ -356,8 +356,8 @@ export class AuthService {
 
     // Preferir un rol ligado a contrato (determinismo de tenant); si no hay,
     // usar el primero (ej. el bonus userShotra con contractId=null).
-    const roleWithContract = userActiveRoles.find((ur) => ur.contractId && ur.contract);
-    const selectedUserRole = roleWithContract || userActiveRoles[0];
+    const roleWithContract = AuthService.preferStaffRole(userActiveRoles.filter((ur) => ur.contractId && ur.contract));
+    const selectedUserRole = roleWithContract || AuthService.preferStaffRole(userActiveRoles);
     const activeRole = selectedUserRole.role;
 
     // tenantId: dueño del contrato del rol si existe; si no, el propio usuario.
@@ -447,10 +447,25 @@ export class AuthService {
     return this.completeLoginWithContract(payload.email, body.applicationName, body.contractId);
   }
 
+  /**
+   * Roles que solo sirven para comprar en el MarketPlace del negocio. Un
+   * usuario puede tenerlos A LA VEZ que un rol de staff en el mismo contrato
+   * (p. ej. Administrador y Cliente): el login del panel debe entrar con el
+   * de staff, y el del MarketPlace pide el de cliente explícitamente.
+   */
+  static readonly CUSTOMER_ROLES = ['clienteInout'];
+
+  /** De varios user_roles, el primero que NO sea de cliente (o el primero si todos lo son). */
+  static preferStaffRole<T extends { role?: { strName?: string } }>(roles: T[]): T | undefined {
+    return roles.find((ur) => !AuthService.CUSTOMER_ROLES.includes(ur.role?.strName || '')) || roles[0];
+  }
+
   async completeLoginWithContract(
     email: string,
     applicationName: string,
     contractId: string,
+    /** Rol a usar si el usuario tiene varios en el contrato (el MarketPlace pide 'clienteInout'). */
+    preferredRole?: string,
   ): Promise<{
     access_token: string;
     user: AuthenticatedUser & {
@@ -474,11 +489,14 @@ export class AuthService {
     const validRoles = await this.applicationsService.findRolesByApplicationName(applicationName);
 
     // Buscar el rol activo para el contrato seleccionado
-    const userRoleForContract = user.userRoles?.find(ur => 
-      ur.status === 'ACTIVE' && 
+    const rolesForContract = (user.userRoles || []).filter(ur =>
+      ur.status === 'ACTIVE' &&
       ur.contractId === contractId &&
       validRoles.includes(ur.role?.strName)
     );
+    const userRoleForContract = preferredRole
+      ? rolesForContract.find(ur => ur.role?.strName === preferredRole)
+      : AuthService.preferStaffRole(rolesForContract);
 
     if (!userRoleForContract) {
       throw new UnauthorizedException('No valid role found for selected contract');
