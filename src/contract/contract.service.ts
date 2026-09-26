@@ -1436,7 +1436,7 @@ export class ContractService {
     try {
       const response = await fetch(`${kiriApiUrl}/api/plan/activate-user`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.INTERNAL_API_KEY || '' },
         body: JSON.stringify({
           email,
           contractId: contract.id,

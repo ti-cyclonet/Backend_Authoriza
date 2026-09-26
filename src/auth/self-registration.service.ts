@@ -1432,7 +1432,7 @@ export class SelfRegistrationService {
       const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
       await fetch(`${kiriApiUrl}/api/plan/activate-user`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.INTERNAL_API_KEY || '' },
         body: JSON.stringify({ email }),
       });
     } catch (err) {
