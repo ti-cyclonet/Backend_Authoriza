@@ -10,6 +10,7 @@ import { MarketplaceClientService, MarketplaceRegisterInput } from './marketplac
 import { ConsentInput, requestMetaFrom } from '../consents/consents.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
+import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -231,6 +232,8 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })
   @Public()
+  // Solo el backend de Kiri (x-internal-key): crea cuentas ya activas
+  @UseGuards(InternalOrAdminGuard)
   @Post('ensure-kiri-user')
   async ensureKiriUser(@Body() body: { email: string; password: string; nombre?: string }) {
     return this.selfRegistrationService.ensureKiriUser(body.email, body.password, body.nombre);

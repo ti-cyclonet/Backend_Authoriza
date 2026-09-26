@@ -1219,14 +1219,21 @@ export class SelfRegistrationService {
     });
 
     if (existing) {
-      // Already exists — update password to match Kiri's password
-      const hashedPassword = await bcrypt.hash(password, 10);
-      existing.strPassword = hashedPassword;
+      // La cuenta de CycloNet es compartida por todas las apps: NUNCA se
+      // sobrescribe su contraseña con la de Kiri (eso cambiaba en silencio la
+      // clave de Authoriza/InOut/Shotra). Solo se continúa si coincide.
+      const samePassword = await bcrypt.compare(password || '', existing.strPassword || '');
+      if (!samePassword) {
+        throw new ConflictException({
+          code: 'PASSWORD_MISMATCH',
+          message: 'Ya tienes una cuenta CycloNet con este correo y otra contraseña. Usa la contraseña de tu cuenta CycloNet (o recupérala) para mejorar tu plan.',
+        });
+      }
       existing.isVerified = true;
       existing.strStatus = 'ACTIVE';
       existing.isAuthorizedSigner = true;
       await this.userRepository.save(existing);
-      return { success: true, message: 'User already exists, password synced.', userId: existing.id };
+      return { success: true, message: 'User already exists.', userId: existing.id };
     }
 
     // Create new user in Authoriza
