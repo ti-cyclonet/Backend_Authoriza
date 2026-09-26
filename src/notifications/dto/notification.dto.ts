@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, MaxLength, IsEmail } from 'class-validator';
 
 export class CreateEmailTemplateDto {
   @IsString()
@@ -42,14 +42,18 @@ export class SendEmailDto {
 
 export class ContactFormDto {
   @IsString()
+  @MaxLength(120)
   name: string;
 
-  @IsString()
+  @IsEmail()
+  @MaxLength(255)
   email: string;
 
   @IsString()
+  @MaxLength(200)
   subject: string;
 
   @IsString()
+  @MaxLength(5000)
   message: string;
 }
