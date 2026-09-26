@@ -215,7 +215,7 @@ export class MarketplaceClientService {
     return { verificationRequired: true, email, message: 'Te enviamos un código para confirmar tu correo.' };
   }
 
-  async verify(input: { tenantId: string; email: string; code: string }) {
+  async verify(input: { tenantId: string; email: string; code: string } & ConsentInput, meta: RequestMeta = {}) {
     const email = this.normalizeEmail(input.email);
     const user = await this.userRepository.findOne({ where: { strUserName: email } });
     if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'No encontramos una cuenta con ese correo.' });
@@ -237,8 +237,15 @@ export class MarketplaceClientService {
       throw new BadRequestException({ code: 'INVALID_CODE', message: 'El código no es correcto.' });
     }
 
-    // La autorización de datos debe haberse otorgado ante ESTE negocio
-    await this.assertConsentGiven(user.id, input.tenantId);
+    // La autorización de datos debe haberse otorgado ante ESTE negocio. Quien
+    // llega aquí desde el inicio de sesión (cuenta sin confirmar, creada en otra
+    // app o por el negocio) aún no la ha dado: la acepta en este mismo paso, ya
+    // con el correo probado por el código.
+    if (!(await this.consentsService.hasHabeasDataFor(user.id, input.tenantId))) {
+      if (!input.acceptTerms && !input.acceptHabeasData) await this.assertConsentGiven(user.id, input.tenantId);
+      this.assertConsents(input);
+      await this.recordConsents(user.id, email, input.tenantId, input, 'MARKETPLACE_VERIFY', meta);
+    }
 
     const tenant = await this.resolveTenant(input.tenantId);
     const role = await this.getClientRole();
@@ -266,7 +273,10 @@ export class MarketplaceClientService {
 
     if (!user.isVerified) {
       await this.issueVerificationCode(user, tenant.businessName);
-      return { verificationRequired: true, email, message: 'Confirma tu correo: te enviamos un nuevo código.' };
+      // Si aún no autorizó sus datos ante este negocio, el paso de confirmación
+      // debe pedirle los checks junto con el código
+      const consentRequired = !(await this.consentsService.hasHabeasDataFor(user.id, input.tenantId));
+      return { verificationRequired: true, consentRequired, email, message: 'Confirma tu correo: te enviamos un nuevo código.' };
     }
     if (!ALLOWED_LOGIN_STATUSES.includes((user.strStatus || '').toUpperCase())) {
       throw new ForbiddenException({ code: 'USER_INACTIVE', message: 'Tu cuenta está inactiva. Contacta al negocio.' });

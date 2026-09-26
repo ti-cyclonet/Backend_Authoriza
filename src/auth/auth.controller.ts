@@ -36,8 +36,11 @@ export class AuthController {
   @ApiOperation({ summary: 'MarketPlace: confirmar el correo con el código de 6 dígitos y vincular al tenant' })
   @Public()
   @Post('marketplace/client/verify')
-  verifyMarketplaceClient(@Body() body: { tenantId: string; email: string; code: string }) {
-    return this.marketplaceClientService.verify(body);
+  verifyMarketplaceClient(
+    @Body() body: { tenantId: string; email: string; code: string } & ConsentInput,
+    @Req() req: ExpressRequest,
+  ) {
+    return this.marketplaceClientService.verify(body, this.requestMeta(req));
   }
 
   @ApiOperation({ summary: 'MarketPlace: iniciar sesión como cliente de un tenant específico' })
