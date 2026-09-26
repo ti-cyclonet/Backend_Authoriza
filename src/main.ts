@@ -1,3 +1,6 @@
+// Carga el .env ANTES de importar los módulos: el secreto JWT se lee al
+// registrar JwtModule (antes de que ConfigModule procese el .env).
+import 'dotenv/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
