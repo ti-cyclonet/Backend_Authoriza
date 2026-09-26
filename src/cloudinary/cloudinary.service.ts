@@ -1,14 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { ConfigService } from '@nestjs/config';
 import { Readable } from 'stream';
+import { PlatformCostsService } from '../platform-costs/platform-costs.service';
 
 @Injectable()
 export class CloudinaryService {
   private folderPrefix: string;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @Optional() private readonly platformCosts?: PlatformCostsService,
+  ) {
     this.folderPrefix = this.configService.get<string>('CLOUDINARY_FOLDER_PREFIX') || '';
+  }
+
+  /** Consumo de Cloudinary para los indicadores de costos de plataformas. */
+  private trackUpload(result: { bytes?: number } | undefined) {
+    this.platformCosts?.track({ application: 'Authoriza', platform: 'CLOUDINARY', metric: 'uploads', quantity: 1 });
+    if (result?.bytes) this.platformCosts?.track({ application: 'Authoriza', platform: 'CLOUDINARY', metric: 'upload_bytes', quantity: result.bytes });
   }
 
   private prefixFolder(folder: string): string {
@@ -34,6 +44,7 @@ export class CloudinaryService {
         },
         (error, result) => {
           if (error) return reject(error);
+          this.trackUpload(result);
           resolve(result);
         },
       );
@@ -70,6 +81,7 @@ export class CloudinaryService {
             return reject(error);
           }
           console.log('Cloudinary upload success:', result.secure_url);
+          this.trackUpload(result);
           resolve(result);
         },
       );

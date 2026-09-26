@@ -54,11 +54,24 @@ export class NotificationsService {
     const html = this.replaceVariables(template.htmlBody, dto.variables || {});
     const subject = this.replaceVariables(template.subject, dto.variables || {});
 
-    const success = await this.mailService.send(dto.to, subject, html);
+    const success = await this.mailService.send(dto.to, subject, html, {
+      application: this.applicationOf(dto.templateCode),
+      tenantId: dto.tenantId,
+    });
     return {
       success,
       message: success ? 'Email sent successfully' : 'Failed to send email',
     };
+  }
+
+  /** App que origina el correo según el prefijo de la plantilla. */
+  private applicationOf(templateCode: string): string {
+    const code = (templateCode || '').toUpperCase();
+    if (code.startsWith('SHOTRA_')) return 'Shotra';
+    if (code.startsWith('KIRI_')) return 'Kiri';
+    if (code.startsWith('FACTONET_')) return 'FactoNet';
+    if (code.startsWith('INOUT_') || code.startsWith('MARKETPLACE_') || code.startsWith('CREDIT_')) return 'Inout';
+    return 'Authoriza';
   }
 
   async sendByTemplate(

@@ -38,6 +38,12 @@ export class SendEmailDto {
 
   @IsOptional()
   variables?: Record<string, string>;
+
+  /** Cliente (tenant) al que corresponde el envío, para medir consumo. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  tenantId?: string;
 }
 
 export class ContactFormDto {
