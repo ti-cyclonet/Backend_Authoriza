@@ -1,3 +1,4 @@
+import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -58,7 +59,7 @@ import { DocumentType } from '../document-types/entities/document-type.entity';
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, SelfRegistrationService, MarketplaceClientService, ConsentsService, JwtStrategy, JwtAuthGuard],
+  providers: [AuthService, SelfRegistrationService, MarketplaceClientService, ConsentsService, JwtStrategy, JwtAuthGuard, InternalOrAdminGuard],
   exports: [AuthService],
 })
 export class AuthModule {}
