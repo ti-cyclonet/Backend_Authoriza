@@ -25,6 +25,7 @@ import { SweepModule } from './sweep/sweep.module';
 import { InvoicesModule } from './invoices/invoices.module';
 import { PotentialUsersModule } from './potential-users/potential-users.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { PlatformCostsModule } from './platform-costs/platform-costs.module';
 import { MailModule } from './mail/mail.module';
 
 import { CustomerParametersModule } from './customer-parameters/customer-parameters.module';
@@ -80,6 +81,7 @@ import { UsageLimitVariablesModule } from './usage-limit-variables/usage-limit-v
     NotificationsModule,
     MailModule,
     UsageLimitVariablesModule,
+    PlatformCostsModule,
   ],
 })
 export class AppModule {}
