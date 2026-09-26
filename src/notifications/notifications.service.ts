@@ -583,6 +583,49 @@ export class NotificationsService {
       this.logger.log('MARKETPLACE_CLIENT_VERIFICATION template seeded');
     }
 
+    // Recordatorio de vencimiento de cartera (InOut: ventas a crédito)
+    const creditReminderTpl = await this.templateRepo.findOne({ where: { code: 'CREDIT_PAYMENT_REMINDER' } });
+    if (!creditReminderTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'CREDIT_PAYMENT_REMINDER',
+          subject: 'Tu factura {{documentCode}} {{statusText}} - {{businessName}}',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:24px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,0.08);">
+    <tr>
+      <td style="background:#1f2a44;padding:24px 32px;text-align:center;">
+        <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:800;">{{businessName}}</h1>
+        <p style="color:rgba(255,255,255,0.7);margin:6px 0 0;font-size:13px;">Recordatorio de pago</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px 36px 24px;">
+        <p style="color:#333;line-height:1.7;margin:0 0 12px;font-size:15px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#333;line-height:1.7;margin:0 0 20px;font-size:15px;">Te recordamos que tu factura <strong>{{documentCode}}</strong> <strong style="color:{{statusColor}};">{{statusText}}</strong> (fecha de vencimiento: {{dueDate}}).</p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;">
+          <tr><td style="padding:14px 18px;font-size:14px;color:#4b5563;">Saldo pendiente</td><td style="padding:14px 18px;font-size:14px;text-align:right;font-weight:700;color:#1f2937;">{{balance}}</td></tr>
+          <tr><td colspan="2" style="padding:0 18px;font-size:13px;color:#b91c1c;">{{interest}}</td></tr>
+          <tr><td style="padding:14px 18px;font-size:15px;color:#1f2937;font-weight:700;border-top:1px solid #e5e7eb;">Total a pagar</td><td style="padding:14px 18px;font-size:16px;text-align:right;font-weight:800;color:#1f2937;border-top:1px solid #e5e7eb;">{{totalDue}}</td></tr>
+        </table>
+        <p style="color:#777;font-size:13px;line-height:1.6;margin:20px 0 0;">Si ya realizaste el pago, ignora este mensaje. Para cualquier duda comunícate directamente con {{businessName}}.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f4f5f7;padding:16px 32px;">
+        <p style="color:#999;margin:0;font-size:11px;text-align:center;">Enviado por InOut &middot; &copy; {{year}} CycloNet S.A.S.</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('CREDIT_PAYMENT_REMINDER template seeded');
+    }
+
     // Kiri Plus welcome (paid plan activated)
     const kiriPlusWelcomeTpl = await this.templateRepo.findOne({ where: { code: 'KIRI_PLUS_WELCOME' } });
     if (!kiriPlusWelcomeTpl) {
