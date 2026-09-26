@@ -5,6 +5,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
 import { SelfRegistrationService } from './self-registration.service';
+import { ContactRateLimitGuard } from '../common/guards/contact-rate-limit.guard';
 import { MarketplaceClientService, MarketplaceRegisterInput } from './marketplace-client.service';
 import { ConsentInput, requestMetaFrom } from '../consents/consents.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -212,6 +213,7 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Send contact form from landing' })
   @Public()
+  @UseGuards(ContactRateLimitGuard)
   @Post('contact')
   async contactForm(@Body() body: { name: string; email: string; phone?: string; subject?: string; message: string }) {
     return this.selfRegistrationService.sendContactEmail(body);

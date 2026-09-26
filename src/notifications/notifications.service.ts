@@ -740,6 +740,16 @@ export class NotificationsService {
 
   async sendContactForm(name: string, email: string, subject: string, message: string): Promise<{ success: boolean; message: string }> {
     const to = 'ti.cyclonet@hotmail.com';
+    // Datos de un formulario público: se escapan antes de insertarlos en el
+    // HTML del correo (evita enlaces/HTML engañosos en el buzón de CycloNet).
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>
+    )[c]);
+    name = esc(String(name ?? '').slice(0, 120));
+    email = esc(String(email ?? '').slice(0, 255));
+    const plainSubject = String(subject ?? '').replace(/[\r\n]+/g, ' ').slice(0, 200);
+    subject = esc(plainSubject);
+    message = esc(String(message ?? '').slice(0, 5000)).replace(/\n/g, '<br>');
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
@@ -760,7 +770,7 @@ export class NotificationsService {
         </div>
       </div>`;
 
-    const success = await this.mailService.send(to, `[Contacto Web] ${subject}`, html);
+    const success = await this.mailService.send(to, `[Contacto Web] ${plainSubject}`, html);
     if (success) this.logger.log(`Contact form email sent from ${email}`);
     return { success, message: success ? 'Email sent successfully' : 'Failed to send email' };
   }
