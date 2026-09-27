@@ -795,7 +795,7 @@ export class UsersService {
     // Fire-and-forget — don't block the response
     fetch(`${kiriApiUrl}/api/plan/set-user-status`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.INTERNAL_API_KEY || '' },
       body: JSON.stringify({ email, allowed }),
     }).catch(() => {
       // Non-blocking: Kiri will also verify status on next login
