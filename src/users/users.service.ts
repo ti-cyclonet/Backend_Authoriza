@@ -778,6 +778,30 @@ export class UsersService {
     return { message: 'Password updated successfully!' };
   }
 
+  /**
+   * Restablece la contraseña de un usuario a la genérica ('1234567890') desde
+   * el panel de administración, y lo obliga a cambiarla en el próximo login.
+   */
+  async resetPassword(userId: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      withDeleted: true,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    user.strPassword = await bcrypt.hash('1234567890', await bcrypt.genSalt());
+    user.dtmLatestUpdateDate = new Date();
+    user.mustChangePassword = true;
+    user.lastPasswordChange = new Date();
+
+    await this.userRepository.save(user);
+
+    return { message: 'Password reset successfully' };
+  }
+
   async toggleStatus(userId: string): Promise<User> {
     const user = await this.findOne(userId);
     user.strStatus = user.strStatus === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
