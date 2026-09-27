@@ -374,7 +374,10 @@ export class UsersService {
     dependentOnId?: string,
     withDeleted = false,
   ): Promise<UserResponseDto[]> {
-    const { limit = 10, offset = 0 } = paginationDto;
+    // Sin `limit` explícito se devuelven todos: los selectores de usuarios
+    // (dependencias, contratos, wizard) llaman sin paginar y esperaban la
+    // lista completa; con el antiguo default de 10 quedaban usuarios fuera.
+    const { limit, offset = 0 } = paginationDto;
 
     const qb = this.userRepository
       .createQueryBuilder('user')
@@ -403,7 +406,15 @@ export class UsersService {
       qb.andWhere('user.dependentOnId = :dependentOnId', { dependentOnId });
     }
 
-    const users = await qb.take(limit).skip(offset).getMany();
+    // Orden estable: sin ORDER BY, Postgres devuelve filas en orden arbitrario
+    // y la paginación puede repetir u omitir usuarios entre páginas.
+    qb.orderBy('user.dtmCreateDate', 'DESC').addOrderBy('user.id', 'ASC');
+
+    if (limit) {
+      qb.take(limit).skip(offset);
+    }
+
+    const users = await qb.getMany();
     
     return users.map(user => {
       const dto = plainToInstance(UserResponseDto, user, {
