@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserDependency } from './entities/user-dependency.entity';
@@ -26,8 +26,46 @@ export class UserDependenciesService {
       throw new ConflictException('Esta relación de dependencia ya existe');
     }
 
+    if (principalUserId === dependentUserId) {
+      throw new BadRequestException('Un usuario no puede depender de sí mismo');
+    }
+
+    // Un usuario puede pertenecer a varios tenants (varios principales), pero
+    // la jerarquía no puede tener ciclos: si el dependiente ya es principal
+    // (directo o transitivo) del principal, la relación cerraría un ciclo.
+    if (await this.isAncestor(dependentUserId, principalUserId)) {
+      throw new ConflictException(
+        'No se puede crear la dependencia: generaría un ciclo (el usuario ya es principal de este usuario)',
+      );
+    }
+
     const dependency = this.userDependencyRepository.create(createUserDependencyDto);
     return this.userDependencyRepository.save(dependency);
+  }
+
+  /** true si `candidateId` está por encima de `userId` en la cadena de principales. */
+  private async isAncestor(candidateId: string, userId: string): Promise<boolean> {
+    const visited = new Set<string>([userId]);
+    let frontier = [userId];
+
+    while (frontier.length > 0) {
+      const parents = await this.userDependencyRepository.find({
+        where: frontier.map((dependentUserId) => ({ dependentUserId })),
+        select: ['principalUserId'],
+      });
+
+      const next: string[] = [];
+      for (const { principalUserId } of parents) {
+        if (principalUserId === candidateId) return true;
+        if (!visited.has(principalUserId)) {
+          visited.add(principalUserId);
+          next.push(principalUserId);
+        }
+      }
+      frontier = next;
+    }
+
+    return false;
   }
 
   async findAll(): Promise<UserDependency[]> {
