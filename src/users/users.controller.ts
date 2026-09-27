@@ -310,6 +310,12 @@ export class UsersController {
     );
   }
 
+  @Post(':id/reset-password')
+  @ApiOperation({ summary: 'Reset user password to the generic one (admin)' })
+  async resetPassword(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.resetPassword(id);
+  }
+
   @Put(':id')
   @ApiOperation({ summary: 'Update user data' })
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
