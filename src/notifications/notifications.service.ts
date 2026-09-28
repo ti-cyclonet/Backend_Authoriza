@@ -223,6 +223,56 @@ export class NotificationsService {
       this.logger.log('USER_VERIFICATION template seeded');
     }
 
+    // Aviso de contraseña restablecida. Las variables son texto plano (se
+    // arman en UsersService): {{resetMessage}} explica quién la restableció y
+    // {{nextStep}} qué hacer ahora (p. ej. la contraseña temporal).
+    const passwordResetTpl = await this.templateRepo.findOne({ where: { code: 'PASSWORD_RESET' } });
+    if (!passwordResetTpl) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'PASSWORD_RESET',
+          subject: 'Tu contraseña fue restablecida - CycloNet',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(12,79,202,0.08);">
+    <!-- Header -->
+    <tr>
+      <td style="background:linear-gradient(135deg,#0c4fca,#3b82f6);padding:32px 32px 28px;text-align:center;">
+        <img src="https://res.cloudinary.com/dn8ki4idz/image/upload/v1783997360/cyclonet_nit_utsq85.png" alt="CycloNet" style="max-width:140px;margin-bottom:12px;" />
+        <p style="color:rgba(255,255,255,0.9);margin:0;font-size:13px;letter-spacing:0.5px;">Plataforma de gestión empresarial</p>
+      </td>
+    </tr>
+    <!-- Body -->
+    <tr>
+      <td style="padding:40px 36px 32px;">
+        <h2 style="color:#0c4fca;margin:0 0 20px;font-size:22px;font-weight:700;">Tu contraseña fue restablecida</h2>
+        <p style="color:#374151;line-height:1.7;margin:0 0 12px;font-size:15px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="color:#374151;line-height:1.7;margin:0 0 20px;font-size:15px;">{{resetMessage}}</p>
+        <div style="background:#eff6ff;border-left:4px solid #0c4fca;border-radius:8px;padding:16px 18px;margin:0 0 24px;">
+          <p style="color:#1e3a8a;line-height:1.6;margin:0;font-size:14px;">{{nextStep}}</p>
+        </div>
+        <p style="color:#374151;line-height:1.7;margin:0 0 8px;font-size:14px;">Cuenta: <strong>{{email}}</strong></p>
+        <p style="color:#374151;line-height:1.7;margin:0 0 24px;font-size:14px;">Fecha: <strong>{{resetDate}}</strong></p>
+        <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">Si no reconoces este cambio, escríbenos de inmediato a <strong>ti.cyclonet@hotmail.com</strong>.</p>
+      </td>
+    </tr>
+    <!-- Footer -->
+    <tr>
+      <td style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e5e7eb;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">&copy; {{year}} CycloNet S.A.S. — Todos los derechos reservados</p>
+        <p style="color:#9ca3af;margin:6px 0 0;font-size:11px;text-align:center;">www.cyclonet.com.co</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('PASSWORD_RESET template seeded');
+    }
+
     const invoiceIssuedTpl = await this.templateRepo.findOne({ where: { code: 'INVOICE_ISSUED' } });
     if (!invoiceIssuedTpl) {
       await this.templateRepo.save(
