@@ -70,7 +70,45 @@ export class UsersService {
    */
   async uploadAvatar(userId: string, file: Express.Multer.File): Promise<{ url: string }> {
     if (!file) throw new BadRequestException('No se recibió ningún archivo');
+    return this.saveAvatar(userId, file);
+  }
 
+  /**
+   * Igual que uploadAvatar pero con la imagen en base64 (data URL), para apps
+   * que la envían servidor-a-servidor (Kiri, que no tiene token de Authoriza).
+   */
+  async setAvatarFromDataUrl(email: string, dataUrl: string): Promise<{ url: string }> {
+    const match = /^data:(image\/(png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/.exec(dataUrl || '');
+    if (!match) throw new BadRequestException('La imagen debe ser un data URL base64 (png, jpg, webp o gif)');
+
+    const buffer = Buffer.from(match[3], 'base64');
+    if (!buffer.length || buffer.length > 8 * 1024 * 1024) {
+      throw new BadRequestException('La imagen está vacía o supera 8 MB');
+    }
+
+    const user = await this.userRepository.findOne({ where: { strUserName: (email || '').trim() } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const ext = match[2] === 'jpeg' ? 'jpg' : match[2];
+    return this.saveAvatar(user.id, {
+      buffer,
+      originalname: `avatar_${Date.now()}.${ext}`,
+      mimetype: match[1],
+      size: buffer.length,
+    } as Express.Multer.File);
+  }
+
+  /** URL vigente del avatar (null si el usuario no ha subido foto). */
+  async getAvatarUrl(where: { id?: string; email?: string }): Promise<string | null> {
+    if (!where.id && !where.email) return null;
+    const user = await this.userRepository.findOne({
+      where: where.id ? { id: where.id } : { strUserName: (where.email || '').trim() },
+      relations: ['basicData'],
+    });
+    return user?.basicData?.avatarUrl || null;
+  }
+
+  private async saveAvatar(userId: string, file: Express.Multer.File): Promise<{ url: string }> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       relations: ['basicData'],
@@ -95,6 +133,7 @@ export class UsersService {
 
     // URL vigente cacheada en BasicData → la sirven todas las apps.
     await this.basicDataRepository.update({ id: user.basicData.id }, { avatarUrl: url });
+    this.notifyKiriAvatarChanged(user.strUserName, url);
 
     return { url };
   }
@@ -919,6 +958,21 @@ export class UsersService {
       body: JSON.stringify({ email, allowed }),
     }).catch(() => {
       // Non-blocking: Kiri will also verify status on next login
+    });
+  }
+
+  /**
+   * Avisa a Kiri del nuevo avatar: Kiri guarda una copia para mostrar la foto
+   * de otros usuarios (Social) sin consultar Authoriza en cada vista.
+   */
+  private notifyKiriAvatarChanged(email: string, url: string): void {
+    const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
+    fetch(`${kiriApiUrl}/api/plan/set-avatar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.INTERNAL_API_KEY || '' },
+      body: JSON.stringify({ email, url }),
+    }).catch(() => {
+      // No bloqueante: Kiri también lo consulta al abrir la app (/auth/me)
     });
   }
 

@@ -316,6 +316,7 @@ export class AuthService {
     status: string | null;
     reason?: string;
     mustChangePassword: boolean;
+    avatarUrl?: string | null;
   }> {
     const normalized = (email || '').trim();
     const user = normalized ? await this.usersService.findEntityByEmail(normalized) : null;
@@ -337,6 +338,7 @@ export class AuthService {
       status: access.status,
       reason: access.reason,
       mustChangePassword: !!user.mustChangePassword,
+      avatarUrl: user.basicData?.avatarUrl || null,
     };
   }
 

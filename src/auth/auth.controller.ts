@@ -151,6 +151,22 @@ export class AuthController {
     return this.usersService.setPasswordByEmail(body?.email, body?.newPassword, body?.currentPassword);
   }
 
+  @ApiOperation({ summary: 'Interno: avatar vigente de un usuario por id o email (Shotra, Kiri)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/avatar')
+  async getAvatar(@Body() body: { userId?: string; email?: string }) {
+    return { url: await this.usersService.getAvatarUrl({ id: body?.userId, email: body?.email }) };
+  }
+
+  @ApiOperation({ summary: 'Interno: fijar el avatar de un usuario desde una imagen base64 (Kiri)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/set-avatar')
+  async setAvatar(@Body() body: { email: string; dataUrl: string }) {
+    return this.usersService.setAvatarFromDataUrl(body?.email, body?.dataUrl);
+  }
+
   @ApiOperation({ summary: 'Self-register a new account (principal + dependent)' })
   @Public()
   @Post('self-register')
