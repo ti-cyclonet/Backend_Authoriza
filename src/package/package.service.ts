@@ -371,8 +371,16 @@ export class PackageService {
             return null; // Don't show disabled features
           }
           // Quantity type: show count
-          if (v.maxValue === 0) return `${v.displayName}: Ilimitado`;
-          if (v.maxValue >= 999999) return `${v.displayName} Ilimitados`;
+          if (v.maxValue === 0) {
+            // En Kiri, 0 en una cantidad significa "no incluido" (p. ej. bolsillos compartidos en FREE)
+            if (v.targetApplication?.toLowerCase() === 'kiri') return null;
+            return `${v.displayName}: Ilimitado`;
+          }
+          if (v.maxValue >= 999999) {
+            return v.targetApplication?.toLowerCase() === 'kiri'
+              ? `Sin límite de ${v.displayName}`
+              : `${v.displayName} Ilimitados`;
+          }
           return `${v.maxValue} ${v.displayName}`;
         })
         .filter(f => f !== null);
@@ -383,6 +391,7 @@ export class PackageService {
         name: pkg.name,
         description: pkg.description,
         price: Number(pkg.price),
+        annualPrice: pkg.annualPrice != null ? Number(pkg.annualPrice) : null,
         isHighlighted: pkg.isHighlighted,
         displayOrder: pkg.displayOrder,
         badge: pkg.badge || null,

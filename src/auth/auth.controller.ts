@@ -265,8 +265,8 @@ export class AuthController {
   @ApiOperation({ summary: 'Upgrade plan for existing user' })
   @Public()
   @Post('upgrade-plan')
-  async upgradePlan(@Body() body: { email: string; password: string; packageId: string } & ConsentInput, @Req() req: ExpressRequest) {
-    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.requestMeta(req));
+  async upgradePlan(@Body() body: { email: string; password: string; packageId: string; billingCycle?: 'monthly' | 'annual' } & ConsentInput, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.requestMeta(req), body.billingCycle);
   }
 
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })
