@@ -8,6 +8,7 @@ import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { User } from '../users/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
+import { notificarFacturaAKiri } from './kiri-invoice-notifier';
 
 /**
  * Invoice Lifecycle Cron Job
@@ -97,6 +98,7 @@ export class InvoiceLifecycleCron {
     if (daysSincePayday >= 15 && invoice.status === InvoiceStatus.NOTIFICATION2) {
       await this.invoiceRepository.update(invoice.id, { status: InvoiceStatus.SUSPENDED });
       await this.suspendContract(invoice, clientEmail, clientName, factonetUrl, year);
+      notificarFacturaAKiri(invoice, 'suspendida');
       this.logger.log(`Invoice ${invoiceCode}: SUSPENDED at PayDay+${daysSincePayday}`);
       return;
     }
@@ -105,6 +107,7 @@ export class InvoiceLifecycleCron {
     if (daysSincePayday >= 7 && invoice.status === InvoiceStatus.NOTIFICATION1) {
       await this.invoiceRepository.update(invoice.id, { status: InvoiceStatus.NOTIFICATION2 });
       this.logger.log(`Invoice ${invoiceCode}: Escalated to NOTIFICATION2 (late fee starts)`);
+      notificarFacturaAKiri(invoice, 'recargo');
 
       if (clientEmail) {
         await this.notificationsService.sendByTemplate('INVOICE_LATE_FEE_START', clientEmail, {
@@ -121,6 +124,7 @@ export class InvoiceLifecycleCron {
     if (daysSincePayday >= 5 && invoice.status === InvoiceStatus.ISSUED) {
       await this.invoiceRepository.update(invoice.id, { status: InvoiceStatus.NOTIFICATION1 });
       this.logger.log(`Invoice ${invoiceCode}: Escalated to NOTIFICATION1 at PayDay+${daysSincePayday}`);
+      notificarFacturaAKiri(invoice, 'aviso_mora');
 
       if (clientEmail) {
         await this.notificationsService.sendByTemplate('INVOICE_WARNING', clientEmail, {
@@ -144,6 +148,7 @@ export class InvoiceLifecycleCron {
         }).catch(e => this.logger.warn(`Email failed: ${e.message}`));
       }
       this.logger.log(`Invoice ${invoiceCode}: PayDay reminder sent`);
+      notificarFacturaAKiri(invoice, 'vence_hoy');
     }
   }
 

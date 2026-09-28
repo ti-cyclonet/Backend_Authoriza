@@ -10,6 +10,7 @@ import { CloudinaryService } from '../cloudinary/cloudinary.service';
 import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 import { User } from '../users/entities/user.entity';
 import { GlobalParametersForInvoices } from '../global-parameters-invoices/entities/global-parameters-for-invoices.entity';
+import { notificarFacturaAKiri } from './kiri-invoice-notifier';
 
 @Injectable()
 export class InvoicesService {
@@ -327,7 +328,9 @@ export class InvoicesService {
     });
 
     this.logger.log(`Payment confirmed (approved) for invoice ${id}`);
-    return await this.findOne(id);
+    const pagada = await this.findOne(id);
+    notificarFacturaAKiri(pagada, 'pagada');
+    return pagada;
   }
 
   /**
@@ -379,7 +382,9 @@ export class InvoicesService {
       this.logger.warn(`Failed to send payment rejected notification: ${err.message}`)
     );
 
-    return await this.findOne(id);
+    const rechazada = await this.findOne(id);
+    notificarFacturaAKiri(rechazada, 'pago_rechazado');
+    return rechazada;
   }
 
   private async sendPaymentRejectedNotification(invoice: Invoice, reason?: string): Promise<void> {
@@ -419,7 +424,12 @@ export class InvoicesService {
       );
     }
 
-    return await this.findOne(id);
+    const actualizada = await this.findOne(id);
+    // Factura de un plan de Kiri ya pendiente por pagar: avisar también en Kiri
+    if (previousStatus === InvoiceStatus.UNCONFIRMED && status === InvoiceStatus.ISSUED) {
+      notificarFacturaAKiri(actualizada, 'emitida');
+    }
+    return actualizada;
   }
 
   private async sendInvoiceIssuedNotification(invoice: Invoice): Promise<void> {
