@@ -85,6 +85,18 @@ export class UsersController {
   }
 
   /**
+   * Avatar VIGENTE del usuario autenticado. El claim `image` del JWT se congela
+   * al iniciar sesión; las apps consultan esto para reflejar un cambio hecho en
+   * otra app sin tener que volver a entrar.
+   */
+  @UseGuards(JwtAuthGuard)
+  @Get('me/avatar')
+  @ApiOperation({ summary: 'Get the authenticated user current avatar (shared across apps)' })
+  async getMyAvatar(@Request() req) {
+    return { url: await this.usersService.getAvatarUrl({ id: req.user.id }) };
+  }
+
+  /**
    * Resumen de identidad (nombre/documento) de un usuario existente por
    * email, para precargar el formulario de "nuevo usuario" de otra app
    * (ej. InOut) cuando la persona ya está registrada en Authoriza y solo
