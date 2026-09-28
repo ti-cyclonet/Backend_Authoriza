@@ -21,6 +21,10 @@ export class Package {
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   price: number;
 
+  // Precio si se paga el año completo (contrato anual). null = solo mensual.
+  @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
+  annualPrice?: number | null;
+
   @Column({ type: 'boolean', default: true })
   isBillable: boolean;
 

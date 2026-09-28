@@ -724,7 +724,7 @@ export class SelfRegistrationService {
     return !existing;
   }
 
-  async upgradePlan(email: string, password: string, packageId: string, consents: ConsentInput = {}, meta: RequestMeta = {}) {
+  async upgradePlan(email: string, password: string, packageId: string, consents: ConsentInput = {}, meta: RequestMeta = {}, billingCycle: 'monthly' | 'annual' = 'monthly') {
     // 1. Find user and validate password
     const user = await this.userRepository.findOne({
       where: { strUserName: email },
@@ -790,27 +790,27 @@ export class SelfRegistrationService {
               // Different application — create a new contract for the principal
               const principalUser = await this.userRepository.findOne({ where: { id: dependency.principalUserId } });
               if (principalUser) {
-                return this.createContractForUpgrade(principalUser, pkg, packageId);
+                return this.createContractForUpgrade(principalUser, pkg, packageId, billingCycle);
               }
             }
             const currentIsPaid = Number(principalContract.package?.price) > 0 && (principalContract.package as any)?.isBillable !== false;
             if (currentIsPaid && newPackageIsFree) {
               throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
             }
-            return this.executeUpgrade(principalContract, pkg, packageId);
+            return this.executeUpgrade(principalContract, pkg, packageId, billingCycle);
           }
         }
       }
 
       // No direct contract exists — create a new one for this user
-      return this.createContractForUpgrade(user, pkg, packageId);
+      return this.createContractForUpgrade(user, pkg, packageId, billingCycle);
     }
 
     // If existing contract is for a different application, create a new contract
     // (e.g., user has Cyclon Plus and wants to try InOut FREE — keep both active)
     const existingTargetApp = contract.package?.targetApplication;
     if (newTargetApplication && existingTargetApp && newTargetApplication !== existingTargetApp) {
-      return this.createContractForUpgrade(user, pkg, packageId);
+      return this.createContractForUpgrade(user, pkg, packageId, billingCycle);
     }
 
     const currentIsPaid = Number(contract.package?.price) > 0 && (contract.package as any)?.isBillable !== false;
@@ -818,7 +818,7 @@ export class SelfRegistrationService {
       throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
     }
 
-    return this.executeUpgrade(contract, pkg, packageId);
+    return this.executeUpgrade(contract, pkg, packageId, billingCycle);
   }
 
   /**
@@ -826,7 +826,7 @@ export class SelfRegistrationService {
    * This happens when the user registered directly in Kiri (without going through
    * the InOut/Authoriza self-registration flow that creates a contract automatically).
    */
-  private async createContractForUpgrade(user: User, pkg: Package, packageId: string) {
+  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
     const contractCode = await this.entityCodeService.generateCode('Contract');
     const today = new Date();
     const endDate = new Date(today);
@@ -838,14 +838,16 @@ export class SelfRegistrationService {
       || user.strUserName.split('@')[0];
     const codePrefix = await this.generateUniqueCodePrefix(userName, this.contractRepository.manager);
 
-    // Paquete no facturable (DEV/FREE) -> valor 0; facturable -> price anual
+    // Paquete no facturable (DEV/FREE) -> valor 0; facturable -> valor del año.
+    // Anual (si el paquete tiene precio anual): una sola factura por ese valor.
     const isNonBillablePkg = (pkg as any).isBillable === false || Number(pkg.price) === 0;
+    const anual = billingCycle === 'annual' && pkg.annualPrice != null && Number(pkg.annualPrice) > 0;
     const contract = this.contractRepository.create({
       code: contractCode,
       user: { id: user.id } as any,
       package: { id: packageId } as any,
-      value: isNonBillablePkg ? 0 : (pkg.price || 0) * 12,
-      mode: PaymentMode.MONTHLY,
+      value: isNonBillablePkg ? 0 : anual ? Number(pkg.annualPrice) : (pkg.price || 0) * 12,
+      mode: anual ? PaymentMode.ANNUAL : PaymentMode.MONTHLY,
       payday: 1,
       startDate: today,
       endDate,
@@ -912,7 +914,7 @@ export class SelfRegistrationService {
     return { success: true, message };
   }
 
-  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string) {
+  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
     const isBillable = (pkg as any).isBillable !== false;
     const isKiriApp = (pkg as any).targetApplication === 'Kiri';
 
@@ -920,7 +922,7 @@ export class SelfRegistrationService {
     // This allows the user to keep using the old plan while the new contract awaits signatures
     if (isBillable && isKiriApp) {
       const user = contract.user;
-      const result = await this.createContractForUpgrade(user, pkg, packageId);
+      const result = await this.createContractForUpgrade(user, pkg, packageId, billingCycle);
       return result;
     }
 

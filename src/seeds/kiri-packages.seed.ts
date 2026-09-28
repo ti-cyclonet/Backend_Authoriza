@@ -5,6 +5,72 @@ import { ConfigurationPackage } from '../configuration-package/entities/configur
 import { Rol } from '../roles/entities/rol.entity';
 import { EntityCodeService } from '../entity-codes/services/entity-code.service';
 import { EntityCode } from '../entity-codes/entities/entity-code.entity';
+import { KIRI_PLAN_PRECIOS, PlanKiri, variablesDelPlan } from './kiri-plan-matrix';
+
+/**
+ * Paquetes de Kiri Finance: KIRI FREE, KIRI PLUS y KIRI PRO.
+ * Lo que incluye cada uno está en kiri-plan-matrix.ts.
+ *
+ * Idempotente (corre en cada arranque):
+ * - Crea el paquete si no existe.
+ * - Sincroniza sus variables (crea las nuevas; corrige tope, tipo y nombre).
+ * - Los precios solo se "migran" desde el valor anterior conocido (PLUS
+ *   16.000 → 12.900) o si nunca se fijaron: un cambio hecho a mano desde el
+ *   panel de Authoriza no se pisa en cada reinicio.
+ */
+interface DefPaquete {
+  plan: PlanKiri;
+  name: string;
+  description: string;
+  /** Descripciones anteriores del seed: si el paquete aún tiene una, se actualiza */
+  descripcionesViejas: string[];
+  /** Precios anteriores del seed que se migran al nuevo */
+  preciosViejos: number[];
+  displayOrder: number;
+  isHighlighted: boolean;
+  badge: string | null;
+  ctaLabel: string;
+  rol: 'userKiri' | 'adminKiri';
+}
+
+const PAQUETES: DefPaquete[] = [
+  {
+    plan: 'FREE',
+    name: 'KIRI FREE',
+    description: 'Empieza a ordenar tu plata: registra tus gastos e ingresos sin límite, controla tus deudas y gastos fijos, ahorra en bolsillos y haz crecer tu Árbol Kiri.',
+    descripcionesViejas: ['Gestión básica de tus finanzas personales. Controla ingresos, deudas y gastos fijos con distribución inteligente de presupuesto.'],
+    preciosViejos: [],
+    displayOrder: 1,
+    isHighlighted: false,
+    badge: null,
+    ctaLabel: 'Comenzar gratis',
+    rol: 'userKiri',
+  },
+  {
+    plan: 'PLUS',
+    name: 'KIRI PLUS',
+    description: 'Todo Kiri para ti: Kiri Coach con IA, dictado y escáner de recibos, proyecciones a 24 meses, reportes en PDF, Social con préstamos y ahorros compartidos, y sin límites en tus registros.',
+    descripcionesViejas: ['Todas las funcionalidades de Kiri Finance. Asistente IA, reportes avanzados, estrategias de deuda, funciones sociales y sin límites en registros.'],
+    preciosViejos: [16000],
+    displayOrder: 2,
+    isHighlighted: true,
+    badge: 'Más popular',
+    ctaLabel: 'Elegir Plan',
+    rol: 'adminKiri',
+  },
+  {
+    plan: 'PRO',
+    name: 'KIRI PRO',
+    description: 'Para el hogar y quien quiere todo: presupuesto del hogar en pareja (tu pareja recibe PLUS gratis), conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
+    descripcionesViejas: [],
+    preciosViejos: [],
+    displayOrder: 3,
+    isHighlighted: false,
+    badge: 'Para el hogar',
+    ctaLabel: 'Elegir Plan',
+    rol: 'adminKiri',
+  },
+];
 
 export default class KiriPackagesSeed {
   async run(dataSource: DataSource): Promise<void> {
@@ -12,181 +78,70 @@ export default class KiriPackagesSeed {
     const ulvRepo = dataSource.getRepository(UsageLimitVariable);
     const configRepo = dataSource.getRepository(ConfigurationPackage);
     const rolRepo = dataSource.getRepository(Rol);
-    const entityCodeRepo = dataSource.getRepository(EntityCode);
-    const entityCodeService = new EntityCodeService(entityCodeRepo);
+    const entityCodeService = new EntityCodeService(dataSource.getRepository(EntityCode));
 
-    // ================================================================
-    // PAQUETE 1: KIRI FREE
-    // ================================================================
-    const freePackageName = 'KIRI FREE';
-    let freePkg = await packageRepo.findOne({ where: { name: freePackageName } });
+    for (const def of PAQUETES) {
+      const precio = KIRI_PLAN_PRECIOS[def.plan];
+      let pkg = await packageRepo.findOne({ where: { name: def.name } });
 
-    if (!freePkg) {
-      const code = await entityCodeService.generateCode('Package');
-      freePkg = packageRepo.create({
-        name: freePackageName,
-        code,
-        displayName: 'KIRI FREE',
-        description:
-          'Gestión básica de tus finanzas personales. Controla ingresos, deudas y gastos fijos con distribución inteligente de presupuesto.',
-        price: 0,
-        isBillable: false,
-        showInLanding: true,
-        displayOrder: 1,
-        isHighlighted: false,
-        ctaLabel: 'Comenzar gratis',
-        ctaType: 'register',
-      });
-      freePkg.targetApplication = 'Kiri';
-      await packageRepo.save(freePkg);
-      console.log('✅ Paquete KIRI FREE creado:', freePkg.id);
-    } else {
-      console.log('⚠️ Paquete KIRI FREE ya existe con ID:', freePkg.id);
-    }
-
-    // Variables del plan FREE (features habilitadas/deshabilitadas)
-    const freeVariables = [
-      // Funcionalidades incluidas (lo esencial)
-      { variableName: 'budgetManagement', displayName: 'Gestión de presupuesto', maxValue: 1, limitType: 'feature' },
-      { variableName: 'debtsTracking', displayName: 'Control de deudas', maxValue: 1, limitType: 'feature' },
-      { variableName: 'fixedExpenses', displayName: 'Gastos fijos', maxValue: 1, limitType: 'feature' },
-      { variableName: 'savingsPockets', displayName: 'Bolsillos de ahorro', maxValue: 1, limitType: 'feature' },
-      // Funcionalidades NO incluidas
-      { variableName: 'basicReports', displayName: 'Reportes básicos', maxValue: 0, limitType: 'feature' },
-      { variableName: 'impulseExpenses', displayName: 'Gastos hormiga', maxValue: 0, limitType: 'feature' },
-      { variableName: 'extraIncomes', displayName: 'Ingresos extras', maxValue: 0, limitType: 'feature' },
-      { variableName: 'emergencyFund', displayName: 'Fondo de emergencia', maxValue: 0, limitType: 'feature' },
-      { variableName: 'gamification', displayName: 'Gamificación y jardín virtual', maxValue: 0, limitType: 'feature' },
-      { variableName: 'aiCoach', displayName: 'Asistente IA financiero', maxValue: 0, limitType: 'feature' },
-      { variableName: 'advancedReports', displayName: 'Reportes avanzados (PDF/Excel)', maxValue: 0, limitType: 'feature' },
-      { variableName: 'debtStrategies', displayName: 'Estrategias de deuda (Bola de nieve / Avalancha)', maxValue: 0, limitType: 'feature' },
-      { variableName: 'socialConnections', displayName: 'Conexiones sociales', maxValue: 0, limitType: 'feature' },
-      { variableName: 'sharedPockets', displayName: 'Bolsillos compartidos', maxValue: 0, limitType: 'feature' },
-      { variableName: 'p2pLoans', displayName: 'Préstamos P2P', maxValue: 0, limitType: 'feature' },
-    ];
-
-    for (const varData of freeVariables) {
-      const existing = await ulvRepo.findOne({
-        where: { packageId: freePkg.id, variableName: varData.variableName },
-      });
-      if (!existing) {
-        const ulv = ulvRepo.create({
-          ...varData,
-          targetApplication: 'Kiri',
-          packageId: freePkg.id,
+      if (!pkg) {
+        pkg = packageRepo.create({
+          name: def.name,
+          code: await entityCodeService.generateCode('Package'),
+          displayName: def.name,
+          description: def.description,
+          price: precio.mensual,
+          annualPrice: precio.anual || null,
+          isBillable: precio.mensual > 0,
+          showInLanding: true,
+          displayOrder: def.displayOrder,
+          isHighlighted: def.isHighlighted,
+          badge: def.badge,
+          ctaLabel: def.ctaLabel,
+          ctaType: 'register',
         });
-        await ulvRepo.save(ulv);
-      } else if (existing.limitType !== varData.limitType || existing.maxValue !== varData.maxValue) {
-        // Keep existing records in sync (e.g. fix legacy limitType='quantity')
-        existing.limitType = varData.limitType;
-        existing.maxValue = varData.maxValue;
-        existing.displayName = varData.displayName;
-        await ulvRepo.save(existing);
+        pkg.targetApplication = 'Kiri';
+        await packageRepo.save(pkg);
+        console.log(`✅ Paquete ${def.name} creado:`, pkg.id);
+      } else {
+        let cambio = false;
+        if (def.preciosViejos.includes(Number(pkg.price))) { pkg.price = precio.mensual; cambio = true; }
+        if (pkg.annualPrice == null && precio.anual > 0) { pkg.annualPrice = precio.anual; cambio = true; }
+        if (!pkg.description || def.descripcionesViejas.includes(pkg.description)) {
+          if (pkg.description !== def.description) { pkg.description = def.description; cambio = true; }
+        }
+        if (pkg.badge == null && def.badge) { pkg.badge = def.badge; cambio = true; }
+        if (pkg.displayOrder !== def.displayOrder) { pkg.displayOrder = def.displayOrder; cambio = true; }
+        if (cambio) {
+          await packageRepo.save(pkg);
+          console.log(`🔄 Paquete ${def.name} actualizado (precio ${pkg.price}, anual ${pkg.annualPrice})`);
+        } else {
+          console.log(`⚠️ Paquete ${def.name} ya existe con ID:`, pkg.id);
+        }
       }
-    }
-    console.log('  ✅ Variables KIRI FREE configuradas');
 
-    // Rol para KIRI FREE: 1 userKiri
-    const userKiriRole = await rolRepo.findOne({ where: { strName: 'userKiri' } });
-    if (userKiriRole) {
-      const existingConfig = await configRepo.findOne({
-        where: { package: { id: freePkg.id }, rol: { id: userKiriRole.id } },
-      });
-      if (!existingConfig) {
-        await configRepo.save(configRepo.create({
-          price: 0,
-          totalAccount: 1,
-          package: freePkg,
-          rol: userKiriRole,
-        }));
-        console.log('  ✅ Rol userKiri (1 cuenta) asignado a KIRI FREE');
+      // Variables del plan (funciones y topes)
+      for (const v of variablesDelPlan(def.plan)) {
+        const existing = await ulvRepo.findOne({ where: { packageId: pkg.id, variableName: v.variableName } });
+        if (!existing) {
+          await ulvRepo.save(ulvRepo.create({ ...v, packageId: pkg.id }));
+        } else if (existing.limitType !== v.limitType || existing.maxValue !== v.maxValue || existing.displayName !== v.displayName) {
+          existing.limitType = v.limitType;
+          existing.maxValue = v.maxValue;
+          existing.displayName = v.displayName;
+          await ulvRepo.save(existing);
+        }
       }
-    }
+      console.log(`  ✅ Variables ${def.name} configuradas`);
 
-    // ================================================================
-    // PAQUETE 2: KIRI PLUS
-    // ================================================================
-    const plusPackageName = 'KIRI PLUS';
-    let plusPkg = await packageRepo.findOne({ where: { name: plusPackageName } });
-
-    if (!plusPkg) {
-      const code = await entityCodeService.generateCode('Package');
-      plusPkg = packageRepo.create({
-        name: plusPackageName,
-        code,
-        displayName: 'KIRI PLUS',
-        description:
-          'Todas las funcionalidades de Kiri Finance. Asistente IA, reportes avanzados, estrategias de deuda, funciones sociales y sin límites en registros.',
-        price: 16000,
-        isBillable: true,
-        showInLanding: true,
-        displayOrder: 2,
-        isHighlighted: true,
-        ctaLabel: 'Elegir Plan',
-        ctaType: 'register',
-      });
-      plusPkg.targetApplication = 'Kiri';
-      await packageRepo.save(plusPkg);
-      console.log('✅ Paquete KIRI PLUS creado:', plusPkg.id);
-    } else {
-      console.log('⚠️ Paquete KIRI PLUS ya existe con ID:', plusPkg.id);
-    }
-
-    // Variables del plan PLUS (todas las features habilitadas)
-    const plusVariables = [
-      // Todas las funcionalidades habilitadas
-      { variableName: 'budgetManagement', displayName: 'Gestión de presupuesto', maxValue: 1, limitType: 'feature' },
-      { variableName: 'debtsTracking', displayName: 'Control de deudas', maxValue: 1, limitType: 'feature' },
-      { variableName: 'fixedExpenses', displayName: 'Gastos fijos', maxValue: 1, limitType: 'feature' },
-      { variableName: 'impulseExpenses', displayName: 'Gastos hormiga', maxValue: 1, limitType: 'feature' },
-      { variableName: 'savingsPockets', displayName: 'Bolsillos de ahorro', maxValue: 1, limitType: 'feature' },
-      { variableName: 'extraIncomes', displayName: 'Ingresos extras', maxValue: 1, limitType: 'feature' },
-      { variableName: 'emergencyFund', displayName: 'Fondo de emergencia', maxValue: 1, limitType: 'feature' },
-      { variableName: 'gamification', displayName: 'Gamificación y jardín virtual', maxValue: 1, limitType: 'feature' },
-      { variableName: 'basicReports', displayName: 'Reportes básicos', maxValue: 1, limitType: 'feature' },
-      { variableName: 'advancedReports', displayName: 'Reportes avanzados (PDF/Excel)', maxValue: 1, limitType: 'feature' },
-      { variableName: 'debtStrategies', displayName: 'Estrategias de deuda (Bola de nieve / Avalancha)', maxValue: 1, limitType: 'feature' },
-      { variableName: 'aiCoach', displayName: 'Asistente IA financiero', maxValue: 1, limitType: 'feature' },
-      { variableName: 'socialConnections', displayName: 'Conexiones sociales', maxValue: 1, limitType: 'feature' },
-      { variableName: 'sharedPockets', displayName: 'Bolsillos compartidos', maxValue: 1, limitType: 'feature' },
-      { variableName: 'p2pLoans', displayName: 'Préstamos P2P', maxValue: 1, limitType: 'feature' },
-    ];
-
-    for (const varData of plusVariables) {
-      const existing = await ulvRepo.findOne({
-        where: { packageId: plusPkg.id, variableName: varData.variableName },
-      });
-      if (!existing) {
-        const ulv = ulvRepo.create({
-          ...varData,
-          targetApplication: 'Kiri',
-          packageId: plusPkg.id,
-        });
-        await ulvRepo.save(ulv);
-      } else if (existing.limitType !== varData.limitType || existing.maxValue !== varData.maxValue) {
-        // Keep existing records in sync (e.g. fix legacy limitType='quantity')
-        existing.limitType = varData.limitType;
-        existing.maxValue = varData.maxValue;
-        existing.displayName = varData.displayName;
-        await ulvRepo.save(existing);
-      }
-    }
-    console.log('  ✅ Variables KIRI PLUS configuradas');
-
-    // Rol para KIRI PLUS: 1 adminKiri
-    const adminKiriRole = await rolRepo.findOne({ where: { strName: 'adminKiri' } });
-    if (adminKiriRole) {
-      const existingConfig = await configRepo.findOne({
-        where: { package: { id: plusPkg.id }, rol: { id: adminKiriRole.id } },
-      });
-      if (!existingConfig) {
-        await configRepo.save(configRepo.create({
-          price: 0,
-          totalAccount: 1,
-          package: plusPkg,
-          rol: adminKiriRole,
-        }));
-        console.log('  ✅ Rol adminKiri (1 cuenta) asignado a KIRI PLUS');
+      // Rol de la cuenta: FREE → userKiri; PLUS/PRO → adminKiri (1 cuenta)
+      const rol = await rolRepo.findOne({ where: { strName: def.rol } });
+      if (rol) {
+        const existingConfig = await configRepo.findOne({ where: { package: { id: pkg.id }, rol: { id: rol.id } } });
+        if (!existingConfig) {
+          await configRepo.save(configRepo.create({ price: 0, totalAccount: 1, package: pkg, rol }));
+          console.log(`  ✅ Rol ${def.rol} (1 cuenta) asignado a ${def.name}`);
+        }
       }
     }
   }

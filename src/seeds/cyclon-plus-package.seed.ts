@@ -10,6 +10,7 @@ import { UserRole } from '../user-roles/entities/user-role.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { PaymentMode } from '../contract/enums/payment-mode.enum';
+import { variablesDelPlan } from './kiri-plan-matrix';
 
 /**
  * CYCLON PLUS [+] — Paquete maestro interno.
@@ -149,26 +150,9 @@ export default class CyclonPlusPackageSeed {
       vars.push({ ...q, targetApplication: 'Inout', limitType: 'quantity' });
     }
 
-    // ── Kiri: todas las features habilitadas ──
-    const kiriFeatureNames: Record<string, string> = {
-      budgetManagement: 'Gestión de presupuesto',
-      debtsTracking: 'Control de deudas',
-      fixedExpenses: 'Gastos fijos',
-      savingsPockets: 'Bolsillos de ahorro',
-      basicReports: 'Reportes básicos',
-      impulseExpenses: 'Gastos hormiga',
-      extraIncomes: 'Ingresos extras',
-      emergencyFund: 'Fondo de emergencia',
-      gamification: 'Gamificación y jardín virtual',
-      advancedReports: 'Reportes avanzados (PDF/Excel)',
-      debtStrategies: 'Estrategias de deuda',
-      aiCoach: 'Asistente IA financiero',
-      socialConnections: 'Conexiones sociales',
-      sharedPockets: 'Bolsillos compartidos',
-      p2pLoans: 'Préstamos P2P',
-    };
-    for (const [variableName, displayName] of Object.entries(kiriFeatureNames)) {
-      vars.push({ variableName, displayName, maxValue: 1, targetApplication: 'Kiri', limitType: 'feature' });
+    // ── Kiri: todo lo del plan PRO (ver kiri-plan-matrix.ts) ──
+    for (const v of variablesDelPlan('PRO')) {
+      vars.push(v);
     }
 
     // ── Shotra: features + límites de cantidad ──
@@ -198,7 +182,7 @@ export default class CyclonPlusPackageSeed {
       const existing = await ulvRepo.findOne({ where: { packageId: pkg.id, variableName: v.variableName } });
       if (!existing) {
         await ulvRepo.save(ulvRepo.create({ ...v, packageId: pkg.id }));
-      } else if (existing.limitType !== v.limitType || existing.maxValue !== v.maxValue) {
+      } else if (existing.limitType !== v.limitType || existing.maxValue !== v.maxValue || existing.displayName !== v.displayName) {
         existing.limitType = v.limitType;
         existing.maxValue = v.maxValue;
         existing.displayName = v.displayName;
