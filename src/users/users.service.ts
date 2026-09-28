@@ -35,6 +35,9 @@ import { UserRolesService } from '../user-roles/user-roles.service';
 import { UserDependenciesService } from '../user-dependencies/user-dependencies.service';
 import { UpdateNaturalPersonDataDto } from 'src/natural-person-data/dto/update-natural-person-data.dto';
 
+/** Contraseña genérica que asigna el reset desde el panel (obliga a cambiarla). */
+const TEMPORARY_PASSWORD = '1234567890';
+
 @Injectable()
 export class UsersService {
   private toResponseDto(user: User): UserResponseDto {
@@ -803,7 +806,10 @@ export class UsersService {
       throw new BadRequestException('La nueva contraseña debe tener al menos 6 caracteres.');
     }
 
-    const user = await this.userRepository.findOne({ where: { strUserName: (email || '').trim() } });
+    const user = await this.userRepository.findOne({
+      where: { strUserName: (email || '').trim() },
+      relations: ['basicData', 'basicData.naturalPersonData', 'basicData.legalEntityData'],
+    });
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -824,32 +830,72 @@ export class UsersService {
     user.lastPasswordChange = new Date();
     await this.userRepository.save(user);
 
+    // Sin la contraseña actual es un restablecimiento ("olvidé mi contraseña"):
+    // se avisa por correo, igual que un reset desde el panel.
+    if (currentPassword === undefined) {
+      await this.sendPasswordResetEmail(
+        user,
+        'Tu contraseña se restableció con el enlace de recuperación que solicitaste.',
+        'Ya puedes iniciar sesión con tu nueva contraseña en todas las aplicaciones CycloNet.',
+      );
+    }
+
     return { message: 'Contraseña actualizada.' };
   }
 
   /**
-   * Restablece la contraseña de un usuario a la genérica ('1234567890') desde
-   * el panel de administración, y lo obliga a cambiarla en el próximo login.
+   * Restablece la contraseña de un usuario a la genérica (TEMPORARY_PASSWORD)
+   * desde el panel de administración, lo obliga a cambiarla en el próximo login
+   * y le avisa por correo.
    */
   async resetPassword(userId: string): Promise<{ message: string }> {
     const user = await this.userRepository.findOne({
       where: { id: userId },
       withDeleted: true,
+      relations: ['basicData', 'basicData.naturalPersonData', 'basicData.legalEntityData'],
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    user.strPassword = await bcrypt.hash('1234567890', await bcrypt.genSalt());
+    user.strPassword = await bcrypt.hash(TEMPORARY_PASSWORD, await bcrypt.genSalt());
     user.dtmLatestUpdateDate = new Date();
     user.mustChangePassword = true;
     user.lastPasswordChange = new Date();
 
     await this.userRepository.save(user);
     this.notifyKiriCredentialsChanged(user.strUserName);
+    await this.sendPasswordResetEmail(
+      user,
+      'Un administrador de CycloNet restableció la contraseña de tu cuenta.',
+      `Inicia sesión con la contraseña temporal ${TEMPORARY_PASSWORD}. Al entrar se te pedirá cambiarla por una propia.`,
+    );
 
     return { message: 'Password reset successfully' };
+  }
+
+  /**
+   * Avisa al usuario que su contraseña fue restablecida. No bloquea el reset:
+   * si el correo falla, la contraseña ya quedó cambiada y solo se registra.
+   */
+  private async sendPasswordResetEmail(user: User, resetMessage: string, nextStep: string): Promise<void> {
+    const customerName = user.basicData?.naturalPersonData
+      ? `${user.basicData.naturalPersonData.firstName || ''} ${user.basicData.naturalPersonData.firstSurname || ''}`.trim()
+      : user.basicData?.legalEntityData?.businessName || user.strUserName;
+
+    try {
+      await this.notificationsService.sendByTemplate('PASSWORD_RESET', user.strUserName, {
+        customerName: customerName || user.strUserName,
+        email: user.strUserName,
+        resetMessage,
+        nextStep,
+        resetDate: new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota', dateStyle: 'long', timeStyle: 'short' }),
+        year: new Date().getFullYear().toString(),
+      });
+    } catch (err) {
+      console.warn(`[PasswordReset] No se pudo enviar el aviso a ${user.strUserName}: ${(err as Error).message}`);
+    }
   }
 
   async toggleStatus(userId: string): Promise<User> {
