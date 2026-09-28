@@ -5,6 +5,7 @@ import {
   Inject,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
@@ -785,8 +786,45 @@ export class UsersService {
     user.lastPasswordChange = new Date();
 
     await this.userRepository.save(user);
+    this.notifyKiriCredentialsChanged(user.strUserName);
 
     return { message: 'Password updated successfully!' };
+  }
+
+  /**
+   * Fija la contraseña de un usuario por email en nombre de otra app del
+   * ecosistema (Kiri) — Authoriza es el único dueño de las contraseñas.
+   * Con `currentPassword` exige la actual (cambio voluntario); sin ella es un
+   * restablecimiento cuyo token ya validó la app que llama.
+   * No notifica a Kiri: la propia app que llama gestiona sus sesiones.
+   */
+  async setPasswordByEmail(email: string, newPassword: string, currentPassword?: string): Promise<{ message: string }> {
+    if (!newPassword || newPassword.length < 6) {
+      throw new BadRequestException('La nueva contraseña debe tener al menos 6 caracteres.');
+    }
+
+    const user = await this.userRepository.findOne({ where: { strUserName: (email || '').trim() } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (currentPassword !== undefined) {
+      const isCurrentValid = await bcrypt.compare(currentPassword, user.strPassword || '');
+      if (!isCurrentValid) {
+        throw new UnauthorizedException('La contraseña actual es incorrecta.');
+      }
+    }
+    if (await bcrypt.compare(newPassword, user.strPassword || '')) {
+      throw new BadRequestException('La nueva contraseña debe ser diferente a la actual.');
+    }
+
+    user.strPassword = await bcrypt.hash(newPassword, 10);
+    user.dtmLatestUpdateDate = new Date();
+    user.mustChangePassword = false;
+    user.lastPasswordChange = new Date();
+    await this.userRepository.save(user);
+
+    return { message: 'Contraseña actualizada.' };
   }
 
   /**
@@ -809,6 +847,7 @@ export class UsersService {
     user.lastPasswordChange = new Date();
 
     await this.userRepository.save(user);
+    this.notifyKiriCredentialsChanged(user.strUserName);
 
     return { message: 'Password reset successfully' };
   }
@@ -834,6 +873,21 @@ export class UsersService {
       body: JSON.stringify({ email, allowed }),
     }).catch(() => {
       // Non-blocking: Kiri will also verify status on next login
+    });
+  }
+
+  /**
+   * Avisa a Kiri que cambió la contraseña en Authoriza para que cierre las
+   * sesiones abiertas (refresh y access tokens emitidos antes del cambio).
+   */
+  private notifyKiriCredentialsChanged(email: string): void {
+    const kiriApiUrl = process.env.KIRI_API_URL || 'http://localhost:4000';
+    fetch(`${kiriApiUrl}/api/plan/revoke-sessions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': process.env.INTERNAL_API_KEY || '' },
+      body: JSON.stringify({ email }),
+    }).catch(() => {
+      // No bloqueante: si Kiri no responde, el login de Kiri igual valida contra Authoriza
     });
   }
 

@@ -11,6 +11,8 @@ import { ConsentInput, requestMetaFrom } from '../consents/consents.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
+import { InternalKeyGuard } from '../common/guards/internal-key.guard';
+import { UsersService } from '../users/users.service';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -19,6 +21,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly selfRegistrationService: SelfRegistrationService,
     private readonly marketplaceClientService: MarketplaceClientService,
+    private readonly usersService: UsersService,
   ) {}
 
   // ─── Clientes del MarketPlace de InOut (rol clienteInout del tenant) ───
@@ -126,6 +129,26 @@ export class AuthController {
       return { exists: false, allowed: false, status: null };
     }
     return this.authService.getUserAccessStatus(body.email);
+  }
+
+  // ─── Credenciales para otras apps (solo servidor-a-servidor) ───
+  // Authoriza es el único dueño de las contraseñas: Kiri valida y cambia
+  // contraseñas a través de estos endpoints en vez de guardar las suyas.
+
+  @ApiOperation({ summary: 'Interno: validar email + contraseña y estado de acceso (Kiri)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/verify-credentials')
+  async verifyCredentials(@Body() body: { email: string; password: string }) {
+    return this.authService.verifyCredentials(body?.email, body?.password);
+  }
+
+  @ApiOperation({ summary: 'Interno: fijar contraseña por email (cambio con la actual, o reset validado por la app)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/set-password')
+  async setPassword(@Body() body: { email: string; newPassword: string; currentPassword?: string }) {
+    return this.usersService.setPasswordByEmail(body?.email, body?.newPassword, body?.currentPassword);
   }
 
   @ApiOperation({ summary: 'Self-register a new account (principal + dependent)' })

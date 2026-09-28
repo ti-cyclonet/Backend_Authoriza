@@ -1307,7 +1307,17 @@ export class SelfRegistrationService {
       where: { strUserName: data.email },
     });
     if (existing) {
-      // Ya existe (posiblemente por otra app del ecosistema).
+      // Ya existe (posiblemente por otra app del ecosistema). La cuenta CycloNet
+      // es compartida: solo quien conoce SU contraseña puede habilitarla en Kiri.
+      // Sin esta comprobación, cualquiera podía registrarse en Kiri con un correo
+      // ajeno y otra contraseña y quedar con acceso a esa cuenta.
+      const samePassword = await bcrypt.compare(data.password || '', existing.strPassword || '');
+      if (!samePassword) {
+        throw new ConflictException({
+          code: 'PASSWORD_MISMATCH',
+          message: 'Ya tienes una cuenta CycloNet con este correo. Regístrate con la contraseña de esa cuenta (o recupérala).',
+        });
+      }
       // Si ya está verificado, creamos directamente el contrato KIRI FREE
       // (idempotente) para habilitar el acceso a Kiri sin re-verificar.
       if (existing.isVerified) {

@@ -305,6 +305,42 @@ export class AuthService {
   }
 
   /**
+   * Valida email + contraseña contra Authoriza en nombre de otra app del
+   * ecosistema (Kiri), que ya no guarda contraseñas propias. Devuelve también el
+   * estado de acceso para resolver el login en una sola llamada.
+   */
+  async verifyCredentials(email: string, password: string): Promise<{
+    exists: boolean;
+    valid: boolean;
+    allowed: boolean;
+    status: string | null;
+    reason?: string;
+    mustChangePassword: boolean;
+  }> {
+    const normalized = (email || '').trim();
+    const user = normalized ? await this.usersService.findEntityByEmail(normalized) : null;
+    if (!user || user.deletedAt) {
+      return { exists: false, valid: false, allowed: false, status: null, reason: 'USER_NOT_FOUND', mustChangePassword: false };
+    }
+
+    const valid = !!password && !!user.strPassword && (await bcrypt.compare(password, user.strPassword));
+    if (!valid) {
+      // Sin detalles de estado: no filtrar información a quien no probó la contraseña
+      return { exists: true, valid: false, allowed: false, status: null, reason: 'INVALID_PASSWORD', mustChangePassword: false };
+    }
+
+    const access = await this.getUserAccessStatus(normalized);
+    return {
+      exists: true,
+      valid: true,
+      allowed: access.allowed,
+      status: access.status,
+      reason: access.reason,
+      mustChangePassword: !!user.mustChangePassword,
+    };
+  }
+
+  /**
    * Emite un token para OTRA aplicación a partir de una sesión ya autenticada,
    * SIN pedir contraseña. Pensado para el "cambio de app" dentro del ecosistema:
    * un usuario logueado en InOut puede obtener un token de Shotra para publicar
