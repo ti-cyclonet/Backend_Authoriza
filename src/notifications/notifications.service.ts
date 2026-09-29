@@ -273,6 +273,127 @@ export class NotificationsService {
       this.logger.log('PASSWORD_RESET template seeded');
     }
 
+    // Pedidos del MarketPlace (InOut): recordatorio de plan separe, cancelación
+    // automática y resumen diario de programados. Los valores llegan escapados
+    // desde InOut; {{ordersTable}} es HTML armado allá.
+    if (!(await this.templateRepo.findOne({ where: { code: 'MARKETPLACE_LAYAWAY_REMINDER' } }))) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'MARKETPLACE_LAYAWAY_REMINDER',
+          subject: 'Tu plan separe {{orderCode}} vence en {{daysLeft}} día(s) - {{businessName}}',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#e65c00,#f59e0b);padding:26px 32px;text-align:center;">
+        <p style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">{{businessName}}</p>
+        <p style="color:rgba(255,255,255,0.9);margin:4px 0 0;font-size:13px;">Recordatorio de plan separe</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px 34px 26px;color:#374151;font-size:15px;line-height:1.65;">
+        <p style="margin:0 0 12px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="margin:0 0 16px;">Tu plan separe del pedido <strong>{{orderCode}}</strong> vence el <strong>{{deadline}}</strong> (en {{daysLeft}} día(s)).</p>
+        <table width="100%" style="border-collapse:collapse;margin:0 0 18px;font-size:14px;">
+          <tr><td style="padding:8px 10px;background:#fff7ed;">Abonado</td><td style="padding:8px 10px;background:#fff7ed;text-align:right;"><strong>{{amountPaid}}</strong></td></tr>
+          <tr><td style="padding:8px 10px;">Saldo por pagar</td><td style="padding:8px 10px;text-align:right;color:#b45309;"><strong>{{balance}}</strong></td></tr>
+        </table>
+        <p style="margin:0 0 22px;">Completa el pago antes de esa fecha para recibir tu pedido. Si el plazo vence sin completarlo, el pedido se cancela.</p>
+        <div style="text-align:center;margin:0 0 8px;">
+          <a href="{{trackingUrl}}" style="display:inline-block;background:#e65c00;color:#ffffff;text-decoration:none;padding:12px 36px;border-radius:50px;font-weight:700;">Ver mi pedido y subir un pago</a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;padding:18px 32px;border-top:1px solid #e5e7eb;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">Enviado con InOut by CycloNet &copy; {{year}}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('MARKETPLACE_LAYAWAY_REMINDER template seeded');
+    }
+    if (!(await this.templateRepo.findOne({ where: { code: 'MARKETPLACE_ORDER_CANCELLED' } }))) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'MARKETPLACE_ORDER_CANCELLED',
+          subject: 'Tu pedido {{orderCode}} fue cancelado - {{businessName}}',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#e65c00,#f59e0b);padding:26px 32px;text-align:center;">
+        <p style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">{{businessName}}</p>
+        <p style="color:rgba(255,255,255,0.9);margin:4px 0 0;font-size:13px;">Pedido cancelado</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px 34px 26px;color:#374151;font-size:15px;line-height:1.65;">
+        <p style="margin:0 0 12px;">Hola <strong>{{customerName}}</strong>,</p>
+        <p style="margin:0 0 12px;">Tu pedido <strong>{{orderCode}}</strong> fue cancelado: {{reason}}</p>
+        <p style="margin:0 0 12px;">{{refundText}}</p>
+        <p style="margin:0;color:#6b7280;font-size:13px;">Si crees que es un error, responde a este correo o escríbele a la tienda.</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;padding:18px 32px;border-top:1px solid #e5e7eb;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">Enviado con InOut by CycloNet &copy; {{year}}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('MARKETPLACE_ORDER_CANCELLED template seeded');
+    }
+    if (!(await this.templateRepo.findOne({ where: { code: 'INOUT_SCHEDULED_ORDERS_SUMMARY' } }))) {
+      await this.templateRepo.save(
+        this.templateRepo.create({
+          code: 'INOUT_SCHEDULED_ORDERS_SUMMARY',
+          subject: 'Mañana tienes {{count}} pedido(s) programado(s) - {{businessName}}',
+          htmlBody: `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f5f7fa;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;margin:24px auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,0.08);">
+    <tr>
+      <td style="background:linear-gradient(135deg,#e65c00,#f59e0b);padding:26px 32px;text-align:center;">
+        <p style="color:#ffffff;margin:0;font-size:20px;font-weight:700;">{{businessName}}</p>
+        <p style="color:rgba(255,255,255,0.9);margin:4px 0 0;font-size:13px;">Pedidos programados para mañana</p>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:32px 34px 26px;color:#374151;font-size:15px;line-height:1.65;">
+        <p style="margin:0 0 14px;">Estos son los pedidos programados para el <strong>{{date}}</strong>:</p>
+        <table width="100%" style="border-collapse:collapse;font-size:14px;margin:0 0 20px;">
+          {{ordersTable}}
+        </table>
+        <div style="text-align:center;">
+          <a href="{{panelUrl}}" style="display:inline-block;background:#e65c00;color:#ffffff;text-decoration:none;padding:12px 36px;border-radius:50px;font-weight:700;">Ver en InOut</a>
+        </div>
+      </td>
+    </tr>
+    <tr>
+      <td style="background:#f8fafc;padding:18px 32px;border-top:1px solid #e5e7eb;">
+        <p style="color:#6b7280;margin:0;font-size:11px;text-align:center;">Enviado con InOut by CycloNet &copy; {{year}}</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+        }),
+      );
+      this.logger.log('INOUT_SCHEDULED_ORDERS_SUMMARY template seeded');
+    }
+
     const invoiceIssuedTpl = await this.templateRepo.findOne({ where: { code: 'INVOICE_ISSUED' } });
     if (!invoiceIssuedTpl) {
       await this.templateRepo.save(
