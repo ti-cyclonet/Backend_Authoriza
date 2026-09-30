@@ -11,7 +11,7 @@ import { ConsentInput, requestMetaFrom } from '../consents/consents.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Public } from './decorators/public.decorator';
 import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
-import { InternalKeyGuard } from '../common/guards/internal-key.guard';
+import { InternalKeyGuard, isInternalRequest } from '../common/guards/internal-key.guard';
 import { UsersService } from '../users/users.service';
 
 @ApiTags('Authentication')
@@ -27,6 +27,20 @@ export class AuthController {
   // ─── Clientes del MarketPlace de InOut (rol clienteInout del tenant) ───
 
   private requestMeta(req: ExpressRequest) {
+    return requestMetaFrom(req);
+  }
+
+  /**
+   * IP y navegador de quien acepta los documentos. Cuando la petición la hace
+   * otra app del ecosistema (x-internal-key), la IP de la petición es la de su
+   * servidor: esa app envía la del usuario en `consentMeta`. Sin la clave
+   * interna se ignora (no se puede suplantar desde afuera).
+   */
+  private consentMeta(req: ExpressRequest, body: any) {
+    const sent = body?.consentMeta;
+    if (sent && isInternalRequest(req)) {
+      return { ipAddress: sent.ipAddress || null, userAgent: sent.userAgent || null };
+    }
     return requestMetaFrom(req);
   }
 
@@ -160,6 +174,14 @@ export class AuthController {
     return this.usersService.setPasswordByEmail(body?.email, body?.newPassword, body?.currentPassword);
   }
 
+  @ApiOperation({ summary: 'Interno: registra la aceptación de términos y tratamiento de datos de un usuario existente (Kiri)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/consents')
+  async recordConsents(@Body() body: { email: string; application?: string; source?: string } & ConsentInput, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.recordAppConsents(body, this.consentMeta(req, body));
+  }
+
   @ApiOperation({ summary: 'Interno: avatar vigente de un usuario por id o email (Shotra, Kiri)' })
   @Public()
   @UseGuards(InternalKeyGuard)
@@ -291,7 +313,7 @@ export class AuthController {
   @Public()
   @Post('upgrade-plan')
   async upgradePlan(@Body() body: { email: string; password: string; packageId: string; billingCycle?: 'monthly' | 'annual' } & ConsentInput, @Req() req: ExpressRequest) {
-    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.requestMeta(req), body.billingCycle);
+    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.consentMeta(req, body), body.billingCycle);
   }
 
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })
@@ -310,8 +332,8 @@ export class AuthController {
     email: string; password: string; firstName: string; secondName?: string;
     firstSurname: string; secondSurname?: string; documentType?: string; documentNumber?: string;
     phone?: string; birthdate?: string; gender?: string; civilStatus?: string;
-  }) {
-    return this.selfRegistrationService.registerKiriUser(body);
+  } & ConsentInput, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.registerKiriUser(body, this.consentMeta(req, body));
   }
 
   @ApiOperation({ summary: 'Register a Shotra user with email verification' })
