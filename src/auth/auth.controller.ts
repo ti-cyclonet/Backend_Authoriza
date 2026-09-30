@@ -316,8 +316,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Upgrade plan for existing user' })
   @Public()
   @Post('upgrade-plan')
-  async upgradePlan(@Body() body: { email: string; password: string; packageId: string; billingCycle?: 'monthly' | 'annual' } & ConsentInput, @Req() req: ExpressRequest) {
-    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.consentMeta(req, body), body.billingCycle);
+  async upgradePlan(@Body() body: { email: string; password: string; packageId: string; billingCycle?: 'monthly' | 'annual'; firstInvoiceDiscountPct?: number } & ConsentInput, @Req() req: ExpressRequest) {
+    // El descuento de la primera factura (Kiri: invitado por un amigo) solo se
+    // acepta si lo manda el backend de Kiri con la clave interna: la ruta es
+    // pública y, sin esto, cualquiera podría pedirse el descuento.
+    const descuento = isInternalRequest(req) ? Number(body.firstInvoiceDiscountPct) || 0 : 0;
+    return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.consentMeta(req, body), body.billingCycle, descuento);
   }
 
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })

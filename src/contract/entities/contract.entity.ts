@@ -44,6 +44,12 @@ export class Contract {
   @Column('decimal', { precision: 12, scale: 2 })
   value: number;
 
+  // Descuento (%) SOLO para la primera factura del contrato — p. ej. Kiri: quien
+  // llega invitado por un amigo tiene 50% en su primer mes de PLUS o 30% en PRO.
+  // Lo fija únicamente el backend de Kiri (x-internal-key) y se borra al usarse.
+  @Column('decimal', { precision: 5, scale: 2, nullable: true })
+  firstInvoiceDiscountPct?: number | null;
+
   @Column({
     type: 'enum',
     enum: PaymentMode,

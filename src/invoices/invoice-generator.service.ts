@@ -184,6 +184,20 @@ export class InvoiceGeneratorService {
       this.logger.log(`Pro-rata applied: ${coveredDays}/${totalDaysInPeriod} days = factor ${proRataFactor.toFixed(4)}. Value: ${originalValue} → ${calculatedValue}. Period: ${periodStart.toISOString()} - ${periodEnd.toISOString()}`);
     }
 
+    // Descuento de la PRIMERA factura (Kiri: invitado por un amigo, 50% PLUS /
+    // 30% PRO el primer mes). Solo si el contrato aún no tiene facturas, y se
+    // borra al aplicarse para que nunca se repita.
+    const descuentoPct = Number(contract.firstInvoiceDiscountPct ?? 0);
+    if (descuentoPct > 0 && descuentoPct <= 100) {
+      const previas = await this.invoiceRepository.count({ where: { contractId: contract.id } });
+      if (previas === 0) {
+        const antes = calculatedValue;
+        calculatedValue = Math.round(calculatedValue * (1 - descuentoPct / 100) * 100) / 100;
+        this.logger.log(`First-invoice discount ${descuentoPct}% on contract ${contract.id}: ${antes} → ${calculatedValue}`);
+      }
+      await this.contractRepository.update(contract.id, { firstInvoiceDiscountPct: null });
+    }
+
     // Generar código usando EntityCodeService
     const code = await this.entityCodeService.generateCode('Invoice');
 

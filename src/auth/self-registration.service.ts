@@ -724,7 +724,7 @@ export class SelfRegistrationService {
     return !existing;
   }
 
-  async upgradePlan(email: string, password: string, packageId: string, consents: ConsentInput = {}, meta: RequestMeta = {}, billingCycle: 'monthly' | 'annual' = 'monthly') {
+  async upgradePlan(email: string, password: string, packageId: string, consents: ConsentInput = {}, meta: RequestMeta = {}, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
     // 1. Find user and validate password
     const user = await this.userRepository.findOne({
       where: { strUserName: email },
@@ -803,14 +803,14 @@ export class SelfRegistrationService {
       }
 
       // No direct contract exists — create a new one for this user
-      return this.createContractForUpgrade(user, pkg, packageId, billingCycle);
+      return this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
     }
 
     // If existing contract is for a different application, create a new contract
     // (e.g., user has Cyclon Plus and wants to try InOut FREE — keep both active)
     const existingTargetApp = contract.package?.targetApplication;
     if (newTargetApplication && existingTargetApp && newTargetApplication !== existingTargetApp) {
-      return this.createContractForUpgrade(user, pkg, packageId, billingCycle);
+      return this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
     }
 
     const currentIsPaid = Number(contract.package?.price) > 0 && (contract.package as any)?.isBillable !== false;
@@ -818,7 +818,7 @@ export class SelfRegistrationService {
       throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
     }
 
-    return this.executeUpgrade(contract, pkg, packageId, billingCycle);
+    return this.executeUpgrade(contract, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
   }
 
   /**
@@ -826,7 +826,7 @@ export class SelfRegistrationService {
    * This happens when the user registered directly in Kiri (without going through
    * the InOut/Authoriza self-registration flow that creates a contract automatically).
    */
-  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
+  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
     const contractCode = await this.entityCodeService.generateCode('Contract');
     const today = new Date();
     const endDate = new Date(today);
@@ -855,6 +855,9 @@ export class SelfRegistrationService {
       issuedAt: new Date(),
       codePrefix,
       businessSector: 'personal',
+      // Descuento del primer mes (Kiri, invitado por un amigo): solo en pago
+      // mensual de un paquete facturable, y como mucho 50%
+      firstInvoiceDiscountPct: !isNonBillablePkg && !anual && firstInvoiceDiscountPct > 0 ? Math.min(firstInvoiceDiscountPct, 50) : null,
     });
 
     const savedContract = await this.contractRepository.save(contract);
@@ -914,7 +917,7 @@ export class SelfRegistrationService {
     return { success: true, message };
   }
 
-  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly') {
+  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
     const isBillable = (pkg as any).isBillable !== false;
     const isKiriApp = (pkg as any).targetApplication === 'Kiri';
 
@@ -922,7 +925,7 @@ export class SelfRegistrationService {
     // This allows the user to keep using the old plan while the new contract awaits signatures
     if (isBillable && isKiriApp) {
       const user = contract.user;
-      const result = await this.createContractForUpgrade(user, pkg, packageId, billingCycle);
+      const result = await this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
       return result;
     }
 
