@@ -352,6 +352,58 @@ export class AuthService {
    * token si el usuario TIENE un rol ACTIVE válido para la app destino. No requiere
    * contrato en la app destino (el rol userShotra del bonus va con contractId=null).
    */
+  /**
+   * Renueva el token de la sesión vigente (mismo rol, tenant y contrato) para
+   * pantallas que quedan abiertas, como el Dashboard. Se revalida contra la base
+   * de datos en cada renovación: si el usuario fue desactivado o perdió el rol,
+   * no se renueva. La sesión tiene una duración máxima desde el login original
+   * (claim `ses`), así que un token no se puede renovar indefinidamente.
+   */
+  static readonly MAX_SESSION_SECONDS = 12 * 60 * 60;
+
+  async renewSession(session: {
+    id: string;
+    email: string;
+    tenantId?: string;
+    rol?: string;
+    contractId?: string | null;
+    iat?: number;
+    ses?: number;
+  }): Promise<{ access_token: string; sessionEndsAt: string }> {
+    const started = Number(session.ses || session.iat) || Math.floor(Date.now() / 1000);
+    const endsAt = started + AuthService.MAX_SESSION_SECONDS;
+    if (Math.floor(Date.now() / 1000) >= endsAt) {
+      throw new UnauthorizedException('La sesión alcanzó su duración máxima. Inicia sesión de nuevo.');
+    }
+
+    const user = await this.usersService.findEntityById(session.id);
+    if (!user || (user as any).deletedAt) throw new UnauthorizedException('User not found');
+    const allowedStatuses = ['ACTIVE', 'EXPIRING', 'CONFIRMED'];
+    if (!allowedStatuses.includes(user.strStatus?.toUpperCase())) {
+      throw new UnauthorizedException('Inactive or expired user. Access denied.');
+    }
+    const stillHasRole = (user.userRoles || []).some(
+      (ur) =>
+        ur.status === 'ACTIVE' &&
+        ur.role?.strName === session.rol &&
+        (!session.contractId || ur.contractId === session.contractId),
+    );
+    if (!stillHasRole) {
+      throw new UnauthorizedException('El rol de esta sesión ya no está activo. Inicia sesión de nuevo.');
+    }
+
+    const access_token = this.jwtService.sign({
+      sub: user.id,
+      email: user.strUserName,
+      tenantId: session.tenantId,
+      contractId: session.contractId || null,
+      rol: session.rol,
+      image: this.avatarFor(user),
+      ses: started,
+    });
+    return { access_token, sessionEndsAt: new Date(endsAt * 1000).toISOString() };
+  }
+
   async switchApplication(
     userId: string,
     applicationName: string,

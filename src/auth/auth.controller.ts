@@ -94,6 +94,15 @@ export class AuthController {
   }
 
   @ApiOperation({
+    summary: 'Renew the current session token (same role/tenant) before it expires',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post('renew')
+  renew(@Request() req) {
+    return this.authService.renewSession(req.user);
+  }
+
+  @ApiOperation({
     summary: 'Switch to another app token using the current session (no password)',
   })
   @UseGuards(JwtAuthGuard)
