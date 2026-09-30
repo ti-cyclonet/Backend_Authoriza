@@ -1304,7 +1304,13 @@ export class SelfRegistrationService {
     birthdate?: string;
     gender?: string;
     civilStatus?: string;
-  }) {
+  } & ConsentInput, meta: RequestMeta = {}) {
+    // Términos de Kiri + autorización de tratamiento de datos: obligatorios
+    this.consentsService.assertAccepted(data);
+    const recordKiriConsents = (userId: string) => this.consentsService.record({
+      userId, email: data.email, tenantId: null, application: 'Kiri', source: 'KIRI_REGISTER', consents: data, meta,
+    });
+
     const existing = await this.userRepository.findOne({
       where: { strUserName: data.email },
     });
@@ -1320,6 +1326,7 @@ export class SelfRegistrationService {
           message: 'Ya tienes una cuenta CycloNet con este correo. Regístrate con la contraseña de esa cuenta (o recupérala).',
         });
       }
+      await recordKiriConsents(existing.id);
       // Si ya está verificado, creamos directamente el contrato KIRI FREE
       // (idempotente) para habilitar el acceso a Kiri sin re-verificar.
       if (existing.isVerified) {
@@ -1405,12 +1412,31 @@ export class SelfRegistrationService {
       this.logger.warn(`Failed to send Kiri verification email: ${err.message}`);
     }
 
+    await recordKiriConsents(result.id);
+
     return {
       success: true,
       message: 'Registro exitoso. Revisa tu correo para verificar tu cuenta.',
       verificationRequired: true,
       userId: result.id,
     };
+  }
+
+  /**
+   * Aceptación de una nueva versión de los documentos por un usuario que ya
+   * existe (p. ej. cuentas de Kiri creadas antes de que se exigieran, o cuando
+   * cambia el texto). Solo servidor-a-servidor (InternalKeyGuard).
+   */
+  async recordAppConsents(data: { email: string; application?: string; source?: string } & ConsentInput, meta: RequestMeta = {}) {
+    this.consentsService.assertAccepted(data);
+    const application = ['Kiri', 'Shotra', 'Inout'].includes(data.application || '') ? data.application! : 'Kiri';
+    const user = await this.userRepository.findOne({ where: { strUserName: data.email } });
+    if (!user) throw new BadRequestException('Usuario no encontrado.');
+    await this.consentsService.record({
+      userId: user.id, email: user.strUserName, tenantId: null, application,
+      source: (data.source || `${application.toUpperCase()}_ACCEPT`).slice(0, 40), consents: data, meta,
+    });
+    return { success: true };
   }
 
   /**
