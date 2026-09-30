@@ -70,7 +70,7 @@ export const KIRI_PLAN_VARIABLES: VarDef[] = [
 /** Precios en COP: mensual y anual (el anual trae unos 2 meses gratis). */
 export const KIRI_PLAN_PRECIOS: Record<PlanKiri, { mensual: number; anual: number }> = {
   FREE: { mensual: 0, anual: 0 },
-  PLUS: { mensual: 12900, anual: 119000 },
+  PLUS: { mensual: 14900, anual: 139000 },
   PRO: { mensual: 24900, anual: 229000 },
 };
 

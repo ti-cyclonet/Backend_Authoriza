@@ -26,6 +26,8 @@ interface DefPaquete {
   descripcionesViejas: string[];
   /** Precios anteriores del seed que se migran al nuevo */
   preciosViejos: number[];
+  /** Precios anuales anteriores del seed que se migran al nuevo */
+  preciosAnualesViejos?: number[];
   displayOrder: number;
   isHighlighted: boolean;
   badge: string | null;
@@ -51,7 +53,9 @@ const PAQUETES: DefPaquete[] = [
     name: 'KIRI PLUS',
     description: 'Todo Kiri para ti: Kiri Coach con IA, dictado y escáner de recibos, proyecciones a 24 meses, reportes en PDF, Social con préstamos y ahorros compartidos, y sin límites en tus registros.',
     descripcionesViejas: ['Todas las funcionalidades de Kiri Finance. Asistente IA, reportes avanzados, estrategias de deuda, funciones sociales y sin límites en registros.'],
-    preciosViejos: [16000],
+    // 16.000 → 12.900 → 14.900 (anual 119.000 → 139.000)
+    preciosViejos: [16000, 12900],
+    preciosAnualesViejos: [119000],
     displayOrder: 2,
     isHighlighted: true,
     badge: 'Más popular',
@@ -61,8 +65,9 @@ const PAQUETES: DefPaquete[] = [
   {
     plan: 'PRO',
     name: 'KIRI PRO',
-    description: 'Para el hogar y quien quiere todo: presupuesto del hogar en pareja (tu pareja recibe PLUS gratis), conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
-    descripcionesViejas: [],
+    description: 'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
+    // Ya no hay PLUS gratis para la pareja de un PRO
+    descripcionesViejas: ['Para el hogar y quien quiere todo: presupuesto del hogar en pareja (tu pareja recibe PLUS gratis), conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.'],
     preciosViejos: [],
     displayOrder: 3,
     isHighlighted: false,
@@ -106,7 +111,7 @@ export default class KiriPackagesSeed {
       } else {
         let cambio = false;
         if (def.preciosViejos.includes(Number(pkg.price))) { pkg.price = precio.mensual; cambio = true; }
-        if (pkg.annualPrice == null && precio.anual > 0) { pkg.annualPrice = precio.anual; cambio = true; }
+        if ((pkg.annualPrice == null || def.preciosAnualesViejos?.includes(Number(pkg.annualPrice))) && precio.anual > 0 && Number(pkg.annualPrice) !== precio.anual) { pkg.annualPrice = precio.anual; cambio = true; }
         if (!pkg.description || def.descripcionesViejas.includes(pkg.description)) {
           if (pkg.description !== def.description) { pkg.description = def.description; cambio = true; }
         }
