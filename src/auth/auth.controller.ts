@@ -108,12 +108,16 @@ export class AuthController {
   }
 
   @ApiOperation({
-    summary: 'Renew the current session token (same role/tenant) before it expires',
+    summary: 'Renew the session token (same role/tenant), even if it just expired, within the max session length',
   })
-  @UseGuards(JwtAuthGuard)
+  @Public()
   @Post('renew')
-  renew(@Request() req) {
-    return this.authService.renewSession(req.user);
+  renew(@Req() req: ExpressRequest) {
+    // Sin JwtAuthGuard: el token puede venir vencido (pestaña en segundo plano
+    // o equipo suspendido más de 1 h). renewSessionFromToken verifica la firma
+    // y aplica la duración máxima de la sesión.
+    const auth = String(req.headers['authorization'] || '');
+    return this.authService.renewSessionFromToken(auth.startsWith('Bearer ') ? auth.slice(7) : '');
   }
 
   @ApiOperation({

@@ -361,6 +361,32 @@ export class AuthService {
    */
   static readonly MAX_SESSION_SECONDS = 12 * 60 * 60;
 
+  /**
+   * Renovación a partir del token tal como llega, aunque ya haya vencido: la
+   * firma debe ser válida (lo emitió Authoriza) y la sesión no puede superar
+   * MAX_SESSION_SECONDS desde el login original, así que un token robado no
+   * sirve para renovar más allá de ese límite.
+   */
+  async renewSessionFromToken(token: string): Promise<{ access_token: string; sessionEndsAt: string }> {
+    if (!token) throw new UnauthorizedException('Se requiere autenticación.');
+    let payload: any;
+    try {
+      payload = this.jwtService.verify(token, { ignoreExpiration: true });
+    } catch {
+      throw new UnauthorizedException('Sesión inválida.');
+    }
+    if (!payload?.sub) throw new UnauthorizedException('Sesión inválida.');
+    return this.renewSession({
+      id: payload.sub,
+      email: payload.email,
+      tenantId: payload.tenantId,
+      rol: payload.rol,
+      contractId: payload.contractId,
+      iat: payload.iat,
+      ses: payload.ses,
+    });
+  }
+
   async renewSession(session: {
     id: string;
     email: string;
