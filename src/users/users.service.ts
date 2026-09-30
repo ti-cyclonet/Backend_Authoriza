@@ -98,6 +98,41 @@ export class UsersService {
     } as Express.Multer.File);
   }
 
+  /** Nombre en partes de un usuario (persona natural) por email; null si no existe. */
+  async getPersonName(email: string): Promise<{ firstName: string; secondName: string | null; firstSurname: string; secondSurname: string | null } | null> {
+    const user = await this.userRepository.findOne({
+      where: { strUserName: (email || '').trim() },
+      relations: ['basicData', 'basicData.naturalPersonData'],
+    });
+    const np = user?.basicData?.naturalPersonData;
+    if (!np) return null;
+    return { firstName: np.firstName, secondName: np.secondName || null, firstSurname: np.firstSurname, secondSurname: np.secondSurname || null };
+  }
+
+  /**
+   * Fija el nombre en partes (Kiri → Authoriza, servidor a servidor). Solo
+   * personas naturales que ya existen; crea NaturalPersonData si faltaba.
+   */
+  async setPersonName(email: string, data: { firstName?: string; secondName?: string | null; firstSurname?: string; secondSurname?: string | null }) {
+    const firstName = (data?.firstName || '').trim();
+    const firstSurname = (data?.firstSurname || '').trim();
+    if (!firstName || !firstSurname) throw new BadRequestException('El primer nombre y el primer apellido son obligatorios');
+    const user = await this.userRepository.findOne({
+      where: { strUserName: (email || '').trim() },
+      relations: ['basicData', 'basicData.naturalPersonData'],
+    });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    if (!user.basicData) throw new BadRequestException('El usuario no tiene datos básicos');
+    const repo = this.basicDataRepository.manager.getRepository(NaturalPersonData);
+    const np = user.basicData.naturalPersonData ?? repo.create({ basicData: user.basicData });
+    np.firstName = firstName;
+    np.secondName = (data.secondName || '').trim() || null;
+    np.firstSurname = firstSurname;
+    np.secondSurname = (data.secondSurname || '').trim() || null;
+    await repo.save(np);
+    return { ok: true };
+  }
+
   /** URL vigente del avatar (null si el usuario no ha subido foto). */
   async getAvatarUrl(where: { id?: string; email?: string }): Promise<string | null> {
     if (!where.id && !where.email) return null;

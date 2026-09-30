@@ -94,6 +94,15 @@ export class AuthController {
   }
 
   @ApiOperation({
+    summary: 'Renew the current session token (same role/tenant) before it expires',
+  })
+  @UseGuards(JwtAuthGuard)
+  @Post('renew')
+  renew(@Request() req) {
+    return this.authService.renewSession(req.user);
+  }
+
+  @ApiOperation({
     summary: 'Switch to another app token using the current session (no password)',
   })
   @UseGuards(JwtAuthGuard)
@@ -165,6 +174,22 @@ export class AuthController {
   @Post('internal/set-avatar')
   async setAvatar(@Body() body: { email: string; dataUrl: string }) {
     return this.usersService.setAvatarFromDataUrl(body?.email, body?.dataUrl);
+  }
+
+  @ApiOperation({ summary: 'Interno: nombre en partes de un usuario por email (Kiri)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/person-name')
+  async getPersonName(@Body() body: { email: string }) {
+    return { name: await this.usersService.getPersonName(body?.email) };
+  }
+
+  @ApiOperation({ summary: 'Interno: fijar el nombre en partes de un usuario (Kiri)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/set-person-name')
+  async setPersonName(@Body() body: { email: string; firstName: string; secondName?: string | null; firstSurname: string; secondSurname?: string | null }) {
+    return this.usersService.setPersonName(body?.email, body);
   }
 
   @ApiOperation({ summary: 'Self-register a new account (principal + dependent)' })

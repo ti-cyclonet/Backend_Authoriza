@@ -22,6 +22,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       tenantId: payload.tenantId,
       rol: payload.rol,
       contractId: payload.contractId,
+      // Para renovar la sesión (auth/renew): cuándo se emitió el token y cuándo
+      // empezó la sesión original (ses se conserva entre renovaciones).
+      iat: payload.iat,
+      ses: payload.ses,
     };
   }
 }
