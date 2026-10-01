@@ -254,6 +254,22 @@ export class UserRolesService {
     return Math.min(Number(config.totalAccount), Math.max(0, Number(limit.maxValue) || 0));
   }
 
+  /**
+   * Configuraciones de rol del paquete del contrato. El rol de cliente del
+   * MarketPlace (clienteInout) no es un cupo del equipo: si un paquete de InOut
+   * no lo trae configurado (p. ej. paquetes de prueba o hechos a mano), se
+   * agrega igual con cupo abierto — acotado por nClientes si el plan lo define.
+   * Sin esto el modal de Usuarios de InOut no ofrecía la opción "Cliente".
+   */
+  private async packageRoleConfigs(contract: any): Promise<any[]> {
+    const configs: any[] = contract.package?.configurations ?? [];
+    const isInoutPackage = configs.some((c) => /Inout$/.test(c.rol?.strName || ''));
+    if (!isInoutPackage || configs.some((c) => c.rol?.strName === 'clienteInout')) return configs;
+    const clientRole = await this.rolRepository.findOne({ where: { strName: 'clienteInout' } });
+    if (!clientRole) return configs;
+    return [...configs, { rol: clientRole, totalAccount: 999999, price: 0 }];
+  }
+
   async validateRoleAvailability(contractId: string, roleId: string): Promise<void> {
     const contract = await this.contractRepository.findOne({
       where: { id: contractId },
@@ -264,7 +280,7 @@ export class UserRolesService {
       throw new BadRequestException('Contract not found');
     }
 
-    const config = contract.package.configurations.find(c => c.rol.id === roleId);
+    const config = (await this.packageRoleConfigs(contract)).find(c => c.rol.id === roleId);
     if (!config) {
       throw new BadRequestException('Role not found in contract package');
     }
@@ -288,7 +304,7 @@ export class UserRolesService {
     }
 
     const availability = [];
-    for (const config of contract.package.configurations) {
+    for (const config of await this.packageRoleConfigs(contract)) {
       const assigned = await this.getAssignedCountByContractAndRole(contractId, config.rol.id);
       const total = this.effectiveRoleTotal(contract, config);
       availability.push({
