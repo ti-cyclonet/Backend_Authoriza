@@ -15,6 +15,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 import { User } from '../users/entities/user.entity';
+import { JwtModule } from '@nestjs/jwt';
+import { jwtConstants } from '../auth/constants';
+import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
 
 @Module({
   imports: [
@@ -22,9 +25,11 @@ import { User } from '../users/entities/user.entity';
     EntityCodesModule,
     NotificationsModule,
     CloudinaryModule,
+    JwtModule.register({ secret: jwtConstants.secret }),
   ],
   controllers: [InvoicesController, PublicInvoicesController],
-  providers: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService, InvoiceLifecycleCron],
-  exports: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService]
+  providers: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService, InvoiceLifecycleCron, InternalOrAdminGuard],
+  // JwtModule + guard exportados para SweepModule (mismo control de acceso)
+  exports: [InvoicesService, InvoiceGeneratorService, InvoiceSweepService, JwtModule, InternalOrAdminGuard]
 })
 export class InvoicesModule {}
