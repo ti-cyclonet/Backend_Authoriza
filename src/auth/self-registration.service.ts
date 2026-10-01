@@ -27,6 +27,15 @@ import { LogAction } from '../logs/entities/log.entity';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
 import { ConsentsService, ConsentInput, RequestMeta } from '../consents/consents.service';
 
+
+/** Firma del cliente tomada de la aceptación de Términos + Habeas Data al contratar. */
+interface ClientSignature {
+  at: Date;
+  by: string;
+  userId: string;
+  ip: string;
+}
+
 @Injectable()
 export class SelfRegistrationService {
   private readonly logger = new Logger(SelfRegistrationService.name);
@@ -750,6 +759,13 @@ export class SelfRegistrationService {
       });
     }
 
+    // Firma del cliente por aceptación: en los planes pagos de Kiri, aceptar los
+    // Términos y la autorización de datos al contratar ES la firma del nuevo
+    // contrato (queda con fecha, IP y usuario). Solo falta la del administrador.
+    const clientSignature: ClientSignature | null = this.consentsService.hasConsents(consents)
+      ? { at: new Date(), by: user.strUserName, userId: user.id, ip: meta.ipAddress || 'unknown' }
+      : null;
+
     // 3. Validate not downgrading from paid to free
     const newPackageIsFree = Number(pkg.price) === 0 || (pkg as any).isBillable === false;
 
@@ -803,14 +819,14 @@ export class SelfRegistrationService {
       }
 
       // No direct contract exists — create a new one for this user
-      return this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
+      return this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature);
     }
 
     // If existing contract is for a different application, create a new contract
     // (e.g., user has Cyclon Plus and wants to try InOut FREE — keep both active)
     const existingTargetApp = contract.package?.targetApplication;
     if (newTargetApplication && existingTargetApp && newTargetApplication !== existingTargetApp) {
-      return this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
+      return this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature);
     }
 
     const currentIsPaid = Number(contract.package?.price) > 0 && (contract.package as any)?.isBillable !== false;
@@ -818,7 +834,7 @@ export class SelfRegistrationService {
       throw new BadRequestException('No es posible cambiar de un plan pago a un plan gratuito.');
     }
 
-    return this.executeUpgrade(contract, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
+    return this.executeUpgrade(contract, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature);
   }
 
   /**
@@ -826,7 +842,7 @@ export class SelfRegistrationService {
    * This happens when the user registered directly in Kiri (without going through
    * the InOut/Authoriza self-registration flow that creates a contract automatically).
    */
-  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
+  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0, clientSignature: ClientSignature | null = null) {
     const contractCode = await this.entityCodeService.generateCode('Contract');
     const today = new Date();
     const endDate = new Date(today);
@@ -859,6 +875,17 @@ export class SelfRegistrationService {
       // mensual de un paquete facturable, y como mucho 50%
       firstInvoiceDiscountPct: !isNonBillablePkg && !anual && firstInvoiceDiscountPct > 0 ? Math.min(firstInvoiceDiscountPct, 50) : null,
     });
+
+    // Plan pago de Kiri contratado aceptando Términos + Habeas Data: esa
+    // aceptación queda como la firma del cliente; el contrato se activa solo
+    // cuando lo firme el administrador de FactoNet (autoActivateIfBothSigned).
+    const firmadoPorAceptacion = !!clientSignature && !isNonBillablePkg && (pkg as any).targetApplication === 'Kiri';
+    if (firmadoPorAceptacion) {
+      contract.clientSignedAt = clientSignature!.at;
+      contract.clientSignedBy = clientSignature!.by;
+      contract.clientSignedByUserId = clientSignature!.userId;
+      contract.clientSignedIp = clientSignature!.ip;
+    }
 
     const savedContract = await this.contractRepository.save(contract);
 
@@ -910,14 +937,16 @@ export class SelfRegistrationService {
       this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
     );
 
-    const message = isBillable && isKiriApp
+    const message = isBillable && isKiriApp && firmadoPorAceptacion
+      ? `Plan cambiado a "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma del administrador de CycloNet en FactoNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto puedes seguir usando tu plan actual.`
+      : isBillable && isKiriApp
       ? `Plan cambiado a "${pkg.name}". Se generó un contrato pendiente de firma. Primero lo firmará el administrador de CycloNet; cuando lo haga, recibirás un correo con el enlace para revisarlo y firmarlo tú en FactoNet (billing.cyclonet.com.co). Mientras tanto puedes seguir usando tu plan actual; al firmar ambas partes, tu nuevo plan se activará automáticamente.`
       : `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`;
 
     return { success: true, message };
   }
 
-  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
+  private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0, clientSignature: ClientSignature | null = null) {
     const isBillable = (pkg as any).isBillable !== false;
     const isKiriApp = (pkg as any).targetApplication === 'Kiri';
 
@@ -925,7 +954,7 @@ export class SelfRegistrationService {
     // This allows the user to keep using the old plan while the new contract awaits signatures
     if (isBillable && isKiriApp) {
       const user = contract.user;
-      const result = await this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct);
+      const result = await this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature);
       return result;
     }
 
