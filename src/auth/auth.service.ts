@@ -117,11 +117,18 @@ export class AuthService {
       throw new UnauthorizedException('UNAUTHORIZED');
     }
 
+    // Un rol de cliente del MarketPlace (clienteInout) no es una empresa en la
+    // que trabaje: esos clientes entran por la tienda (marketplace-client.service).
+    // Si además tiene un rol de staff, el panel solo considera los de staff; así
+    // ser cliente de otro negocio no le obliga a elegir empresa al entrar.
+    const staffRoles = userActiveRoles.filter(ur => !AuthService.CUSTOMER_ROLES.includes(ur.role?.strName || ''));
+    const panelRoles = staffRoles.length > 0 ? staffRoles : userActiveRoles;
+
     // Detectar múltiples contratos (para esta app) y forzar selección cuando hay
     // ambigüedad. Cada contrato representa un "tenant"/plan distinto; el usuario
     // debe elegir con cuál sesión entrar para que tenantId/rol sean deterministas.
     const uniqueContracts = new Map();
-    userActiveRoles.forEach(ur => {
+    panelRoles.forEach(ur => {
       if (ur.contractId && ur.contract) {
         uniqueContracts.set(ur.contractId, {
           contractId: ur.contractId,
@@ -157,8 +164,8 @@ export class AuthService {
     // Elegir el rol activo de forma DETERMINISTA:
     // preferir el rol ligado a un contrato (si existe) sobre roles sin contrato,
     // para que tenantId/codePrefix se deriven de un contrato real y no de [0] arbitrario.
-    const roleWithContract = AuthService.preferStaffRole(userActiveRoles.filter(ur => ur.contractId && ur.contract));
-    const selectedUserRole = roleWithContract || AuthService.preferStaffRole(userActiveRoles);
+    const roleWithContract = AuthService.preferStaffRole(panelRoles.filter(ur => ur.contractId && ur.contract));
+    const selectedUserRole = roleWithContract || AuthService.preferStaffRole(panelRoles);
     const activeRole = selectedUserRole.role;
 
     // 6. Validar si debe cambiar su contraseña
