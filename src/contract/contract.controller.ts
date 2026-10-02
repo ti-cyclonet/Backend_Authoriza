@@ -11,6 +11,7 @@ import {
   Req,
   Res,
   StreamableFile,
+  UseGuards,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { ContractService } from './contract.service';
@@ -18,6 +19,7 @@ import { CreateContractDto } from './dto/create-contract.dto';
 import { UpdateContractDto } from './dto/update-contract.dto';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { Public } from '../auth/decorators/public.decorator';
+import { InternalKeyGuard } from '../common/guards/internal-key.guard';
 
 @Controller('contracts')
 export class ContractController {
@@ -132,6 +134,20 @@ export class ContractController {
     @Query('application') application?: string,
   ) {
     return this.contractService.findTenantLimits(tenantId, application);
+  }
+
+  /**
+   * Interno (x-internal-key): cuánto paga al mes el tenant por su plan de una
+   * app. No es público: es información comercial del cliente.
+   */
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Get('tenant/:tenantId/plan-cost')
+  findTenantPlanCost(
+    @Param('tenantId') tenantId: string,
+    @Query('application') application?: string,
+  ) {
+    return this.contractService.findTenantPlanCost(tenantId, application || 'InOut');
   }
 
   @Get('tenant/:tenantId')
