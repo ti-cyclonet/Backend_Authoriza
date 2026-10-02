@@ -8,7 +8,7 @@ import { CustomerParameter } from '../customer-parameters/entities/customer-para
  * Categorías:
  * - FISCAL: IVA, retenciones
  * - COMERCIAL: % ganancia, % descuento, penalización por mora
- * - OPERATIVO: costos fijos (arriendo, servicios)
+ * - OPERATIVO: costos fijos (arriendo, servicios) y si se incluye el plan de InOut
  * - NEGOCIO: datos del negocio para facturación
  */
 export default class InoutParametersSeed {
@@ -140,6 +140,12 @@ export default class InoutParametersSeed {
         name: 'Nómina Mensual',
         description: 'Valor total mensual de la nómina de empleados',
         dataType: 'number',
+      },
+      {
+        code: 'INCLUIR_PLAN_INOUT',
+        name: 'Incluir el plan de InOut en el costeo',
+        description: 'Sí: el valor mensual de tu plan pago de InOut se suma a los costos indirectos (arriendo, servicios, nómina) y se prorratea en el costo de lo que produces y vendes. Un plan gratuito suma $0.',
+        dataType: 'boolean',
       },
 
       // ═══════ DATOS DEL NEGOCIO (para facturación) ═══════

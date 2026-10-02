@@ -1257,6 +1257,34 @@ export class ContractService {
     }
   }
 
+  /**
+   * Costo mensual del plan de una app para el tenant (lo usa InOut para incluir
+   * su suscripción en el costeo, si el negocio lo decide). Mismo contrato que
+   * gobierna los límites. contract.value es el valor ANUAL (precio × 12 o el
+   * precio anual con descuento), así que el mensual es value / 12; un paquete
+   * no facturable (FREE) cuesta 0. Sin contrato activo → 0.
+   */
+  async findTenantPlanCost(tenantId: string, application: string) {
+    let limits: any;
+    try {
+      limits = await this.findTenantLimits(tenantId, application);
+    } catch (err) {
+      if (err instanceof NotFoundException) {
+        return { packageName: null, isBillable: false, mode: null, annualValue: 0, monthlyValue: 0 };
+      }
+      throw err;
+    }
+    const contract = await this.contractRepository.findOne({ where: { id: limits.contractId } });
+    const annualValue = limits.isBillable ? Number(contract?.value) || 0 : 0;
+    return {
+      packageName: limits.packageName,
+      isBillable: !!limits.isBillable,
+      mode: contract?.mode ?? null,
+      annualValue: Math.round(annualValue * 100) / 100,
+      monthlyValue: Math.round((annualValue / 12) * 100) / 100,
+    };
+  }
+
   async findTenantLimits(tenantId: string, application?: string) {
     // Resolver TODOS los usuarios cuyos contratos pueden gobernar el acceso de
     // este tenant: el propio usuario + TODOS sus principales activos (un
