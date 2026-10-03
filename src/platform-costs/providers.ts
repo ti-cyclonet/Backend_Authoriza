@@ -4,14 +4,22 @@ import { amzDateNow, signSigV4 } from './aws-sigv4';
 export interface AwsDailyCost {
   day: string;
   service: string;
+  /** Valor de la etiqueta de aplicación del recurso ('' si no está etiquetado). */
+  tag: string;
   amountUsd: number;
 }
 
+/** Etiqueta de AWS que identifica la app dueña de un recurso (p. ej. app=Shotra). */
+export const AWS_APP_TAG = () => process.env.AWS_COST_APP_TAG || 'app';
+
 /**
- * AWS Cost Explorer: costo diario (UnblendedCost) agrupado por servicio.
+ * AWS Cost Explorer: costo diario (UnblendedCost) agrupado por servicio y por
+ * la etiqueta de aplicación (AWS_APP_TAG). Para que la etiqueta aparezca debe
+ * estar activada como "etiqueta de asignación de costos" en AWS Billing; si no,
+ * todo llega sin etiqueta y se reparte por porcentajes como antes.
  * Requiere un usuario IAM con permiso ce:GetCostAndUsage
  * (AWS_COST_ACCESS_KEY_ID / AWS_COST_SECRET_ACCESS_KEY). Cada consulta a
- * Cost Explorer cuesta ~USD 0,01: se consulta una vez al día.
+ * Cost Explorer cuesta ~USD 0,01 (agrupar por etiqueta no la encarece).
  */
 export async function fetchAwsDailyCosts(from: string, toExclusive: string): Promise<AwsDailyCost[]> {
   const accessKeyId = process.env.AWS_COST_ACCESS_KEY_ID;
@@ -28,7 +36,7 @@ export async function fetchAwsDailyCosts(from: string, toExclusive: string): Pro
       TimePeriod: { Start: from, End: toExclusive },
       Granularity: 'DAILY',
       Metrics: ['UnblendedCost'],
-      GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }],
+      GroupBy: [{ Type: 'DIMENSION', Key: 'SERVICE' }, { Type: 'TAG', Key: AWS_APP_TAG() }],
       ...(nextToken ? { NextPageToken: nextToken } : {}),
     });
     const headers = {
@@ -50,9 +58,12 @@ export async function fetchAwsDailyCosts(from: string, toExclusive: string): Pro
 
     for (const period of data.ResultsByTime || []) {
       for (const g of period.Groups || []) {
+        // La clave de la etiqueta llega como "app$Shotra" ("app$" sin etiqueta)
+        const tagKey = String(g.Keys?.[1] || '');
         results.push({
           day: period.TimePeriod.Start,
           service: g.Keys?.[0] || 'Otros',
+          tag: tagKey.includes('$') ? tagKey.slice(tagKey.indexOf('$') + 1) : '',
           amountUsd: parseFloat(g.Metrics?.UnblendedCost?.Amount || '0') || 0,
         });
       }
