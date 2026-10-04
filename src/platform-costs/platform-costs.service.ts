@@ -5,7 +5,7 @@ import { Between, DataSource, Repository } from 'typeorm';
 import {
   PlatformCostDaily, PlatformCostSettings, PlatformRate, PlatformSnapshot, PlatformUsageDaily,
 } from './entities/platform-cost.entities';
-import { fetchAwsDailyCosts, fetchCloudinaryUsage } from './providers';
+import { AWS_APP_TAG, fetchAwsDailyCosts, fetchCloudinaryUsage } from './providers';
 
 /** Aplicaciones del ecosistema (nombres como en Package.targetApplication). */
 export const APPLICATIONS = ['Authoriza', 'Inout', 'FactoNet', 'Shotra', 'Kiri'] as const;
@@ -24,6 +24,18 @@ const DEFAULT_RATES: PlatformRate[] = [
   { platform: 'SES', metric: 'emails', label: 'Amazon SES · por correo', usdPerUnit: 0.0001 },
   { platform: 'BELVO', metric: 'api_calls', label: 'Belvo · por llamada', usdPerUnit: 0 },
 ];
+
+/**
+ * App del ecosistema a la que corresponde un valor de la etiqueta de AWS
+ * (sin distinguir mayúsculas; "Kiri Finance" o "AidCash" cuentan como Kiri).
+ * '-' si no hay etiqueta o no corresponde a ninguna app: costo compartido.
+ */
+export function appFromTag(tag: string): string {
+  const t = String(tag || '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+  if (!t) return '-';
+  const alias: Record<string, string> = { kirifinance: 'Kiri', aidcash: 'Kiri' };
+  return alias[t] || APPLICATIONS.find((a) => a.toLowerCase() === t) || '-';
+}
 
 const num = (v: any) => {
   const n = parseFloat(String(v ?? 0));
@@ -51,8 +63,10 @@ function monthRange(month: string) {
  *   correos, llamadas a Belvo) y Authoriza los acumula por día.
  * - Costo real: AWS Cost Explorer (por servicio, diario) y el uso del plan
  *   de Cloudinary, sincronizados una vez al día.
- * La infraestructura compartida de AWS se reparte entre las apps según
- * porcentajes configurables; SES y Cloudinary según su consumo medido.
+ * El costo de AWS etiquetado con la app (etiqueta AWS_APP_TAG, p. ej. la app de
+ * Amplify de cada frontend) va directo a esa app; la infraestructura compartida
+ * sin etiqueta se reparte según porcentajes configurables. SES y Cloudinary
+ * se reparten según su consumo medido.
  */
 @Injectable()
 export class PlatformCostsService {
@@ -176,14 +190,21 @@ export class PlatformCostsService {
       try {
         // Fin exclusivo = hoy: el día en curso aún no está consolidado
         const rows = await fetchAwsDailyCosts(from, today);
-        for (const r of rows) {
-          await this.dataSource.query(
-            `INSERT INTO platform_cost_daily (day, platform, service, "amountUsd", "updatedAt")
-             VALUES ($1, 'AWS', $2, $3, now())
-             ON CONFLICT (day, platform, service) DO UPDATE SET "amountUsd" = EXCLUDED."amountUsd", "updatedAt" = now()`,
-            [r.day, r.service.slice(0, 150), r.amountUsd],
-          );
-        }
+        // Se reemplaza el rango completo: así no quedan filas de un reparto
+        // anterior (p. ej. de antes de etiquetar un recurso). Varias etiquetas
+        // pueden caer en la misma app ("shotra" y "Shotra"): se suman.
+        await this.dataSource.transaction(async (m) => {
+          await m.query(`DELETE FROM platform_cost_daily WHERE platform = 'AWS' AND day >= $1 AND day < $2`, [from, today]);
+          for (const r of rows) {
+            await m.query(
+              `INSERT INTO platform_cost_daily (day, platform, service, application, "amountUsd", "updatedAt")
+               VALUES ($1, 'AWS', $2, $3, $4, now())
+               ON CONFLICT (day, platform, service, application)
+               DO UPDATE SET "amountUsd" = platform_cost_daily."amountUsd" + EXCLUDED."amountUsd", "updatedAt" = now()`,
+              [r.day, r.service.slice(0, 150), appFromTag(r.tag), r.amountUsd],
+            );
+          }
+        });
         await this.saveSnapshot('AWS', { lastSync: new Date().toISOString(), rows: rows.length, from, to: today }, null);
         result.AWS = `ok (${rows.length} registros)`;
       } catch (err) {
@@ -234,6 +255,13 @@ export class PlatformCostsService {
     const isSes = (s: string) => /simple email service|\bses\b/i.test(s);
     const sesReal = [...awsByService.entries()].filter(([k]) => isSes(k)).reduce((a, [, v]) => a + v, 0);
     const hasAws = costs.some((c) => c.platform === 'AWS');
+    // Costo etiquetado con una app (SES no: se reparte por correos enviados)
+    const awsDirect = new Map<string, number>();
+    costs.filter((c) => c.platform === 'AWS' && c.application && c.application !== '-' && !isSes(c.service))
+      .forEach((c) => awsDirect.set(c.application, (awsDirect.get(c.application) || 0) + num(c.amountUsd)));
+    const awsDirectTotal = [...awsDirect.values()].reduce((a, b) => a + b, 0);
+    // Infraestructura compartida (sin etiqueta), la que se reparte por porcentajes
+    const awsShared = hasAws ? Math.max(0, awsTotal - sesReal - awsDirectTotal) : 0;
     // Último día con costo de AWS (con sincronización semanal va rezagado)
     const awsLastDay = costs.filter((c) => c.platform === 'AWS').reduce((m, c) => (String(c.day) > m ? String(c.day) : m), '');
 
@@ -269,11 +297,13 @@ export class PlatformCostsService {
     };
     const cloudBasis = total(bytesByApp) > 0 ? bytesByApp : uploadsByApp;
     const byApplication = APPLICATIONS.map((app) => {
-      const aws = (hasAws ? awsTotal - sesReal : 0) * (num(settings.awsAllocation?.[app]) / allocTotal);
+      const awsDirectUsd = awsDirect.get(app) || 0;
+      const awsSharedUsd = awsShared * (num(settings.awsAllocation?.[app]) / allocTotal);
+      const aws = awsDirectUsd + awsSharedUsd;
       const ses = sesCost * share(emailsByApp, app);
       const cloud = cloudinaryCost * share(cloudBasis, app);
       const belvo = (belvoByApp.get(app) || 0) * rate('BELVO', 'api_calls');
-      return { application: app, awsUsd: round(aws), sesUsd: round(ses), cloudinaryUsd: round(cloud), belvoUsd: round(belvo), totalUsd: round(aws + ses + cloud + belvo) };
+      return { application: app, awsUsd: round(aws), awsDirectUsd: round(awsDirectUsd), awsSharedUsd: round(awsSharedUsd), sesUsd: round(ses), cloudinaryUsd: round(cloud), belvoUsd: round(belvo), totalUsd: round(aws + ses + cloud + belvo) };
     });
 
     // ── Por cliente (solo lo atribuible por consumo medido) ──
@@ -293,7 +323,7 @@ export class PlatformCostsService {
       range: { start, last, next },
       awsDaysCovered: awsLastDay ? Number(awsLastDay.slice(8, 10)) : 0,
       platforms: {
-        AWS: { costUsd: round(hasAws ? awsTotal : sesEstimated), estimated: !hasAws, services: [...awsByService.entries()].map(([service, usd]) => ({ service, usd: round(usd) })).sort((a, b) => b.usd - a.usd) },
+        AWS: { costUsd: round(hasAws ? awsTotal : sesEstimated), estimated: !hasAws, taggedUsd: round(awsDirectTotal), sharedUsd: round(awsShared), services: [...awsByService.entries()].map(([service, usd]) => ({ service, usd: round(usd) })).sort((a, b) => b.usd - a.usd) },
         CLOUDINARY: { costUsd: round(cloudinaryCost), estimated: settings.cloudinaryMonthlyUsd <= 0, credits },
         BELVO: { costUsd: round(belvoCost), estimated: true },
       },
@@ -383,6 +413,8 @@ export class PlatformCostsService {
         alert: budgetUsd > 0 && projectedUsd >= budgetUsd * 0.8,
         estimated: c.estimated,
         services: c.services || undefined,
+        taggedUsd: c.taggedUsd ?? undefined,
+        sharedUsd: c.sharedUsd ?? undefined,
         credits: c.credits ?? undefined,
       };
     });
@@ -428,7 +460,7 @@ export class PlatformCostsService {
         ? { creditsUsed: num(cloudSnap.data.credits.usage), creditsLimit: num(cloudSnap.data.credits.limit), usedPercent: num(cloudSnap.data.credits.used_percent), plan: cloudSnap.data.plan || null }
         : null,
       sources: {
-        aws: { configured: !!process.env.AWS_COST_ACCESS_KEY_ID, lastSync: awsSnap?.capturedAt || null, error: awsSnap?.error || null },
+        aws: { configured: !!process.env.AWS_COST_ACCESS_KEY_ID, appTag: AWS_APP_TAG(), lastSync: awsSnap?.capturedAt || null, error: awsSnap?.error || null },
         cloudinary: { lastSync: cloudSnap?.capturedAt || null, error: cloudSnap?.error || null },
       },
     };

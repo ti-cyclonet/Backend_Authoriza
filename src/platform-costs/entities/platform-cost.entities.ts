@@ -38,9 +38,12 @@ export class PlatformUsageDaily {
   updatedAt: Date;
 }
 
-/** Costo real diario reportado por la plataforma (p. ej. AWS Cost Explorer por servicio). */
+/**
+ * Costo real diario reportado por la plataforma (p. ej. AWS Cost Explorer por
+ * servicio y por la etiqueta de aplicación de los recursos).
+ */
 @Entity({ name: 'platform_cost_daily' })
-@Unique(['day', 'platform', 'service'])
+@Unique(['day', 'platform', 'service', 'application'])
 export class PlatformCostDaily {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -54,6 +57,14 @@ export class PlatformCostDaily {
   /** Servicio dentro de la plataforma (ej. 'Amazon Relational Database Service'). */
   @Column({ type: 'varchar', length: 150 })
   service: string;
+
+  /**
+   * App dueña del costo según la etiqueta del recurso en AWS (p. ej. app=Shotra
+   * en su app de Amplify). '-' = sin etiqueta: infraestructura compartida que
+   * se reparte entre las apps según awsAllocation.
+   */
+  @Column({ type: 'varchar', length: 30, default: '-' })
+  application: string;
 
   @Column({ type: 'decimal', precision: 14, scale: 6, default: 0 })
   amountUsd: number;
@@ -107,7 +118,10 @@ export class PlatformCostSettings {
   @Column({ type: 'jsonb', default: () => "'{}'" })
   budgets: Record<string, number>;
 
-  /** Reparto (%) por aplicación de la infraestructura compartida de AWS (EC2, RDS, Amplify…). */
+  /**
+   * Reparto (%) por aplicación de la infraestructura compartida de AWS (EC2,
+   * RDS…): solo el costo SIN etiqueta de app; lo etiquetado va directo a su app.
+   */
   @Column({ type: 'jsonb', default: () => "'{}'" })
   awsAllocation: Record<string, number>;
 
