@@ -50,6 +50,12 @@ export class Contract {
   @Column('decimal', { precision: 5, scale: 2, nullable: true })
   firstInvoiceDiscountPct?: number | null;
 
+  // Meses gratis acumulados (Kiri: premios por invitar amigos a quien ya paga
+  // su plan). Cada factura descuenta los meses que cubre (1 mensual, 6
+  // semestral, 12 anual) hasta agotarlos. Solo lo suma el backend de Kiri.
+  @Column({ type: 'int', default: 0 })
+  freeMonthsCredit: number;
+
   @Column({
     type: 'enum',
     enum: PaymentMode,

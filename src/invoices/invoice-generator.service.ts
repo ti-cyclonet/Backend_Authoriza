@@ -198,6 +198,21 @@ export class InvoiceGeneratorService {
       await this.contractRepository.update(contract.id, { firstInvoiceDiscountPct: null });
     }
 
+    // Meses gratis ganados (Kiri: premios por invitar amigos). Una factura
+    // mensual usa 1, la semestral hasta 6 y la anual hasta 12; el resto queda
+    // para las siguientes. Si cubren toda la factura, sale en $0 ya pagada.
+    const credito = Number(contract.freeMonthsCredit ?? 0);
+    let cubiertaPorCredito = false;
+    if (credito > 0 && calculatedValue > 0) {
+      const mesesDeLaFactura = contract.mode === PaymentMode.ANNUAL ? 12 : contract.mode === PaymentMode.SEMIANNUAL ? 6 : 1;
+      const usados = Math.min(credito, mesesDeLaFactura);
+      const antes = calculatedValue;
+      calculatedValue = Math.round(calculatedValue * (1 - usados / mesesDeLaFactura) * 100) / 100;
+      cubiertaPorCredito = calculatedValue <= 0;
+      await this.contractRepository.update(contract.id, { freeMonthsCredit: credito - usados });
+      this.logger.log(`Free months credit ${usados}/${mesesDeLaFactura} on contract ${contract.id}: ${antes} → ${calculatedValue} (quedan ${credito - usados})`);
+    }
+
     // Generar código usando EntityCodeService
     const code = await this.entityCodeService.generateCode('Invoice');
 
@@ -229,7 +244,9 @@ export class InvoiceGeneratorService {
       value: calculatedValue,
       issueDate,
       expirationDate,
-      status: InvoiceStatus.UNCONFIRMED,
+      // Cubierta toda por meses gratis: no hay nada que cobrar ni que recordar
+      status: cubiertaPorCredito ? InvoiceStatus.PAID : InvoiceStatus.UNCONFIRMED,
+      ...(cubiertaPorCredito ? { paymentDate: issueDate, paidAmount: 0 } : {}),
       userId: contract.user.id,
       contractId: contract.id,
       periodStart,

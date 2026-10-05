@@ -150,6 +150,20 @@ export class ContractController {
     return this.contractService.findTenantPlanCost(tenantId, application || 'InOut');
   }
 
+  /**
+   * Interno (x-internal-key): meses gratis en el contrato pago del tenant
+   * (Kiri: premios del programa de invitados).
+   */
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('tenant/:tenantId/free-months')
+  addFreeMonths(
+    @Param('tenantId') tenantId: string,
+    @Body() body: { months: number; application?: string },
+  ) {
+    return this.contractService.addFreeMonths(tenantId, body?.application || 'Kiri', body?.months);
+  }
+
   @Get('tenant/:tenantId')
   findByTenant(@Param('tenantId') tenantId: string) {
     return this.contractService.findByTenant(tenantId);
