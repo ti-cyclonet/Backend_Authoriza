@@ -1258,6 +1258,30 @@ export class ContractService {
   }
 
   /**
+   * Suma meses gratis al contrato PAGO del propio tenant en una app (Kiri:
+   * "1 mes gratis de tu plan" por invitar amigos). Solo su contrato propio y
+   * facturable: nunca el de un principal (plan de empresa) ni uno FREE. Sin
+   * contrato pago → applied: false y Kiri le da el premio de otra forma.
+   */
+  async addFreeMonths(tenantId: string, application: string, months: number) {
+    const meses = Math.max(1, Math.min(24, Math.floor(Number(months) || 0)));
+    let limits: any;
+    try {
+      limits = await this.findTenantLimits(tenantId, application);
+    } catch (err) {
+      if (err instanceof NotFoundException) return { applied: false, reason: 'sin_contrato' };
+      throw err;
+    }
+    const contract = await this.contractRepository.findOne({ where: { id: limits.contractId } });
+    if (!contract || contract.user?.id !== tenantId) return { applied: false, reason: 'contrato_ajeno' };
+    if (!limits.isBillable || !(Number(contract.value) > 0)) return { applied: false, reason: 'sin_plan_pago' };
+    await this.contractRepository.increment({ id: contract.id }, 'freeMonthsCredit', meses);
+    const credito = Number(contract.freeMonthsCredit ?? 0) + meses;
+    this.logger.log(`Free months +${meses} on contract ${contract.id} (${application}) → ${credito}`);
+    return { applied: true, contractId: contract.id, packageName: limits.packageName, freeMonthsCredit: credito };
+  }
+
+  /**
    * Costo mensual del plan de una app para el tenant (lo usa InOut para incluir
    * su suscripción en el costeo, si el negocio lo decide). Mismo contrato que
    * gobierna los límites. contract.value es el valor ANUAL (precio × 12 o el
