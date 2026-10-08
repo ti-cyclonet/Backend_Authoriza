@@ -9,12 +9,28 @@ import { User } from '../users/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { UserDependency } from '../user-dependencies/entities/user-dependency.entity';
 import { notificarFacturaAKiri } from './kiri-invoice-notifier';
+import { fechaLarga, pesos, totalFactura } from '../notifications/plantillas-facturacion';
+
+/** Días antes del día de pago en que se avisa que la factura vence pronto. */
+export const DIAS_AVISO_PREVIO = 3;
+
+/**
+ * 'YYYY-MM-DD' (columna date) como fecha local. new Date('2026-09-01') la toma
+ * como medianoche UTC: en un servidor con hora de Colombia sería el 31 de
+ * agosto y el día de pago caería un mes antes.
+ */
+export function fechaSinHora(valor: unknown): Date | null {
+  const texto = valor instanceof Date ? valor.toISOString() : typeof valor === 'string' ? valor : '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(texto);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
 
 /**
  * Invoice Lifecycle Cron Job
  * Runs daily to manage invoice status escalation and notifications.
  * 
  * Timeline from PayDay:
+ * - PayDay - 3: "vence pronto" reminder if still ISSUED
  * - PayDay (day 0): Send reminder if still ISSUED
  * - PayDay + 5: Change to NOTIFICATION1, warning notification
  * - PayDay + 7: Change to NOTIFICATION2, late_fee_penalty starts
@@ -37,7 +53,9 @@ export class InvoiceLifecycleCron {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  @Cron('0 8 * * *') // Every day at 8:00 AM
+  // 8:00 a. m. en Bogotá. Sin timeZone corría a las 8:00 UTC (3:00 a. m. en Colombia)
+  // y los recordatorios llegaban de madrugada.
+  @Cron('0 8 * * *', { timeZone: 'America/Bogota' })
   async handleInvoiceLifecycle(): Promise<void> {
     this.logger.log('Starting invoice lifecycle check...');
 
@@ -70,7 +88,7 @@ export class InvoiceLifecycleCron {
 
   private async processInvoice(invoice: Invoice, today: Date): Promise<void> {
     const payday = invoice.contract?.payday || 1;
-    const periodStart = invoice.periodStart ? new Date(invoice.periodStart) : null;
+    const periodStart = fechaSinHora(invoice.periodStart);
     if (!periodStart) return;
 
     // Calculate the payday date for this invoice's billing period
@@ -78,7 +96,6 @@ export class InvoiceLifecycleCron {
     payDate.setHours(0, 0, 0, 0);
 
     const daysSincePayday = Math.floor((today.getTime() - payDate.getTime()) / (1000 * 60 * 60 * 24));
-    if (daysSincePayday < 0) return; // PayDay hasn't arrived yet
 
     const clientEmail = invoice.user?.strUserName;
     const clientName = invoice.user?.basicData?.legalEntityData?.businessName
@@ -87,6 +104,25 @@ export class InvoiceLifecycleCron {
     const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
     const year = new Date().getFullYear().toString();
     const invoiceCode = invoice.code || `DF${invoice.id}`;
+    const amount = pesos(totalFactura(invoice));
+    const dueDate = fechaLarga(payDate);
+
+    // PayDay - 3: aviso de que vence pronto (antes solo se avisaba el mismo día)
+    if (daysSincePayday === -DIAS_AVISO_PREVIO && invoice.status === InvoiceStatus.ISSUED) {
+      if (clientEmail) {
+        await this.notificationsService.sendByTemplate('INVOICE_DUE_SOON', clientEmail, {
+          customerName: clientName,
+          invoiceCode,
+          amount,
+          dueDate,
+          factonetUrl,
+          year,
+        }).catch(e => this.logger.warn(`Email failed: ${e.message}`));
+      }
+      this.logger.log(`Invoice ${invoiceCode}: due-soon reminder sent (PayDay-${DIAS_AVISO_PREVIO})`);
+      return;
+    }
+    if (daysSincePayday < 0) return; // PayDay hasn't arrived yet
 
     // PayDay + 20: CANCEL contract and deactivate users
     if (daysSincePayday >= 20 && invoice.status === InvoiceStatus.SUSPENDED) {
@@ -143,6 +179,7 @@ export class InvoiceLifecycleCron {
         await this.notificationsService.sendByTemplate('INVOICE_REMINDER', clientEmail, {
           customerName: clientName,
           invoiceCode,
+          amount,
           factonetUrl,
           year,
         }).catch(e => this.logger.warn(`Email failed: ${e.message}`));
