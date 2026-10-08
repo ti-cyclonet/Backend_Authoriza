@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger, ConflictException } from '@nestjs/common';
+import { pesos, totalFactura } from '../notifications/plantillas-facturacion';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between } from 'typeorm';
 import { Invoice, InvoiceStatus } from './entities/invoice.entity';
@@ -320,7 +321,8 @@ export class InvoicesService {
     this.logger.log(`confirmPayment: Invoice ${id} current status = "${invoice.status}"`);
 
     if ((invoice.status as string) !== 'Payment Reported') {
-      throw new Error(`Invoice ${id} is not in 'Payment Reported' status. Current status: ${invoice.status}`);
+      // 409 con mensaje claro (antes new Error → 500 genérico)
+      throw new ConflictException(`La factura no tiene un pago reportado por verificar (estado actual: ${invoice.status}).`);
     }
 
     await this.invoiceRepository.update(id, {
@@ -328,6 +330,9 @@ export class InvoicesService {
     });
 
     this.logger.log(`Payment confirmed (approved) for invoice ${id}`);
+    this.sendPaymentConfirmedNotification(id).catch(err =>
+      this.logger.warn(`Failed to send payment confirmed notification: ${err.message}`)
+    );
     const pagada = await this.findOne(id);
     notificarFacturaAKiri(pagada, 'pagada');
     return pagada;
@@ -349,7 +354,8 @@ export class InvoicesService {
     }
 
     if (invoice.status !== InvoiceStatus.PAYMENT_REPORTED) {
-      throw new Error(`Invoice ${id} is not in 'Payment Reported' status. Current status: ${invoice.status}`);
+      // 409 con mensaje claro (antes new Error → 500 genérico)
+      throw new ConflictException(`La factura no tiene un pago reportado por verificar (estado actual: ${invoice.status}).`);
     }
 
     // Clear late_fee_penalty from globalParameters if it was set
@@ -387,6 +393,26 @@ export class InvoicesService {
     return rechazada;
   }
 
+  /** Avisa al cliente que su pago quedó confirmado (por el administrador o por la pasarela). */
+  private async sendPaymentConfirmedNotification(id: number): Promise<void> {
+    const invoice = await this.invoiceRepository.findOne({
+      where: { id },
+      relations: ['user', 'user.basicData', 'user.basicData.legalEntityData', 'user.basicData.naturalPersonData'],
+    });
+    const clientEmail = invoice?.user?.strUserName;
+    if (!clientEmail) return;
+    const clientName = invoice.user?.basicData?.legalEntityData?.businessName
+      || invoice.user?.basicData?.naturalPersonData?.firstName
+      || clientEmail;
+    await this.notificationsService.sendByTemplate('PAYMENT_CONFIRMED', clientEmail, {
+      customerName: clientName,
+      invoiceCode: invoice.code || `INV-${invoice.id}`,
+      amount: pesos(invoice.paidAmount ?? totalFactura(invoice)),
+      factonetUrl: process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login',
+      year: new Date().getFullYear().toString(),
+    });
+  }
+
   private async sendPaymentRejectedNotification(invoice: Invoice, reason?: string): Promise<void> {
     const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
     const year = new Date().getFullYear().toString();
@@ -399,9 +425,9 @@ export class InvoicesService {
     if (clientEmail) {
       try {
         await this.notificationsService.sendByTemplate('PAYMENT_REJECTED', clientEmail, {
-          customerName: clientName || 'Client',
+          customerName: clientName || 'Cliente',
           invoiceCode,
-          reason: reason || 'No reason provided',
+          reason: reason || 'Sin motivo indicado',
           factonetUrl,
           year,
         });
