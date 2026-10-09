@@ -3,6 +3,7 @@
 import 'dotenv/config';
 import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { OcultarSecretosInterceptor } from './common/interceptors/ocultar-secretos.interceptor';
 import { ValidationPipe } from '@nestjs/common';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -45,6 +46,9 @@ async function bootstrap() {
     credentials: true,
   });
   app.setGlobalPrefix('api');
+
+  // Nunca responder hashes de contraseña ni códigos de verificación (ver el interceptor)
+  app.useGlobalInterceptors(new OcultarSecretosInterceptor());
 
   app.useGlobalPipes(
     new ValidationPipe({
