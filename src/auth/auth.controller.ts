@@ -6,6 +6,7 @@ import { LoginDto } from './dto/login.dto';
 import { SelfRegisterDto, VerifyRegistrationDto } from './dto/self-register.dto';
 import { SelfRegistrationService } from './self-registration.service';
 import { ContactRateLimitGuard } from '../common/guards/contact-rate-limit.guard';
+import { PasswordAttemptsRateLimitGuard } from '../common/guards/password-attempts-rate-limit.guard';
 import { MarketplaceClientService, MarketplaceRegisterInput } from './marketplace-client.service';
 import { ConsentInput, requestMetaFrom } from '../consents/consents.service';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
@@ -353,6 +354,14 @@ export class AuthController {
     birthdate?: string; gender?: string; civilStatus?: string;
   } & ConsentInput, @Req() req: ExpressRequest) {
     return this.selfRegistrationService.registerShotraUser(body, this.requestMeta(req));
+  }
+
+  @ApiOperation({ summary: 'Activar Shotra en una cuenta CycloNet existente (valida la contraseña; exige términos + habeas data)' })
+  @Public()
+  @UseGuards(PasswordAttemptsRateLimitGuard)
+  @Post('activate-shotra')
+  async activateShotra(@Body() body: { email: string; password: string } & ConsentInput, @Req() req: ExpressRequest) {
+    return this.selfRegistrationService.activateShotraForExistingUser(body, this.requestMeta(req));
   }
 
   @ApiOperation({ summary: 'Verify Shotra user email (POST, para clientes móviles)' })

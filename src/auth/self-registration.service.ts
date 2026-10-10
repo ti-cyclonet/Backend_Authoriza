@@ -2,7 +2,10 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -1641,6 +1644,15 @@ export class SelfRegistrationService {
     // Si aún no está verificado, reenviamos código; el contrato de Shotra se
     // creará al verificar (verifyShotraUser).
     if (existing) {
+      // Solo el dueño de la cuenta puede activarle Shotra (y aceptar los términos
+      // en su nombre): antes bastaba conocer el correo.
+      const passwordOk = !!existing.strPassword && (await bcrypt.compare(data.password, existing.strPassword));
+      if (!passwordOk) {
+        throw new ConflictException({
+          code: 'ACCOUNT_EXISTS',
+          message: 'Ya existe una cuenta CycloNet con este correo. Inicia sesión en Shotra con esa contraseña para activar tu acceso.',
+        });
+      }
       if (!existing.isVerified) {
         const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
         const verificationExpires = new Date();
@@ -1660,6 +1672,8 @@ export class SelfRegistrationService {
       }
       // Ya verificado: el usuario existe y está activo en el ecosistema.
       // Creamos directamente el contrato de Shotra (idempotente) sin re-verificar.
+      this.assertAccountActive(existing);
+      await this.assertShotraNotBlocked(existing.id);
       await recordShotraConsents(existing.id);
       await this.ensureShotraContractAndRoles(existing.id);
       return {
@@ -1798,9 +1812,81 @@ export class SelfRegistrationService {
     }
 
     // Crear (idempotente) el contrato de Shotra y asignar roles.
-    await this.ensureShotraContractAndRoles(user.id);
+    const result = await this.ensureShotraContractAndRoles(user.id);
+    if (result === 'blocked') {
+      return { success: true, message: 'Cuenta verificada, pero tu acceso a Shotra está suspendido. Escríbenos para revisarlo.' };
+    }
 
     return { success: true, message: '¡Cuenta verificada! Ya puedes acceder a Shotra.' };
+  }
+
+  /**
+   * Activa Shotra en una cuenta CycloNet que ya existe (la persona usa otra app
+   * del ecosistema y nunca entró a Shotra). La app lo ofrece cuando el login
+   * responde "sin plan de Shotra": se vuelven a validar correo y contraseña, se
+   * registran los términos de Shotra + la autorización de datos y se crea el
+   * contrato SHOTRA FREE. No reactiva un acceso que un administrador suspendió.
+   */
+  async activateShotraForExistingUser(data: { email: string; password: string } & ConsentInput, meta: RequestMeta = {}) {
+    if (!data?.email || !data?.password) {
+      throw new BadRequestException('Correo y contraseña son obligatorios.');
+    }
+    this.consentsService.assertAccepted(data);
+
+    const user = await this.userRepository.findOne({ where: { strUserName: data.email } });
+    // Mismo mensaje para correo inexistente y contraseña errada (no revela cuentas)
+    const passwordOk = !!user?.strPassword && (await bcrypt.compare(data.password, user.strPassword));
+    if (!user || !passwordOk) {
+      throw new UnauthorizedException('Correo o contraseña incorrectos.');
+    }
+    if (!user.isVerified) {
+      throw new BadRequestException('Primero verifica tu correo: te enviamos un código cuando creaste tu cuenta.');
+    }
+    this.assertAccountActive(user);
+    await this.assertShotraNotBlocked(user.id);
+
+    await this.consentsService.record({
+      userId: user.id, email: data.email, tenantId: null, application: 'Shotra', source: 'SHOTRA_ACTIVATE', consents: data, meta,
+    });
+    const result = await this.ensureShotraContractAndRoles(user.id);
+    if (result === 'unavailable') {
+      throw new ServiceUnavailableException('No pudimos activar Shotra en este momento. Intenta más tarde.');
+    }
+    return { success: true, message: 'Se activó Shotra en tu cuenta CycloNet.' };
+  }
+
+  /** Cuenta CycloNet desactivada o eliminada: no se le activa Shotra (ni se reactiva). */
+  private assertAccountActive(user: User): void {
+    const status = String(user.strStatus || '').toUpperCase();
+    if (status === 'INACTIVE' || status === 'DELETED') {
+      throw new ForbiddenException('Tu cuenta CycloNet no está activa. Escríbenos para revisarla.');
+    }
+  }
+
+  /**
+   * Un administrador suspendió o canceló el acceso a Shotra (contrato de un
+   * paquete de Shotra que no está ACTIVE, o su rol desactivado): no se reactiva
+   * desde el registro ni desde la activación.
+   */
+  private async assertShotraNotBlocked(userId: string): Promise<void> {
+    if ((await this.shotraAccessState(userId)) === 'blocked') {
+      throw new ForbiddenException('Tu acceso a Shotra está suspendido. Escríbenos para revisarlo.');
+    }
+  }
+
+  private async shotraAccessState(userId: string): Promise<'none' | 'active' | 'blocked'> {
+    const contracts: { id: string; status: string }[] = await this.dataSource.query(
+      `SELECT c.id, c.status FROM contract c JOIN package p ON p.id = c."packageId"
+        WHERE c."userId" = $1 AND p."targetApplication" = 'Shotra' AND c."deletedAt" IS NULL`,
+      [userId],
+    );
+    if (!contracts.length) return 'none';
+    if (!contracts.some((c) => c.status === ContractStatus.ACTIVE)) return 'blocked';
+    const roles: { status: string }[] = await this.dataSource.query(
+      `SELECT ur.status FROM user_roles ur WHERE ur."contractId"::text = ANY($1::text[])`,
+      [contracts.map((c) => c.id)],
+    );
+    return roles.length && !roles.some((r) => r.status === 'ACTIVE') ? 'blocked' : 'active';
   }
 
   /**
@@ -1808,15 +1894,17 @@ export class SelfRegistrationService {
    * roles userShotra (desde configuration_package) + adminInvoices (FactoNet).
    * NO toca contratos ni roles de otras aplicaciones. Idempotente.
    */
-  private async ensureShotraContractAndRoles(userId: string) {
+  private async ensureShotraContractAndRoles(userId: string): Promise<'ok' | 'blocked' | 'unavailable'> {
     const freePkg = await this.packageRepository.findOne({
       where: { name: 'SHOTRA FREE' },
       relations: ['usageLimitVariables'],
     });
     if (!freePkg) {
       this.logger.warn('Paquete SHOTRA FREE no encontrado; no se puede crear el contrato de Shotra.');
-      return;
+      return 'unavailable';
     }
+    // Acceso suspendido o cancelado por un administrador: no se toca
+    if ((await this.shotraAccessState(userId)) === 'blocked') return 'blocked';
 
     await this.dataSource.transaction(async (manager) => {
       // ¿Ya tiene un contrato para un paquete de Shotra? (evitar duplicados)
@@ -1830,11 +1918,8 @@ export class SelfRegistrationService {
       let contractId: string;
 
       if (existingShotraContract) {
+        // Ya activo (los bloqueados se descartaron arriba): no se reactiva nada
         contractId = existingShotraContract.id;
-        if (existingShotraContract.status !== ContractStatus.ACTIVE) {
-          existingShotraContract.status = ContractStatus.ACTIVE;
-          await manager.save(existingShotraContract);
-        }
       } else {
         const contractCode = await this.entityCodeService.generateCode('Contract');
         const userForPrefix = await manager.findOne(User, {
@@ -1898,11 +1983,16 @@ export class SelfRegistrationService {
         }
       }
 
-      // Asegurar que el usuario quede ACTIVE
-      await manager.update(User, { id: userId }, { strStatus: 'ACTIVE' });
+      // Una cuenta recién confirmada pasa a ACTIVE. Antes se forzaba ACTIVE sin
+      // mirar: reactivaba cuentas desactivadas por un administrador.
+      await manager.query(
+        `UPDATE "user" SET "strStatus" = 'ACTIVE' WHERE id = $1 AND upper("strStatus") IN ('UNCONFIRMED', 'CONFIRMED')`,
+        [userId],
+      );
     });
 
     this.logger.log(`Contrato SHOTRA FREE + roles asignados a usuario ${userId}`);
+    return 'ok';
   }
 
   async sendContactEmail(data: { name: string; email: string; phone?: string; subject?: string; message: string }) {
