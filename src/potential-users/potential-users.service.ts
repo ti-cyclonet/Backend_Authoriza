@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { PotentialUser, PotentialUserStatus } from './potential-user.entity';
 import { CreatePotentialUserDto } from './dto/create-potential-user.dto';
+import { CreateTenantCustomerDto } from './dto/create-tenant-customer.dto';
 
 @Injectable()
 export class PotentialUsersService {
@@ -49,6 +50,47 @@ export class PotentialUsersService {
 
     const potentialUser = this.potentialUsersRepository.create(createPotentialUserDto);
     return await this.potentialUsersRepository.save(potentialUser);
+  }
+
+  /**
+   * Cliente rápido del negocio (venta directa / pedido en InOut): solo el
+   * nombre es obligatorio. Si trae correo o teléfono de un cliente que el
+   * negocio ya tiene, lo actualiza en vez de duplicarlo. Nunca toma el
+   * registro de otro negocio (el correo es único en la tabla).
+   */
+  async createForTenant(tenantId: string, dto: CreateTenantCustomerDto): Promise<PotentialUser> {
+    const name = dto.name.replace(/\s+/g, ' ').trim();
+    if (name.length < 2) throw new BadRequestException('Escribe el nombre del cliente.');
+    const email = dto.email?.trim().toLowerCase() || null;
+    const phone = dto.phone?.trim() || null;
+    const data = {
+      name,
+      ...(phone ? { phone } : {}),
+      ...(dto.documentNumber?.trim() ? { documentNumber: dto.documentNumber.trim() } : {}),
+      ...(dto.address?.trim() ? { address: dto.address.trim() } : {}),
+    };
+
+    if (email) {
+      const byEmail = await this.potentialUsersRepository.findOne({ where: { email } });
+      if (byEmail) {
+        if (byEmail.sourceTenantId !== tenantId) {
+          throw new ConflictException('Ese correo ya está registrado. Deja el correo vacío o usa otro.');
+        }
+        if (byEmail.status === PotentialUserStatus.CONVERTED) return byEmail;
+        Object.assign(byEmail, data);
+        return await this.potentialUsersRepository.save(byEmail);
+      }
+    }
+    if (phone) {
+      const byPhone = await this.potentialUsersRepository.findOne({ where: { phone, sourceTenantId: tenantId } });
+      if (byPhone && byPhone.status !== PotentialUserStatus.CONVERTED) {
+        Object.assign(byPhone, data, email && !byPhone.email ? { email } : {});
+        return await this.potentialUsersRepository.save(byPhone);
+      }
+    }
+    return await this.potentialUsersRepository.save(
+      this.potentialUsersRepository.create({ ...data, email, sourceApplication: 'Inout', sourceTenantId: tenantId }),
+    );
   }
 
   async findBySource(sourceApplication: string, sourceTenantId: string): Promise<PotentialUser[]> {

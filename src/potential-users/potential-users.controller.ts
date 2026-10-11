@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Body, Param, UseGuards, Request, ForbiddenException } from '@nestjs/common';
 import { PotentialUsersService } from './potential-users.service';
 import { CreatePotentialUserDto } from './dto/create-potential-user.dto';
+import { CreateTenantCustomerDto } from './dto/create-tenant-customer.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
@@ -26,6 +27,13 @@ export class PotentialUsersController {
   @Post()
   async create(@Body() createPotentialUserDto: CreatePotentialUserDto) {
     return await this.potentialUsersService.create(createPotentialUserDto);
+  }
+
+  /** Cliente rápido del negocio en sesión (venta directa / pedido): basta el nombre. */
+  @UseGuards(JwtAuthGuard)
+  @Post('mine')
+  async createMine(@Body() dto: CreateTenantCustomerDto, @Request() req) {
+    return await this.potentialUsersService.createForTenant(this.tenantOf(req), dto);
   }
 
   /** Clientes potenciales del negocio en sesión (módulo Usuarios de InOut). */
