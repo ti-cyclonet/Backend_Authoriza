@@ -27,6 +27,8 @@ function bogotaDateKey(d: Date): string {
 }
 
 const num = (v: any) => Number(v) || 0;
+/** Cuántos registros recientes de cada tipo se comparan para detectar novedades. */
+const NEWS_LIMIT = 10;
 const UNPAID = Object.values(InvoiceStatus).filter((s) => s !== InvoiceStatus.PAID);
 
 /**
@@ -72,6 +74,7 @@ export class DashboardOverviewService {
       usersAgg, signupsRaw,
       billedSeriesRaw, collectedSeriesRaw,
       recentLogs,
+      newsContracts, newsInvoices, newsUsers, newsPayments,
     ] = await Promise.all([
       collected(monthStart, now),
       collected(prevMonthStart, monthStart),
@@ -119,6 +122,25 @@ export class DashboardOverviewService {
         .where('i.status = :paid', { paid: InvoiceStatus.PAID })
         .andWhere('COALESCE(i.paymentDate, i.updatedAt) >= :from', { from: sixMonthsStart }).getRawMany(),
       this.logsService.getRecentLogs(12),
+      // Novedades: lo último de cada tipo. El panel compara con la consulta
+      // anterior y avisa con una burbuja sonora de lo que llegó.
+      this.contractRepository.createQueryBuilder('c')
+        .leftJoin('c.user', 'u').leftJoin('c.package', 'p')
+        .select(['c.id AS id', 'c.code AS code', 'c.status AS status', 'c.value AS value', 'u.strUserName AS client', 'p.name AS package'])
+        .where('c.status <> :deleted', { deleted: ContractStatus.DELETED })
+        .orderBy('c.createdAt', 'DESC').limit(NEWS_LIMIT).getRawMany(),
+      inv().leftJoin('i.user', 'u')
+        .select(['i.id AS id', 'i.code AS code', 'i.value AS value', 'i.status AS status', 'u.strUserName AS client'])
+        .where('i.status <> :draft', { draft: InvoiceStatus.UNCONFIRMED })
+        .orderBy('i.createdAt', 'DESC').addOrderBy('i.id', 'DESC').limit(NEWS_LIMIT).getRawMany(),
+      this.userRepository.createQueryBuilder('u')
+        .select(['u.id AS id', 'u.strUserName AS name'])
+        .where('u.deletedAt IS NULL')
+        .orderBy('u.dtmCreateDate', 'DESC').limit(NEWS_LIMIT).getRawMany(),
+      inv().leftJoin('i.user', 'u')
+        .select(['i.id AS id', 'i.code AS code', 'i.status AS status', 'COALESCE(i.paidAmount, i.value) AS value', 'u.strUserName AS client'])
+        .where('i.status IN (:...st)', { st: [InvoiceStatus.PAID, InvoiceStatus.PAYMENT_REPORTED] })
+        .orderBy('COALESCE(i.paymentDate, i.updatedAt)', 'DESC').limit(NEWS_LIMIT).getRawMany(),
     ]);
 
     // Series: últimos 6 meses (facturado vs recaudado) y registros de 14 días
@@ -184,6 +206,13 @@ export class DashboardOverviewService {
       },
       series: { months, signups: days },
       activity: recentLogs.map((l) => ({ id: l.id, level: l.level, action: l.action, message: l.message, createdAt: l.createdAt })),
+      news: {
+        contracts: newsContracts.map((c) => ({ id: c.id, code: c.code, status: c.status, monthly: Math.round(num(c.value) / 12), client: c.client, package: c.package })),
+        invoices: newsInvoices.map((i) => ({ id: i.id, code: i.code, value: num(i.value), status: i.status, client: i.client })),
+        users: newsUsers.map((u) => ({ id: u.id, name: u.name })),
+        // La clave incluye el estado: "pago reportado" y luego "pagada" son dos novedades
+        payments: newsPayments.map((p) => ({ key: `${p.id}:${p.status}`, id: p.id, code: p.code, value: num(p.value), status: p.status, client: p.client })),
+      },
     };
   }
 }
