@@ -183,11 +183,17 @@ export class PlatformCostsService {
     const today = todayCo();
     const { start, prev } = monthRange(today.slice(0, 7));
     // Con consulta semanal, la primera semana del mes aún trae días (y ajustes)
-    // del mes anterior: se refresca también
-    const from = Number(today.slice(8, 10)) <= 7 ? `${prev}-01` : start;
+    // del mes anterior: se refresca también. Si el mes anterior no tiene datos
+    // (p. ej. la primera sincronización), también se trae: es la misma consulta.
+    let from = Number(today.slice(8, 10)) <= 7 ? `${prev}-01` : start;
 
     if (opts.aws && process.env.AWS_COST_ACCESS_KEY_ID) {
       try {
+        if (from === start) {
+          const prevRange = monthRange(prev);
+          const prevRows = await this.costRepo.count({ where: { platform: 'AWS', day: Between(prevRange.start, prevRange.last) } });
+          if (!prevRows) from = prevRange.start;
+        }
         // Fin exclusivo = hoy: el día en curso aún no está consolidado
         const rows = await fetchAwsDailyCosts(from, today);
         // Se reemplaza el rango completo: así no quedan filas de un reparto
