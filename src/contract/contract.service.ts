@@ -180,6 +180,8 @@ export class ContractService {
       startDate: dto.startDate ?? contract.startDate,
       endDate: dto.endDate ?? contract.endDate,
       status: statusChanged ? contract.status : newStatus, // No cambiar aquí si va a cascadear
+      // Sector de la tienda (InOut): vacío = se conserva el que tenía
+      businessSector: dto.businessSector?.trim() ? dto.businessSector.trim() : contract.businessSector,
     });
 
     const savedContract = await this.contractRepository.save(contract);
