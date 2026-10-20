@@ -18,6 +18,8 @@ import { Image } from 'src/images/entities/image.entity';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { UserRolesModule } from '../user-roles/user-roles.module';
 import { UserDependenciesModule } from '../user-dependencies/user-dependencies.module';
+import { MailModule } from '../mail/mail.module';
+import { PasswordRecoveryService } from './password-recovery.service';
 
 @Module({
   imports: [
@@ -32,9 +34,10 @@ import { UserDependenciesModule } from '../user-dependencies/user-dependencies.m
     forwardRef(() => ContractModule),
     UserRolesModule,
     UserDependenciesModule,
+    MailModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService, UserCleanupService],
-  exports: [UsersService],
+  providers: [UsersService, UserCleanupService, PasswordRecoveryService],
+  exports: [UsersService, PasswordRecoveryService],
 })
 export class UsersModule {}
