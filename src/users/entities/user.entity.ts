@@ -34,6 +34,14 @@ export class User {
   @Column({ type: 'timestamp', nullable: true })
   lastPasswordChange: Date;
 
+  /** "¿Olvidaste tu contraseña?": SHA-256 del token enviado por correo (nunca el token). */
+  @Column({ type: 'varchar', length: 64, nullable: true, select: false })
+  strResetTokenHash: string | null;
+
+  /** Vencimiento del enlace de recuperación (1 hora). */
+  @Column({ type: 'timestamp', nullable: true })
+  dtmResetTokenExpires: Date | null;
+
   @Column({ nullable: true })
   verificationCode: string;
 
