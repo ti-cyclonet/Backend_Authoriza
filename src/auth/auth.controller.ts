@@ -14,6 +14,7 @@ import { Public } from './decorators/public.decorator';
 import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
 import { InternalKeyGuard, isInternalRequest } from '../common/guards/internal-key.guard';
 import { UsersService } from '../users/users.service';
+import { PasswordRecoveryService } from '../users/password-recovery.service';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -23,6 +24,7 @@ export class AuthController {
     private readonly selfRegistrationService: SelfRegistrationService,
     private readonly marketplaceClientService: MarketplaceClientService,
     private readonly usersService: UsersService,
+    private readonly passwordRecovery: PasswordRecoveryService,
   ) {}
 
   // ─── Clientes del MarketPlace de InOut (rol clienteInout del tenant) ───
@@ -147,6 +149,24 @@ export class AuthController {
       userId: user?.id || null,
       message: user ? 'Este correo ya tiene una cuenta registrada.' : 'Email disponible.',
     };
+  }
+
+  // ─── ¿Olvidaste tu contraseña? (InOut, FactoNet, Authoriza) ───
+
+  @ApiOperation({ summary: 'Envía al correo un enlace para restablecer la contraseña (misma respuesta exista o no la cuenta)' })
+  @Public()
+  @UseGuards(PasswordAttemptsRateLimitGuard)
+  @Post('forgot-password')
+  async forgotPassword(@Body() body: { email: string; app?: string }) {
+    return this.passwordRecovery.forgot(body?.email, body?.app);
+  }
+
+  @ApiOperation({ summary: 'Fija la nueva contraseña con el token del enlace (un solo uso, 1 hora)' })
+  @Public()
+  @UseGuards(PasswordAttemptsRateLimitGuard)
+  @Post('reset-password')
+  async resetPasswordWithToken(@Body() body: { token: string; newPassword: string }) {
+    return this.passwordRecovery.reset(body?.token, body?.newPassword);
   }
 
   @ApiOperation({ summary: 'Get user access status by email (for external apps like Kiri)' })
