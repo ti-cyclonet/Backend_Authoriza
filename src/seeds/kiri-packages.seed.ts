@@ -65,9 +65,12 @@ const PAQUETES: DefPaquete[] = [
   {
     plan: 'PRO',
     name: 'KIRI PRO',
-    description: 'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
-    // Ya no hay PLUS gratis para la pareja de un PRO
-    descripcionesViejas: ['Para el hogar y quien quiere todo: presupuesto del hogar en pareja (tu pareja recibe PLUS gratis), conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.'],
+    description: 'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, más IA, escáner que separa por productos, escenarios guardados, historial ilimitado y soporte prioritario. Conexión con tu banco, próximamente.',
+    // Ya no hay PLUS gratis para la pareja de un PRO; la conexión con el banco aún no está disponible
+    descripcionesViejas: [
+      'Para el hogar y quien quiere todo: presupuesto del hogar en pareja (tu pareja recibe PLUS gratis), conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
+      'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
+    ],
     preciosViejos: [],
     displayOrder: 3,
     isHighlighted: false,
