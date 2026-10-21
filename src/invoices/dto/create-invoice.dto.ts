@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsDateString, IsEnum, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsDateString, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { InvoiceStatus } from '../entities/invoice.entity';
 
 export class CreateInvoiceDto {
@@ -24,4 +24,19 @@ export class CreateInvoiceDto {
 
   @IsNotEmpty()
   userId: string;
+
+  /** Cargos que no son el plan (adicionales de otras apps): qué se cobra. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  concept?: string;
+
+  /** Periodo del servicio que se cobra (FactoNet lo muestra en la factura). */
+  @IsOptional()
+  @IsDateString()
+  periodStart?: string;
+
+  @IsOptional()
+  @IsDateString()
+  periodEnd?: string;
 }
