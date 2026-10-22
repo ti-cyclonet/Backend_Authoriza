@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { UserDependenciesModule } from './user-dependencies/user-dependencies.module';
 import { UsersModule } from './users/users.module';
+import { QuoterModule } from './quoter/quoter.module';
 import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
@@ -56,6 +57,7 @@ import { UsageLimitVariablesModule } from './usage-limit-variables/usage-limit-v
     }),
     AuthModule,
     UsersModule,
+    QuoterModule,
     RolesModule,
     UserRolesModule,
     UserDependenciesModule,
