@@ -50,92 +50,142 @@ export const QUOTER_DEFAULTS: any = {
       30,
       40,
       30
-    ]
+    ],
+    "nivelBase": "junior"
   },
   "roles": [
     {
       "id": "pm",
       "nombre": "Gestión del proyecto",
       "modalidad": "empleado",
-      "mensual": 7000000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 4000000,
+        "semi": 7000000,
+        "senior": 11000000
+      }
     },
     {
       "id": "arq",
       "nombre": "Arquitectura y liderazgo técnico",
       "modalidad": "empleado",
-      "mensual": 13000000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 9000000,
+        "semi": 13000000,
+        "senior": 17000000
+      },
+      "nivelMinimo": "semi"
     },
     {
       "id": "ux",
       "nombre": "Diseño UX/UI",
       "modalidad": "contratista",
-      "mensual": 6500000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 4200000,
+        "semi": 6500000,
+        "senior": 9000000
+      }
     },
     {
       "id": "front",
       "nombre": "Desarrollo frontend",
       "modalidad": "empleado",
-      "mensual": 6000000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 3000000,
+        "semi": 6000000,
+        "senior": 9000000
+      }
     },
     {
       "id": "back",
       "nombre": "Desarrollo backend",
       "modalidad": "empleado",
-      "mensual": 7500000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 3500000,
+        "semi": 7500000,
+        "senior": 11500000
+      }
     },
     {
       "id": "movil",
       "nombre": "Desarrollo móvil",
       "modalidad": "empleado",
-      "mensual": 6500000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 4000000,
+        "semi": 6500000,
+        "senior": 9500000
+      }
     },
     {
       "id": "qa",
       "nombre": "Pruebas y calidad (QA)",
       "modalidad": "contratista",
-      "mensual": 5200000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 3300000,
+        "semi": 5200000,
+        "senior": 7800000
+      }
     },
     {
       "id": "devops",
       "nombre": "Nube y DevOps",
       "modalidad": "contratista",
-      "mensual": 12000000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 6500000,
+        "semi": 12000000,
+        "senior": 19000000
+      }
     },
     {
       "id": "datos",
       "nombre": "Datos e inteligencia artificial",
       "modalidad": "contratista",
-      "mensual": 11000000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 7200000,
+        "semi": 11000000,
+        "senior": 15600000
+      }
     },
     {
       "id": "contenido",
       "nombre": "Diseño gráfico y contenido",
       "modalidad": "contratista",
-      "mensual": 3000000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 2300000,
+        "semi": 3000000,
+        "senior": 4500000
+      }
     },
     {
       "id": "pauta",
       "nombre": "Pauta digital (trafficker)",
       "modalidad": "contratista",
-      "mensual": 4500000,
-      "arl": "I"
+      "arl": "I",
+      "niveles": {
+        "junior": 3200000,
+        "semi": 4500000,
+        "senior": 6500000
+      }
     },
     {
       "id": "iot",
       "nombre": "Electrónica e IoT",
       "modalidad": "contratista",
-      "mensual": 5000000,
-      "arl": "II"
+      "arl": "II",
+      "niveles": {
+        "junior": 2900000,
+        "semi": 5000000,
+        "senior": 7200000
+      }
     }
   ],
   "servicios": [
@@ -1774,6 +1824,11 @@ export const QUOTER_DEFAULTS: any = {
       }
     },
     "dependencias": 1.3,
+    "horasNivel": {
+      "junior": 1.25,
+      "semi": 1,
+      "senior": 0.85
+    },
     "iotDispositivos": {
       "1-5": 5,
       "6-20": 15,

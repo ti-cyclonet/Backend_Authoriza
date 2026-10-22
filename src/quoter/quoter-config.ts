@@ -3,6 +3,8 @@
  * lo que falte (claves nuevas en una versión posterior) sale de los valores
  * por defecto. Las listas (roles, servicios) se reemplazan completas.
  */
+import { NIVELES } from './quoter-cost';
+
 const isObj = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 export function mergeConfig(defaults: any, saved: any): any {
@@ -41,8 +43,22 @@ export function validateConfig(c: any): string[] {
     else roleIds.add(r.id);
     if (!r?.nombre) errors.push(`roles[${i}]: falta el nombre.`);
     if (r?.modalidad !== 'empleado' && r?.modalidad !== 'contratista') errors.push(`roles[${i}]: la modalidad es empleado o contratista.`);
-    if (!(num(r?.mensual) && r.mensual > 0)) errors.push(`roles[${i}]: el valor mensual debe ser mayor que 0.`);
+    const niveles = isObj(r?.niveles) ? r.niveles : null;
+    if (niveles) {
+      for (const n of NIVELES) {
+        if (!(num(niveles[n]) && niveles[n] > 0)) errors.push(`roles[${i}]: el valor ${n} debe ser mayor que 0.`);
+      }
+      if (NIVELES.every((n) => num(niveles[n])) && !(niveles.junior <= niveles.semi && niveles.semi <= niveles.senior)) {
+        errors.push(`roles[${i}]: los valores van de menor a mayor (junior ≤ semi senior ≤ senior).`);
+      }
+    } else if (!(num(r?.mensual) && r.mensual > 0)) {
+      errors.push(`roles[${i}]: faltan los valores por nivel.`);
+    }
+    if (r?.nivelMinimo !== undefined && r?.nivelMinimo !== null && !NIVELES.includes(r.nivelMinimo)) {
+      errors.push(`roles[${i}]: el nivel mínimo es junior, semi o senior.`);
+    }
   });
+  if (emp.nivelBase !== undefined && !NIVELES.includes(emp.nivelBase)) errors.push('empresa.nivelBase es junior, semi o senior.');
 
   (Array.isArray(c.servicios) ? c.servicios : []).forEach((s: any, i: number) => {
     if (!s?.id || !s?.nombre) errors.push(`servicios[${i}]: falta el id o el nombre.`);
