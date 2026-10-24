@@ -30,6 +30,9 @@ const CREDIT_REMINDER_OLD_HEADER = `      <td style="background:#1f2a44;padding:
 
 export const QUOTE_REQUEST_INBOX = 'ti.cyclonet.sas@gmail.com';
 
+/** Logo de CycloNet publicado en la landing, para los correos de cotización. */
+const CYCLONET_LOGO_URL = 'https://www.cyclonet.com.co/assets/img/cyclonet.png';
+
 /**
  * ¿El asunto es una solicitud de cotización? Cotizador («Cotizador CN-…»),
  * temas de la landing («Quiero cotizar: …») o un asunto escrito por el cliente
@@ -1006,6 +1009,10 @@ ${CREDIT_REMINDER_HEADER}
 
     const layout = (heading: string, intro: string, footer: string) => `
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+        <div style="background:#ffffff;padding:18px 22px 14px;text-align:center;">
+          <img src="${CYCLONET_LOGO_URL}" alt="CycloNet S.A.S." width="170" style="display:block;margin:0 auto;width:170px;max-width:60%;height:auto;border:0;">
+          <p style="margin:6px 0 0;font-size:12px;color:#5b6b86;letter-spacing:.04em;">CycloNet S.A.S. · cyclonet.com.co</p>
+        </div>
         <div style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:22px;text-align:center;">
           <h2 style="color:#fff;margin:0;">${heading}</h2>
           <p style="color:#bbdefb;margin:6px 0 0;font-size:13px;">Ref. ${esc(ref)} · ${esc(title)}</p>
