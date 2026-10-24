@@ -49,7 +49,8 @@ import { UsageLimitVariablesModule } from './usage-limit-variables/usage-limit-v
         password: config.get<string>('DB_PASSWORD', ''),
         database: config.get<string>('DB_NAME', 'authoriza'),
         synchronize: true,
-        logging: true,
+        // Consultas SQL solo con DB_LOGGING=true (depuración); si no, errores y advertencias
+        logging: config.get<string>('DB_LOGGING') === 'true' ? true : ['error', 'warn'],
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         autoLoadEntities: true,
         ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
