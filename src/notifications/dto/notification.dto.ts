@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, MaxLength, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, MaxLength, IsEmail, Matches } from 'class-validator';
 
 export class CreateEmailTemplateDto {
   @IsString()
@@ -44,6 +44,41 @@ export class SendEmailDto {
   @IsString()
   @MaxLength(100)
   tenantId?: string;
+}
+
+/** Solicitud del cotizador de la landing: el resumen va al cliente y a CycloNet. */
+export class QuoteRequestDto {
+  @IsString()
+  @MaxLength(120)
+  name: string;
+
+  @IsEmail()
+  @MaxLength(255)
+  email: string;
+
+  /** Referencia de la cotización, p. ej. CN-261023-AB12. */
+  @Matches(/^CN-[A-Z0-9-]{4,30}$/)
+  ref: string;
+
+  @IsString()
+  @MaxLength(200)
+  title: string;
+
+  /** Inversión aproximada en texto, p. ej. "$41 M – $47 M". */
+  @IsString()
+  @MaxLength(60)
+  range: string;
+
+  /** Resumen en texto plano (estimado, equipo, detalle y respuestas). */
+  @IsString()
+  @MaxLength(12000)
+  summary: string;
+
+  /** Enlace a la cotización; solo se incluye si es de cyclonet.com.co. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(8000)
+  link?: string;
 }
 
 export class ContactFormDto {

@@ -9,6 +9,10 @@ import {
   SendEmailDto,
 } from './dto/notification.dto';
 import { PLANTILLAS_FACTURACION } from './plantillas-facturacion';
+import { QuoteRequestDto } from './dto/notification.dto';
+
+/** Buzón comercial que recibe las solicitudes del cotizador (el de contacto general es otro). */
+export const QUOTE_REQUEST_INBOX = 'ti.cyclonet.sas@gmail.com';
 
 @Injectable()
 export class NotificationsService {
@@ -945,6 +949,57 @@ export class NotificationsService {
     const success = await this.mailService.send(to, `[Contacto Web] ${plainSubject}`, html);
     if (success) this.logger.log(`Contact form email sent from ${email}`);
     return { success, message: success ? 'Email sent successfully' : 'Failed to send email' };
+  }
+
+  /**
+   * Solicitud del cotizador de la landing: el resumen llega al cliente y al
+   * buzón comercial de CycloNet (no al de contacto general). Los datos vienen de
+   * un formulario público, así que todo se escapa y el enlace solo se incluye si
+   * apunta al cotizador de cyclonet.com.co.
+   */
+  async sendQuoteRequest(dto: QuoteRequestDto): Promise<{ success: boolean; clientSent: boolean; message: string }> {
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>
+    )[c]);
+    const oneLine = (v: any, max: number) => String(v ?? '').replace(/[\r\n]+/g, ' ').trim().slice(0, max);
+    const name = oneLine(dto.name, 120), firstName = name.split(' ')[0] || name;
+    const title = oneLine(dto.title, 200), range = oneLine(dto.range, 60), ref = oneLine(dto.ref, 40);
+    const summary = esc(String(dto.summary ?? '').slice(0, 12000)).replace(/\n/g, '<br>');
+    const link = /^https:\/\/(www\.)?cyclonet\.com\.co\/cotizador\//.test(dto.link || '') ? dto.link! : null;
+
+    const layout = (heading: string, intro: string, footer: string) => `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:22px;text-align:center;">
+          <h2 style="color:#fff;margin:0;">${heading}</h2>
+          <p style="color:#bbdefb;margin:6px 0 0;font-size:13px;">Ref. ${esc(ref)} · ${esc(title)}</p>
+        </div>
+        <div style="padding:24px;color:#333;line-height:1.55;">
+          ${intro}
+          <p style="font-size:20px;font-weight:bold;color:#0d47a1;margin:16px 0 4px;">${esc(range)}</p>
+          <p style="margin:0 0 16px;color:#666;font-size:13px;">Inversión aproximada, antes de IVA</p>
+          ${link ? `<p style="text-align:center;margin:20px 0;"><a href="${esc(link)}" style="background:#0d47a1;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:bold;">Ver la cotización completa</a></p>` : ''}
+          <div style="background:#f5f7fb;padding:14px 16px;border-radius:8px;font-size:13px;font-family:Consolas,Menlo,monospace;">${summary}</div>
+        </div>
+        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:12px;color:#888;">${footer}</div>
+      </div>`;
+
+    const internal = layout(
+      'Nueva solicitud del cotizador',
+      `<p><strong>Cliente:</strong> ${esc(name)} · <a href="mailto:${esc(dto.email)}">${esc(dto.email)}</a></p>`,
+      'Enviado desde el cotizador de cyclonet.com.co',
+    );
+    const client = layout(
+      `¡Gracias, ${esc(firstName)}!`,
+      `<p>Recibimos tu solicitud. Este es el resumen de lo que armaste en nuestro cotizador; te escribimos en menos de un día hábil para agendar una reunión de 30 minutos, sin costo, donde afinamos el alcance y el precio final.</p>`,
+      'CycloNet S.A.S. · cyclonet.com.co<br>Si no solicitaste esta cotización, puedes ignorar este correo.',
+    );
+
+    const success = await this.mailService.send(QUOTE_REQUEST_INBOX, `[Cotizador] ${ref}: ${title} · ${range}`, internal);
+    const clientSent = success
+      ? await this.mailService.send(dto.email, `Tu cotización ${ref} · CycloNet`, client)
+      : false;
+    if (success) this.logger.log(`Quote request ${ref} sent (client copy: ${clientSent})`);
+    return { success, clientSent, message: success ? 'Quote request sent' : 'Failed to send quote request' };
   }
 
   private async sendContactConfirmation(name: string, email: string, subject: string, message: string): Promise<void> {
