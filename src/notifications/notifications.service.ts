@@ -22,6 +22,8 @@ const CREDIT_REMINDER_HEADER = `      <td style="background:#ffffff;padding:26px
         <h1 style="color:#1f2a44;margin:0;font-size:21px;font-weight:800;">{{businessName}}</h1>
         <p style="color:#6b7280;margin:6px 0 0;font-size:13px;">Recordatorio de pago</p>
       </td>`;
+/** Párrafo final del recordatorio: el botón de pago se inserta antes. */
+const CREDIT_REMINDER_PAY_ANCHOR = '<p style="color:#777;font-size:13px;line-height:1.6;margin:20px 0 0;">Si ya realizaste el pago';
 /** Encabezado de la versión anterior, para actualizar la plantilla ya sembrada. */
 const CREDIT_REMINDER_OLD_HEADER = `      <td style="background:#1f2a44;padding:24px 32px;text-align:center;">
         <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:800;">{{businessName}}</h1>
@@ -86,7 +88,7 @@ export class NotificationsService {
   async sendEmail(dto: SendEmailDto): Promise<{ success: boolean; message: string }> {
     const template = await this.findTemplateByCode(dto.templateCode);
     // Variables opcionales de las plantillas: vacías si quien envía no las manda
-    const variables = { logoBlock: '', ...(dto.variables || {}) };
+    const variables = { logoBlock: '', payButton: '', ...(dto.variables || {}) };
     const html = this.replaceVariables(template.htmlBody, variables);
     const subject = this.replaceVariables(template.subject, variables);
 
@@ -814,6 +816,7 @@ ${CREDIT_REMINDER_HEADER}
           <tr><td colspan="2" style="padding:0 18px;font-size:13px;color:#b91c1c;">{{interest}}</td></tr>
           <tr><td style="padding:14px 18px;font-size:15px;color:#1f2937;font-weight:700;border-top:1px solid #e5e7eb;">Total a pagar</td><td style="padding:14px 18px;font-size:16px;text-align:right;font-weight:800;color:#1f2937;border-top:1px solid #e5e7eb;">{{totalDue}}</td></tr>
         </table>
+        {{payButton}}
         <p style="color:#777;font-size:13px;line-height:1.6;margin:20px 0 0;">Si ya realizaste el pago, ignora este mensaje. Para cualquier duda comunícate directamente con {{businessName}}.</p>
       </td>
     </tr>
@@ -828,12 +831,21 @@ ${CREDIT_REMINDER_HEADER}
         }),
       );
       this.logger.log('CREDIT_PAYMENT_REMINDER template seeded');
-    } else if (!creditReminderTpl.htmlBody.includes('{{logoBlock}}') && creditReminderTpl.htmlBody.includes(CREDIT_REMINDER_OLD_HEADER)) {
-      // Versión anterior (solo el nombre, sobre fondo oscuro): se cambia solo el encabezado
-      await this.templateRepo.update(creditReminderTpl.id, {
-        htmlBody: creditReminderTpl.htmlBody.replace(CREDIT_REMINDER_OLD_HEADER, CREDIT_REMINDER_HEADER),
-      });
-      this.logger.log('CREDIT_PAYMENT_REMINDER template updated with store logo');
+    } else {
+      // Versiones anteriores: se cambian solo las partes nuevas; si un
+      // administrador editó esas partes, no se tocan
+      let html = creditReminderTpl.htmlBody;
+      if (!html.includes('{{logoBlock}}') && html.includes(CREDIT_REMINDER_OLD_HEADER)) {
+        html = html.replace(CREDIT_REMINDER_OLD_HEADER, CREDIT_REMINDER_HEADER);
+      }
+      // Botón «Pagar o subir comprobante» (InOut envía {{payButton}} con el enlace)
+      if (!html.includes('{{payButton}}') && html.includes(CREDIT_REMINDER_PAY_ANCHOR)) {
+        html = html.replace(CREDIT_REMINDER_PAY_ANCHOR, `{{payButton}}\n        ${CREDIT_REMINDER_PAY_ANCHOR}`);
+      }
+      if (html !== creditReminderTpl.htmlBody) {
+        await this.templateRepo.update(creditReminderTpl.id, { htmlBody: html });
+        this.logger.log('CREDIT_PAYMENT_REMINDER template updated (store logo / pay button)');
+      }
     }
 
     // Kiri Plus welcome (paid plan activated)
