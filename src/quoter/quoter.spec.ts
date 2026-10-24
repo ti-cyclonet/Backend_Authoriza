@@ -83,4 +83,11 @@ describe('cotizador: parámetros', () => {
     expect(errors.some((e) => e.includes('web.landing.front'))).toBe(true);
     expect(errors.some((e) => e.includes('"nadie" no existe'))).toBe(true);
   });
+
+  it('rechaza factores de precision en cero o negativos', () => {
+    const bad = mergeConfig(QUOTER_DEFAULTS, { factores: { precision: { perfil: { negocio: 0 }, casosDescritos: -1 } } });
+    const errors = validateConfig(bad);
+    expect(errors).toContain('factores.precision.perfil.negocio debe ser mayor que 0.');
+    expect(errors).toContain('factores.precision.casosDescritos debe ser mayor que 0.');
+  });
 });

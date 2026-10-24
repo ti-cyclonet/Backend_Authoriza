@@ -60,6 +60,17 @@ export function validateConfig(c: any): string[] {
   });
   if (emp.nivelBase !== undefined && !NIVELES.includes(emp.nivelBase)) errors.push('empresa.nivelBase es junior, semi o senior.');
 
+  // Precisión del rango según el perfil de quien cotiza y el alcance definido
+  const prec = isObj(c.factores?.precision) ? c.factores.precision : {};
+  for (const grupo of ['perfil', 'alcance']) {
+    for (const [k, v] of Object.entries(isObj(prec[grupo]) ? prec[grupo] : {})) {
+      if (!(num(v) && v > 0)) errors.push(`factores.precision.${grupo}.${k} debe ser mayor que 0.`);
+    }
+  }
+  if (prec.casosDescritos !== undefined && !(num(prec.casosDescritos) && prec.casosDescritos > 0)) {
+    errors.push('factores.precision.casosDescritos debe ser mayor que 0.');
+  }
+
   (Array.isArray(c.servicios) ? c.servicios : []).forEach((s: any, i: number) => {
     if (!s?.id || !s?.nombre) errors.push(`servicios[${i}]: falta el id o el nombre.`);
     if (s?.moneda !== 'COP' && s?.moneda !== 'USD') errors.push(`servicios[${i}]: la moneda es COP o USD.`);
