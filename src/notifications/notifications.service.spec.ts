@@ -101,3 +101,14 @@ describe('landing: cotizaciones que llegan por el formulario de contacto', () =>
     },
   );
 });
+
+describe('landing: marca de CycloNet en el correo de cotización', () => {
+  it('el cliente y el buzón comercial ven el logo y el nombre de CycloNet', async () => {
+    const { mail, service } = nuevo();
+    await service.sendQuoteRequest(solicitud);
+    for (const call of mail.send.mock.calls) {
+      expect(call[2]).toContain('src="https://www.cyclonet.com.co/assets/img/cyclonet.png"');
+      expect(call[2]).toContain('CycloNet S.A.S.');
+    }
+  });
+});
