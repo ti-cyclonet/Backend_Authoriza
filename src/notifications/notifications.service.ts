@@ -30,6 +30,16 @@ const CREDIT_REMINDER_OLD_HEADER = `      <td style="background:#1f2a44;padding:
 
 export const QUOTE_REQUEST_INBOX = 'ti.cyclonet.sas@gmail.com';
 
+/**
+ * ¿El asunto es una solicitud de cotización? Cotizador («Cotizador CN-…»),
+ * temas de la landing («Quiero cotizar: …») o un asunto escrito por el cliente
+ * con cotizar, cotización, cotizador, presupuesto o precio.
+ */
+export function isQuoteRequestSubject(subject: unknown): boolean {
+  const s = String(subject ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return /\bcotiza|\bpresupuest|\bprecios?\b/.test(s);
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -939,7 +949,9 @@ ${CREDIT_REMINDER_HEADER}
     // Solicitudes del cotizador que llegan por esta ruta (versiones viejas de la
     // landing, copias locales o pestañas abiertas antes del cambio) van al buzón
     // comercial, no al de contacto general.
-    const fromQuoter = /^Cotizador CN-[A-Z0-9-]+:/.test(String(subject ?? '').trim());
+    // También las solicitudes de cotización del formulario de contacto: los temas
+    // de la landing arman «Quiero cotizar: …» y el cliente puede escribir el suyo.
+    const fromQuoter = isQuoteRequestSubject(subject);
     const to = fromQuoter ? QUOTE_REQUEST_INBOX : 'ti.cyclonet@hotmail.com';
     // Datos de un formulario público: se escapan antes de insertarlos en el
     // HTML del correo (evita enlaces/HTML engañosos en el buzón de CycloNet).
@@ -971,7 +983,7 @@ ${CREDIT_REMINDER_HEADER}
         </div>
       </div>`;
 
-    const success = await this.mailService.send(to, `${fromQuoter ? '[Cotizador]' : '[Contacto Web]'} ${plainSubject}`, html);
+    const success = await this.mailService.send(to, `${fromQuoter ? '[Cotización]' : '[Contacto Web]'} ${plainSubject}`, html);
     if (success) this.logger.log(`Contact form email sent from ${email}`);
     return { success, message: success ? 'Email sent successfully' : 'Failed to send email' };
   }

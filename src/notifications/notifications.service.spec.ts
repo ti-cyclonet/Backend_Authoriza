@@ -76,12 +76,28 @@ describe('landing: cotizaciones que llegan por el formulario de contacto', () =>
     const { mail, service } = nuevo();
     await service.sendContactForm('Ana', 'ana@empresa.co', 'Cotizador CN-261024-7P5D: Tienda en línea · $7,7 M – $15 M', 'Solicitud…');
     expect(mail.send.mock.calls[0][0]).toBe('ti.cyclonet.sas@gmail.com');
-    expect(mail.send.mock.calls[0][1]).toBe('[Cotizador] Cotizador CN-261024-7P5D: Tienda en línea · $7,7 M – $15 M');
+    expect(mail.send.mock.calls[0][1]).toBe('[Cotización] Cotizador CN-261024-7P5D: Tienda en línea · $7,7 M – $15 M');
   });
 
-  it('un mensaje que solo menciona el cotizador sigue siendo contacto', async () => {
+  it.each([
+    'Quiero cotizar: Aplicación a la medida',
+    'Quiero cotizar: Página web o landing',
+    'Cotización de una app de domicilios',
+    'COTIZACION tienda virtual',
+    'Presupuesto para un sistema de inventario',
+    '¿Qué precio tiene una landing?',
+  ])('«%s» va al buzón comercial', async (asunto) => {
     const { mail, service } = nuevo();
-    await service.sendContactForm('Ana', 'ana@empresa.co', 'Pregunta sobre el Cotizador', 'Hola');
-    expect(mail.send.mock.calls[0][0]).toBe('ti.cyclonet@hotmail.com');
+    await service.sendContactForm('Ana', 'ana@empresa.co', asunto, 'Hola');
+    expect(mail.send.mock.calls[0][0]).toBe('ti.cyclonet.sas@gmail.com');
   });
+
+  it.each(['Soporte con mi cuenta', 'Demo Authoriza', 'Consulta Kiri Finance', 'Trabaja con nosotros · Desarrollo · Ana'])(
+    '«%s» sigue en el buzón de contacto',
+    async (asunto) => {
+      const { mail, service } = nuevo();
+      await service.sendContactForm('Ana', 'ana@empresa.co', asunto, 'Hola');
+      expect(mail.send.mock.calls[0][0]).toBe('ti.cyclonet@hotmail.com');
+    },
+  );
 });
