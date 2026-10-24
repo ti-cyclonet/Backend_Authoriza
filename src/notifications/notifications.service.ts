@@ -12,6 +12,22 @@ import { PLANTILLAS_FACTURACION } from './plantillas-facturacion';
 import { QuoteRequestDto } from './dto/notification.dto';
 
 /** Buzón comercial que recibe las solicitudes del cotizador (el de contacto general es otro). */
+/**
+ * Encabezado del recordatorio de cartera de InOut: logo y nombre de la tienda,
+ * para que el cliente reconozca quién le cobra. InOut envía {{logoBlock}} (la
+ * etiqueta <img>, o vacío si la tienda no tiene logo) y {{businessName}}.
+ */
+const CREDIT_REMINDER_HEADER = `      <td style="background:#ffffff;padding:26px 32px 20px;text-align:center;border-bottom:4px solid #1f2a44;">
+        {{logoBlock}}
+        <h1 style="color:#1f2a44;margin:0;font-size:21px;font-weight:800;">{{businessName}}</h1>
+        <p style="color:#6b7280;margin:6px 0 0;font-size:13px;">Recordatorio de pago</p>
+      </td>`;
+/** Encabezado de la versión anterior, para actualizar la plantilla ya sembrada. */
+const CREDIT_REMINDER_OLD_HEADER = `      <td style="background:#1f2a44;padding:24px 32px;text-align:center;">
+        <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:800;">{{businessName}}</h1>
+        <p style="color:rgba(255,255,255,0.7);margin:6px 0 0;font-size:13px;">Recordatorio de pago</p>
+      </td>`;
+
 export const QUOTE_REQUEST_INBOX = 'ti.cyclonet.sas@gmail.com';
 
 @Injectable()
@@ -56,8 +72,10 @@ export class NotificationsService {
 
   async sendEmail(dto: SendEmailDto): Promise<{ success: boolean; message: string }> {
     const template = await this.findTemplateByCode(dto.templateCode);
-    const html = this.replaceVariables(template.htmlBody, dto.variables || {});
-    const subject = this.replaceVariables(template.subject, dto.variables || {});
+    // Variables opcionales de las plantillas: vacías si quien envía no las manda
+    const variables = { logoBlock: '', ...(dto.variables || {}) };
+    const html = this.replaceVariables(template.htmlBody, variables);
+    const subject = this.replaceVariables(template.subject, variables);
 
     const success = await this.mailService.send(dto.to, subject, html, {
       application: this.applicationOf(dto.templateCode),
@@ -772,10 +790,7 @@ export class NotificationsService {
 <body style="margin:0;padding:0;background:#f4f5f7;font-family:'Segoe UI',Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:24px auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 4px 18px rgba(0,0,0,0.08);">
     <tr>
-      <td style="background:#1f2a44;padding:24px 32px;text-align:center;">
-        <h1 style="color:#ffffff;margin:0;font-size:20px;font-weight:800;">{{businessName}}</h1>
-        <p style="color:rgba(255,255,255,0.7);margin:6px 0 0;font-size:13px;">Recordatorio de pago</p>
-      </td>
+${CREDIT_REMINDER_HEADER}
     </tr>
     <tr>
       <td style="padding:32px 36px 24px;">
@@ -800,6 +815,12 @@ export class NotificationsService {
         }),
       );
       this.logger.log('CREDIT_PAYMENT_REMINDER template seeded');
+    } else if (!creditReminderTpl.htmlBody.includes('{{logoBlock}}') && creditReminderTpl.htmlBody.includes(CREDIT_REMINDER_OLD_HEADER)) {
+      // Versión anterior (solo el nombre, sobre fondo oscuro): se cambia solo el encabezado
+      await this.templateRepo.update(creditReminderTpl.id, {
+        htmlBody: creditReminderTpl.htmlBody.replace(CREDIT_REMINDER_OLD_HEADER, CREDIT_REMINDER_HEADER),
+      });
+      this.logger.log('CREDIT_PAYMENT_REMINDER template updated with store logo');
     }
 
     // Kiri Plus welcome (paid plan activated)
