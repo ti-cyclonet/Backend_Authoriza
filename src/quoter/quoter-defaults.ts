@@ -340,6 +340,14 @@ export const QUOTER_DEFAULTS: any = {
       "precio": 300000,
       "periodo": "unico",
       "exterior": false
+    },
+    {
+      "id": "alta_disponibilidad",
+      "nombre": "Infraestructura redundante (balanceador y réplica de base de datos)",
+      "moneda": "USD",
+      "precio": 90,
+      "periodo": "mensual",
+      "exterior": true
     }
   ],
   "paquetes": {
@@ -1718,6 +1726,236 @@ export const QUOTER_DEFAULTS: any = {
         ]
       }
     },
+    "req.levantamiento": {
+      "nombre": "Levantamiento y documentación de requisitos",
+      "horas": {
+        "pm": [
+          10,
+          16,
+          24
+        ],
+        "ux": [
+          4,
+          8,
+          12
+        ],
+        "arq": [
+          4,
+          6,
+          10
+        ]
+      }
+    },
+    "tec.stack": {
+      "nombre": "Adaptación al stack y lineamientos de tu empresa",
+      "horas": {
+        "arq": [
+          6,
+          10,
+          16
+        ],
+        "devops": [
+          4,
+          8,
+          12
+        ]
+      }
+    },
+    "tec.infra.cliente": {
+      "nombre": "Despliegue en la nube de tu empresa",
+      "horas": {
+        "arq": [
+          2,
+          4,
+          6
+        ],
+        "devops": [
+          8,
+          14,
+          22
+        ]
+      }
+    },
+    "tec.infra.onpremise": {
+      "nombre": "Instalación en tus servidores (on-premise)",
+      "horas": {
+        "arq": [
+          4,
+          6,
+          10
+        ],
+        "devops": [
+          16,
+          26,
+          40
+        ],
+        "qa": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
+    "tec.ambientes.3": {
+      "nombre": "Ambientes de desarrollo, QA y producción",
+      "horas": {
+        "devops": [
+          8,
+          12,
+          18
+        ]
+      }
+    },
+    "tec.sso": {
+      "nombre": "Inicio de sesión corporativo (SSO)",
+      "horas": {
+        "back": [
+          12,
+          20,
+          30
+        ],
+        "front": [
+          3,
+          5,
+          8
+        ],
+        "qa": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
+    "tec.auditoria": {
+      "nombre": "Auditoría y trazabilidad de cambios",
+      "horas": {
+        "back": [
+          10,
+          16,
+          24
+        ],
+        "front": [
+          4,
+          6,
+          10
+        ],
+        "qa": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
+    "tec.ha": {
+      "nombre": "Alta disponibilidad (SLA 99,9 %)",
+      "horas": {
+        "arq": [
+          4,
+          6,
+          10
+        ],
+        "devops": [
+          16,
+          24,
+          36
+        ]
+      }
+    },
+    "tec.pruebas": {
+      "nombre": "Pruebas automatizadas con cobertura mínima",
+      "horas": {
+        "back": [
+          8,
+          12,
+          18
+        ],
+        "front": [
+          6,
+          10,
+          14
+        ],
+        "qa": [
+          16,
+          24,
+          36
+        ]
+      }
+    },
+    "tec.api": {
+      "nombre": "API documentada (OpenAPI) para terceros",
+      "horas": {
+        "pm": [
+          2,
+          3,
+          4
+        ],
+        "back": [
+          8,
+          14,
+          20
+        ]
+      }
+    },
+    "tec.seguridad": {
+      "nombre": "Pruebas de seguridad (OWASP Top 10)",
+      "horas": {
+        "back": [
+          6,
+          10,
+          16
+        ],
+        "devops": [
+          6,
+          10,
+          16
+        ],
+        "qa": [
+          4,
+          6,
+          10
+        ]
+      }
+    },
+    "tec.accesibilidad": {
+      "nombre": "Accesibilidad (WCAG 2.1 AA)",
+      "horas": {
+        "ux": [
+          6,
+          10,
+          16
+        ],
+        "front": [
+          10,
+          16,
+          24
+        ],
+        "qa": [
+          4,
+          6,
+          10
+        ]
+      }
+    },
+    "tec.docs": {
+      "nombre": "Documentación técnica y de despliegue",
+      "horas": {
+        "arq": [
+          4,
+          6,
+          10
+        ],
+        "back": [
+          4,
+          8,
+          12
+        ],
+        "devops": [
+          2,
+          4,
+          6
+        ]
+      }
+    },
     "extra.capacitacion": {
       "nombre": "Capacitación a tu equipo",
       "horas": {
@@ -1828,6 +2066,19 @@ export const QUOTER_DEFAULTS: any = {
       "junior": 1.25,
       "semi": 1,
       "senior": 0.85
+    },
+    "precision": {
+      "perfil": {
+        "negocio": 3,
+        "funcional": 2,
+        "tecnico": 1.5
+      },
+      "alcance": {
+        "listo": 0.7,
+        "parcial": 1,
+        "no": 1.3
+      },
+      "casosDescritos": 0.9
     },
     "iotDispositivos": {
       "1-5": 5,
