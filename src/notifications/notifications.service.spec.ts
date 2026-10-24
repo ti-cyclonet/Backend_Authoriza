@@ -70,3 +70,18 @@ describe('landing: validación de la solicitud del cotizador', () => {
     expect(errores({ ...solicitud, to: 'otro@correo.co' }).length).toBeGreaterThan(0);
   });
 });
+
+describe('landing: cotizaciones que llegan por el formulario de contacto', () => {
+  it('versiones viejas del cotizador van al buzón comercial, no al de contacto', async () => {
+    const { mail, service } = nuevo();
+    await service.sendContactForm('Ana', 'ana@empresa.co', 'Cotizador CN-261024-7P5D: Tienda en línea · $7,7 M – $15 M', 'Solicitud…');
+    expect(mail.send.mock.calls[0][0]).toBe('ti.cyclonet.sas@gmail.com');
+    expect(mail.send.mock.calls[0][1]).toBe('[Cotizador] Cotizador CN-261024-7P5D: Tienda en línea · $7,7 M – $15 M');
+  });
+
+  it('un mensaje que solo menciona el cotizador sigue siendo contacto', async () => {
+    const { mail, service } = nuevo();
+    await service.sendContactForm('Ana', 'ana@empresa.co', 'Pregunta sobre el Cotizador', 'Hola');
+    expect(mail.send.mock.calls[0][0]).toBe('ti.cyclonet@hotmail.com');
+  });
+});
