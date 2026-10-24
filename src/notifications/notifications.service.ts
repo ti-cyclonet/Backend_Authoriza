@@ -10,6 +10,9 @@ import {
 } from './dto/notification.dto';
 import { PLANTILLAS_FACTURACION } from './plantillas-facturacion';
 
+/** Quién recibe los formularios de la landing: contacto y solicitudes del cotizador. */
+export const CONTACT_FORM_RECIPIENTS = ['ti.cyclonet@hotmail.com', 'ti.cyclonet.sas@gmail.com'];
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -911,7 +914,8 @@ export class NotificationsService {
   }
 
   async sendContactForm(name: string, email: string, subject: string, message: string): Promise<{ success: boolean; message: string }> {
-    const to = 'ti.cyclonet@hotmail.com';
+    // Buzones de CycloNet que reciben las solicitudes de la landing (contacto y cotizador)
+    const to = CONTACT_FORM_RECIPIENTS.join(', ');
     // Datos de un formulario público: se escapan antes de insertarlos en el
     // HTML del correo (evita enlaces/HTML engañosos en el buzón de CycloNet).
     const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => (
