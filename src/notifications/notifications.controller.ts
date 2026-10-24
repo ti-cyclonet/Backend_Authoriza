@@ -16,6 +16,7 @@ import {
   UpdateEmailTemplateDto,
   SendEmailDto,
   ContactFormDto,
+  QuoteRequestDto,
 } from './dto/notification.dto';
 
 /**
@@ -73,6 +74,13 @@ export class NotificationsController {
   @UseGuards(ContactRateLimitGuard)
   sendContactForm(@Body() dto: ContactFormDto) {
     return this.notificationsService.sendContactForm(dto.name, dto.email, dto.subject, dto.message);
+  }
+
+  /** Cotizador de la landing: resumen al cliente y al buzón comercial. Mismo límite por IP. */
+  @Post('quote')
+  @UseGuards(ContactRateLimitGuard)
+  sendQuoteRequest(@Body() dto: QuoteRequestDto) {
+    return this.notificationsService.sendQuoteRequest(dto);
   }
 
   // ── Seed ──
