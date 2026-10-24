@@ -50,4 +50,19 @@ describe('recordatorio de cartera: logo y nombre de la tienda', () => {
     expect(mail.send.mock.calls[1][2]).not.toContain('{{logoBlock}}');
     expect(mail.send.mock.calls[0][1]).toContain('Arepas Jimmy');
   });
+
+  it('agrega el botón de pago a la plantilla ya sembrada y lo llena con el enlace de InOut', async () => {
+    const parrafo = '<p style="color:#777;font-size:13px;line-height:1.6;margin:20px 0 0;">Si ya realizaste el pago, ignora este mensaje.</p>';
+    const r = repo([{ code: 'CREDIT_PAYMENT_REMINDER', subject: 'Tu factura', htmlBody: `<div>{{logoBlock}} {{businessName}}</div>${parrafo}` }]);
+    const mail = { send: jest.fn().mockResolvedValue(true) };
+    const service = new NotificationsService(r as any, mail as any);
+    await service.seedDefaultTemplates();
+    const tpl = r.rows.find((x) => x.code === 'CREDIT_PAYMENT_REMINDER');
+    expect(tpl.htmlBody.indexOf('{{payButton}}')).toBeLessThan(tpl.htmlBody.indexOf('Si ya realizaste el pago'));
+
+    await service.sendEmail({ to: 'a@b.co', templateCode: 'CREDIT_PAYMENT_REMINDER', variables: { businessName: 'Arepas', payButton: '<a href="https://app.cyclonet.com.co/pago/abc">Pagar o subir comprobante</a>' } });
+    await service.sendEmail({ to: 'a@b.co', templateCode: 'CREDIT_PAYMENT_REMINDER', variables: { businessName: 'Arepas' } });
+    expect(mail.send.mock.calls[0][2]).toContain('https://app.cyclonet.com.co/pago/abc');
+    expect(mail.send.mock.calls[1][2]).not.toContain('{{payButton}}');
+  });
 });
