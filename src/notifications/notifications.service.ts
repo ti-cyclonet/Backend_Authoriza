@@ -915,7 +915,11 @@ export class NotificationsService {
   }
 
   async sendContactForm(name: string, email: string, subject: string, message: string): Promise<{ success: boolean; message: string }> {
-    const to = 'ti.cyclonet@hotmail.com';
+    // Solicitudes del cotizador que llegan por esta ruta (versiones viejas de la
+    // landing, copias locales o pestañas abiertas antes del cambio) van al buzón
+    // comercial, no al de contacto general.
+    const fromQuoter = /^Cotizador CN-[A-Z0-9-]+:/.test(String(subject ?? '').trim());
+    const to = fromQuoter ? QUOTE_REQUEST_INBOX : 'ti.cyclonet@hotmail.com';
     // Datos de un formulario público: se escapan antes de insertarlos en el
     // HTML del correo (evita enlaces/HTML engañosos en el buzón de CycloNet).
     const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => (
@@ -946,7 +950,7 @@ export class NotificationsService {
         </div>
       </div>`;
 
-    const success = await this.mailService.send(to, `[Contacto Web] ${plainSubject}`, html);
+    const success = await this.mailService.send(to, `${fromQuoter ? '[Cotizador]' : '[Contacto Web]'} ${plainSubject}`, html);
     if (success) this.logger.log(`Contact form email sent from ${email}`);
     return { success, message: success ? 'Email sent successfully' : 'Failed to send email' };
   }
