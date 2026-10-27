@@ -6,6 +6,7 @@ import { UserDependenciesModule } from './user-dependencies/user-dependencies.mo
 import { UsersModule } from './users/users.module';
 import { QuoterModule } from './quoter/quoter.module';
 import { TestimonialsModule } from './testimonials/testimonials.module';
+import { PartnersModule } from './partners/partners.module';
 import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
 import { UserRolesModule } from './user-roles/user-roles.module';
@@ -61,6 +62,7 @@ import { UsageLimitVariablesModule } from './usage-limit-variables/usage-limit-v
     UsersModule,
     QuoterModule,
     TestimonialsModule,
+    PartnersModule,
     RolesModule,
     UserRolesModule,
     UserDependenciesModule,
