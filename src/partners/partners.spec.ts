@@ -20,7 +20,7 @@ function crear(rows: any[] = []) {
     save: jest.fn(async (x) => { clicks.push(x); return x; }),
     delete: jest.fn(async () => ({})),
   };
-  return { service: new PartnersService(repo as any, clickRepo as any), repo, clickRepo };
+  return { service: new PartnersService(repo as any, clickRepo as any, {} as any), repo, clickRepo };
 }
 
 const oferta = (over: any = {}) => ({

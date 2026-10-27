@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { PartnerClick, PartnerOffer } from './partner-offer.entity';
+import { PartnerClick, PartnerEarning, PartnerOffer } from './partner-offer.entity';
 
 export const CATEGORIES = ['facturacion', 'contabilidad', 'pagos', 'hardware', 'mensajeria', 'domicilios', 'web', 'otros'];
 export const APPLICATIONS = ['inout'];
@@ -44,6 +44,7 @@ export class PartnersService {
   constructor(
     @InjectRepository(PartnerOffer) private readonly repo: Repository<PartnerOffer>,
     @InjectRepository(PartnerClick) private readonly clicks: Repository<PartnerClick>,
+    @InjectRepository(PartnerEarning) private readonly earnings: Repository<PartnerEarning>,
   ) {}
 
   /** Lo que ve la app: sin el enlace de destino (el clic pasa por go/:id). */
@@ -73,9 +74,9 @@ export class PartnersService {
     return offer.url;
   }
 
-  /** Administración: todo el catálogo con los clics de los últimos 30 días. */
+  /** Administración: todo el catálogo con los clics de los últimos 30 días y lo que ha pagado cada aliado. */
   async list() {
-    const [items, counts] = await Promise.all([
+    const [items, counts, paid] = await Promise.all([
       this.repo.find({ order: { sortOrder: 'ASC', name: 'ASC' } }),
       this.clicks.createQueryBuilder('c')
         .select('c.offerId', 'offerId')
@@ -84,11 +85,16 @@ export class PartnersService {
         .addSelect('COUNT(DISTINCT c."tenantId")', 'tenants')
         .groupBy('c.offerId')
         .getRawMany(),
+      this.earnings.createQueryBuilder('e')
+        .select('e."offerId"', 'offerId').addSelect('SUM(e.amount)', 'total')
+        .where('e."offerId" IS NOT NULL').groupBy('e."offerId"')
+        .getRawMany(),
     ]);
     const by = new Map(counts.map((c: any) => [c.offerId, c]));
+    const earned = new Map(paid.map((p: any) => [p.offerId, Math.round(Number(p.total) * 100) / 100]));
     return items.map((o) => {
       const c: any = by.get(o.id) || {};
-      return { ...o, clicks: { total: Number(c.total || 0), last30: Number(c.last30 || 0), tenants: Number(c.tenants || 0) } };
+      return { ...o, clicks: { total: Number(c.total || 0), last30: Number(c.last30 || 0), tenants: Number(c.tenants || 0) }, earned: earned.get(o.id) || 0 };
     });
   }
 
@@ -149,7 +155,7 @@ export class PartnersService {
     return this.repo.save(offer);
   }
 
-  /** Borra el servicio y sus clics. */
+  /** Borra el servicio y sus clics (los ingresos registrados se conservan). */
   async remove(id: string) {
     const offer = await this.repo.findOne({ where: { id } });
     if (!offer) throw new NotFoundException('Servicio no encontrado.');
