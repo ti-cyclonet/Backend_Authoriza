@@ -1,18 +1,25 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { Response } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { AdminAuthorizaGuard } from '../platform-costs/admin-authoriza.guard';
 import { CATEGORIES, PLACEMENTS, PartnerOfferInput, PartnersService } from './partners.service';
+import { EARNING_SOURCES, PartnerEarningInput, PartnerEarningsService } from './partner-earnings.service';
 
 /**
  * Servicios recomendados (aliados).
  * - Las apps leen el catálogo (público, sin los enlaces de destino).
  * - Cada clic pasa por go/:id, que lo cuenta y redirige al aliado.
- * - El administrador de Authoriza arma el catálogo y ve los clics.
+ * - El administrador de Authoriza arma el catálogo, ve los clics y registra
+ *   los ingresos que pagan los aliados (bloque del dashboard).
  */
 @Controller('partners')
 export class PartnersController {
-  constructor(private readonly service: PartnersService) {}
+  constructor(
+    private readonly service: PartnersService,
+    private readonly earnings: PartnerEarningsService,
+    private readonly jwt: JwtService,
+  ) {}
 
   @Public()
   @Get('public')
@@ -38,13 +45,41 @@ export class PartnersController {
   @Get('options')
   @UseGuards(AdminAuthorizaGuard)
   options() {
-    return { categories: CATEGORIES, placements: PLACEMENTS };
+    return { categories: CATEGORIES, placements: PLACEMENTS, earningSources: EARNING_SOURCES };
   }
 
   @Get()
   @UseGuards(AdminAuthorizaGuard)
   list() {
     return this.service.list();
+  }
+
+  // ── Ingresos por aliados ──
+  @Get('earnings/summary')
+  @UseGuards(AdminAuthorizaGuard)
+  earningsSummary(@Query('month') month?: string) {
+    return this.earnings.summary(month);
+  }
+
+  @Get('earnings')
+  @UseGuards(AdminAuthorizaGuard)
+  earningsList(@Query('month') month?: string) {
+    return this.earnings.list(month);
+  }
+
+  @Post('earnings')
+  @UseGuards(AdminAuthorizaGuard)
+  earningsCreate(@Body() body: PartnerEarningInput, @Req() req: any) {
+    const token = String(req.headers?.authorization || '').replace(/^Bearer /, '');
+    let who: string | undefined;
+    try { who = (this.jwt.decode(token) as any)?.email; } catch { who = undefined; }
+    return this.earnings.create(body || {}, who);
+  }
+
+  @Delete('earnings/:id')
+  @UseGuards(AdminAuthorizaGuard)
+  earningsRemove(@Param('id') id: string) {
+    return this.earnings.remove(id);
   }
 
   @Get(':id/clicks')
