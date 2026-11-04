@@ -81,6 +81,45 @@ export class QuoteRequestDto {
   link?: string;
 }
 
+/** Postulación de «Trabaja con nosotros» (multipart: estos campos + el PDF «cv»). */
+export class JobApplicationDto {
+  @IsString()
+  @MaxLength(120)
+  nombre: string;
+
+  @IsEmail()
+  @MaxLength(255)
+  correo: string;
+
+  @IsString()
+  @MaxLength(30)
+  celular: string;
+
+  @IsString()
+  @MaxLength(80)
+  area: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  experiencia?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  ciudad?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  enlace?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(3000)
+  sobre?: string;
+}
+
 export class ContactFormDto {
   @IsString()
   @MaxLength(120)

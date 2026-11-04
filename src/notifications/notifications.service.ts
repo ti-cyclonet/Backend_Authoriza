@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailTemplate } from './entities/email-template.entity';
@@ -9,7 +9,7 @@ import {
   SendEmailDto,
 } from './dto/notification.dto';
 import { PLANTILLAS_FACTURACION } from './plantillas-facturacion';
-import { QuoteRequestDto } from './dto/notification.dto';
+import { JobApplicationDto, QuoteRequestDto } from './dto/notification.dto';
 
 /** Buzón comercial que recibe las solicitudes del cotizador (el de contacto general es otro). */
 /**
@@ -31,6 +31,10 @@ const CREDIT_REMINDER_OLD_HEADER = `      <td style="background:#1f2a44;padding:
       </td>`;
 
 export const QUOTE_REQUEST_INBOX = 'ti.cyclonet.sas@gmail.com';
+/** Buzón de selección (hojas de vida de «Trabaja con nosotros»). */
+export const JOBS_INBOX = 'ti.cyclonet@hotmail.com';
+/** Tamaño máximo de la hoja de vida en PDF. */
+export const CV_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Logo de CycloNet publicado en la landing, para los correos de cotización. */
 const CYCLONET_LOGO_URL = 'https://www.cyclonet.com.co/assets/img/cyclonet.png';
@@ -1001,6 +1005,64 @@ ${CREDIT_REMINDER_HEADER}
     const success = await this.mailService.send(to, `${fromQuoter ? '[Cotización]' : '[Contacto Web]'} ${plainSubject}`, html);
     if (success) this.logger.log(`Contact form email sent from ${email}`);
     return { success, message: success ? 'Email sent successfully' : 'Failed to send email' };
+  }
+
+  /**
+   * Postulación de «Trabaja con nosotros»: llega al buzón de selección con la
+   * hoja de vida en PDF adjunta. Formulario público: se escapa todo y el
+   * adjunto solo pasa si de verdad es un PDF (tipo y firma «%PDF-»).
+   */
+  async sendJobApplication(dto: JobApplicationDto, cv?: Express.Multer.File): Promise<{ success: boolean; attached: boolean; message: string }> {
+    if (cv) {
+      const isPdf = cv.mimetype === 'application/pdf' && cv.buffer?.subarray(0, 5).toString('latin1') === '%PDF-';
+      if (!isPdf) throw new BadRequestException('La hoja de vida debe ser un archivo PDF.');
+      if (cv.size > CV_MAX_BYTES) throw new BadRequestException('La hoja de vida no puede pesar más de 5 MB.');
+    }
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>
+    )[c]);
+    const oneLine = (v: any) => String(v ?? '').replace(/[\r\n]+/g, ' ').trim();
+    const nombre = oneLine(dto.nombre), area = oneLine(dto.area);
+    // Solo enlaces http(s) se vuelven clicables
+    const enlace = /^https?:\/\/\S+$/i.test(dto.enlace || '') ? dto.enlace! : '';
+    const row = (k: string, v: string) => `<tr><td style="padding:6px 12px 6px 0;color:#666;white-space:nowrap;">${k}</td><td style="padding:6px 0;"><strong>${v || '—'}</strong></td></tr>`;
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:20px;text-align:center;">
+          <h2 style="color:#fff;margin:0;">Nueva postulación</h2>
+          <p style="color:#bbdefb;margin:5px 0 0;font-size:13px;">Trabaja con nosotros · cyclonet.com.co</p>
+        </div>
+        <div style="padding:24px;">
+          <table style="border-collapse:collapse;font-size:14px;">
+            ${row('Nombre', esc(nombre))}
+            ${row('Correo', `<a href="mailto:${esc(dto.correo)}">${esc(dto.correo)}</a>`)}
+            ${row('Celular', esc(dto.celular))}
+            ${row('Área', esc(area))}
+            ${row('Experiencia', esc(dto.experiencia))}
+            ${row('Ciudad', esc(dto.ciudad))}
+            ${row('Enlace', enlace ? `<a href="${esc(enlace)}">${esc(enlace)}</a>` : '')}
+            ${row('Hoja de vida', cv ? 'Adjunta en PDF' : 'No adjuntó PDF')}
+          </table>
+          <hr style="border:none;border-top:1px solid #e0e0e0;margin:16px 0;">
+          <p><strong>Sobre la persona:</strong></p>
+          <p style="background:#f5f5f5;padding:12px;border-radius:6px;">${esc(dto.sobre || '—').replace(/\n/g, '<br>')}</p>
+        </div>
+        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:12px;color:#888;">
+          Enviado desde «Trabaja con nosotros» de cyclonet.com.co
+        </div>
+      </div>`;
+
+    const filename = `HV ${nombre.replace(/[^\p{L}\p{N} ._-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'postulante'}.pdf`;
+    const success = await this.mailService.send(
+      JOBS_INBOX,
+      `[Trabaja con nosotros] ${area} · ${nombre}`.slice(0, 200),
+      html,
+      undefined,
+      cv ? [{ filename, content: cv.buffer, contentType: 'application/pdf' }] : undefined,
+    );
+    if (success) this.logger.log(`Job application sent (${area}, PDF: ${!!cv})`);
+    return { success, attached: !!cv, message: success ? 'Application sent' : 'Failed to send application' };
   }
 
   /**
