@@ -2,6 +2,12 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { PlatformCostsService } from '../platform-costs/platform-costs.service';
 
+export interface MailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType?: string;
+}
+
 export interface MailUsageMeta {
   /** App del ecosistema que origina el correo (para repartir el costo de SES). */
   application?: string;
@@ -17,9 +23,9 @@ export class MailService {
     @Optional() private readonly platformCosts?: PlatformCostsService,
   ) {}
 
-  async send(to: string, subject: string, html: string, meta?: MailUsageMeta): Promise<boolean> {
+  async send(to: string, subject: string, html: string, meta?: MailUsageMeta, attachments?: MailAttachment[]): Promise<boolean> {
     try {
-      await this.mailer.sendMail({ to, subject, html });
+      await this.mailer.sendMail({ to, subject, html, ...(attachments?.length ? { attachments } : {}) });
       this.logger.log(`Email sent to ${to} — "${subject}"`);
       this.platformCosts?.track({
         application: meta?.application || 'Authoriza',
