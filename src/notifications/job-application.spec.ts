@@ -32,6 +32,25 @@ describe('NotificationsService.sendJobApplication', () => {
     expect(attachments[0]).toMatchObject({ filename: 'HV Ana b Ruiz b.pdf', contentType: 'application/pdf' });
   });
 
+  it('le confirma al aspirante, sin reenviarle la hoja de vida', async () => {
+    const res = await service.sendJobApplication(dto, pdf());
+    expect(res.confirmationSent).toBe(true);
+    expect(send).toHaveBeenCalledTimes(2);
+    const [to, subject, html, , attachments] = send.mock.calls[1];
+    expect(to).toBe('ana@correo.co');
+    expect(subject).toContain('Recibimos tu postulación');
+    expect(html).toContain('Desarrollo web y móvil');
+    expect(html).toContain('Ana &lt;b&gt;Ruiz&lt;/b&gt;');
+    expect(attachments).toBeUndefined();
+  });
+
+  it('si la postulación no llegó al buzón, no confirma', async () => {
+    send.mockResolvedValueOnce(false);
+    const res = await service.sendJobApplication(dto);
+    expect(res).toMatchObject({ success: false, confirmationSent: false });
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
   it('sin PDF también se envía, sin adjunto', async () => {
     const res = await service.sendJobApplication(dto);
     expect(res.attached).toBe(false);
