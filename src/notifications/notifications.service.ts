@@ -1012,7 +1012,7 @@ ${CREDIT_REMINDER_HEADER}
    * hoja de vida en PDF adjunta. Formulario público: se escapa todo y el
    * adjunto solo pasa si de verdad es un PDF (tipo y firma «%PDF-»).
    */
-  async sendJobApplication(dto: JobApplicationDto, cv?: Express.Multer.File): Promise<{ success: boolean; attached: boolean; message: string }> {
+  async sendJobApplication(dto: JobApplicationDto, cv?: Express.Multer.File): Promise<{ success: boolean; attached: boolean; confirmationSent: boolean; message: string }> {
     if (cv) {
       const isPdf = cv.mimetype === 'application/pdf' && cv.buffer?.subarray(0, 5).toString('latin1') === '%PDF-';
       if (!isPdf) throw new BadRequestException('La hoja de vida debe ser un archivo PDF.');
@@ -1061,8 +1061,39 @@ ${CREDIT_REMINDER_HEADER}
       undefined,
       cv ? [{ filename, content: cv.buffer, contentType: 'application/pdf' }] : undefined,
     );
-    if (success) this.logger.log(`Job application sent (${area}, PDF: ${!!cv})`);
-    return { success, attached: !!cv, message: success ? 'Application sent' : 'Failed to send application' };
+    // Confirmación al aspirante, solo si la postulación llegó al buzón
+    const confirmationSent = success
+      ? await this.mailService.send(dto.correo, 'Recibimos tu postulación · CycloNet S.A.S.', this.jobConfirmationHtml(nombre, area, !!cv))
+      : false;
+    if (success) this.logger.log(`Job application sent (${area}, PDF: ${!!cv}, confirmación: ${confirmationSent})`);
+    return { success, attached: !!cv, confirmationSent, message: success ? 'Application sent' : 'Failed to send application' };
+  }
+
+  /** Correo al aspirante: confirma lo recibido. No reenvía la hoja de vida. */
+  private jobConfirmationHtml(nombre: string, area: string, attached: boolean): string {
+    const esc = (v: any) => String(v ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>
+    )[c]);
+    const firstName = nombre.split(' ')[0] || nombre;
+    return `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;">
+        <div style="background:#ffffff;padding:18px 22px 14px;text-align:center;">
+          <img src="${CYCLONET_LOGO_URL}" alt="CycloNet S.A.S." width="170" style="display:block;margin:0 auto;width:170px;max-width:60%;height:auto;border:0;">
+        </div>
+        <div style="background:linear-gradient(135deg,#1a237e,#0d47a1);padding:22px;text-align:center;">
+          <h2 style="color:#fff;margin:0;">¡Gracias, ${esc(firstName)}!</h2>
+          <p style="color:#bbdefb;margin:6px 0 0;font-size:13px;">Recibimos tu postulación</p>
+        </div>
+        <div style="padding:24px;color:#333;line-height:1.6;">
+          <p>Hola ${esc(nombre)}, gracias por tu interés en trabajar con nosotros.</p>
+          <p>Recibimos tu postulación para el área de <strong>${esc(area)}</strong>${attached ? ' junto con tu hoja de vida en PDF' : ''}. Nuestro equipo la revisará y, cuando se abra una vacante que encaje con tu perfil, te contactaremos por este correo o a tu celular.</p>
+          <p>No necesitas enviarla de nuevo. Si quieres actualizar tus datos o tu hoja de vida, responde a este correo o vuelve a postularte en <a href="https://www.cyclonet.com.co/#trabaja" style="color:#0d47a1;">cyclonet.com.co</a>.</p>
+          <p style="margin-top:20px;">Un saludo,<br><strong>Equipo CycloNet S.A.S.</strong></p>
+        </div>
+        <div style="background:#f5f5f5;padding:12px;text-align:center;font-size:12px;color:#888;">
+          CycloNet S.A.S. · cyclonet.com.co<br>Si no enviaste esta postulación, puedes ignorar este correo.
+        </div>
+      </div>`;
   }
 
   /**
