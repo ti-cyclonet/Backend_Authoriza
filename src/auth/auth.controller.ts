@@ -345,6 +345,25 @@ export class AuthController {
     return this.selfRegistrationService.upgradePlan(body.email, body.password, body.packageId, body, this.consentMeta(req, body), body.billingCycle, descuento);
   }
 
+  @ApiOperation({ summary: 'Upgrade plan from inside an app with the current session' })
+  @UseGuards(JwtAuthGuard)
+  @Post('plan/upgrade')
+  async upgradePlanFromApp(
+    @Request() req,
+    @Body() body: { packageId: string; billingCycle?: 'monthly' | 'annual' } & ConsentInput,
+  ) {
+    // Usuario y rol salen del JWT vigente, no del body.
+    const billingCycle = body.billingCycle === 'annual' ? 'annual' : 'monthly';
+    return this.selfRegistrationService.upgradePlanFromApp(req.user, body.packageId, body, requestMetaFrom(req), billingCycle);
+  }
+
+  @ApiOperation({ summary: 'Pending plan change (contract awaiting signatures) of the current account' })
+  @UseGuards(JwtAuthGuard)
+  @Get('plan/pending-upgrade')
+  async pendingUpgrade(@Request() req, @Query('application') application?: string) {
+    return this.selfRegistrationService.pendingUpgradeStatus(req.user.id, application);
+  }
+
   @ApiOperation({ summary: 'Ensure a Kiri user exists in Authoriza (creates if not found)' })
   @Public()
   // Solo el backend de Kiri (x-internal-key): crea cuentas ya activas
