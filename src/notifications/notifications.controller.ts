@@ -7,7 +7,10 @@ import {
   Param,
   Body,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { InternalOrAdminGuard } from './guards/internal-or-admin.guard';
 import { ContactRateLimitGuard } from '../common/guards/contact-rate-limit.guard';
 import { NotificationsService } from './notifications.service';
@@ -17,7 +20,9 @@ import {
   SendEmailDto,
   ContactFormDto,
   QuoteRequestDto,
+  JobApplicationDto,
 } from './dto/notification.dto';
+import { CV_MAX_BYTES } from './notifications.service';
 
 /**
  * Envío de correos y plantillas: solo otros servicios del ecosistema (con
@@ -74,6 +79,17 @@ export class NotificationsController {
   @UseGuards(ContactRateLimitGuard)
   sendContactForm(@Body() dto: ContactFormDto) {
     return this.notificationsService.sendContactForm(dto.name, dto.email, dto.subject, dto.message);
+  }
+
+  /**
+   * «Trabaja con nosotros» de la landing: datos + hoja de vida en PDF
+   * (opcional, máx. 5 MB) adjunta al correo. Mismo límite por IP.
+   */
+  @Post('job-application')
+  @UseGuards(ContactRateLimitGuard)
+  @UseInterceptors(FileInterceptor('cv', { limits: { fileSize: CV_MAX_BYTES, files: 1 } }))
+  sendJobApplication(@Body() dto: JobApplicationDto, @UploadedFile() cv?: Express.Multer.File) {
+    return this.notificationsService.sendJobApplication(dto, cv);
   }
 
   /** Cotizador de la landing: resumen al cliente y al buzón comercial. Mismo límite por IP. */
