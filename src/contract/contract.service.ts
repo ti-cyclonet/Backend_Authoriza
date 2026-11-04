@@ -705,6 +705,17 @@ export class ContractService {
               .whereInIds(oldIds)
               .execute();
 
+            // 2b. Fuera de Kiri (InOut…) los roles del contrato viejo —del dueño y
+            //     de sus usuarios dependientes— son los mismos del nuevo plan:
+            //     pasan al contrato nuevo en vez de desactivarse.
+            if (contract.package.targetApplication !== 'Kiri') {
+              await this.contractRepository.manager.query(
+                `UPDATE user_roles SET "contractId" = $1
+                 WHERE "contractId" = ANY($2::uuid[]) AND status = 'ACTIVE'`,
+                [contract.id, oldIds],
+              );
+            }
+
             // 3. Desactivar los roles vinculados a esos contratos (ej. userKiri del
             //    FREE), para que no queden roles del plan viejo activos junto al nuevo.
             await this.contractRepository.manager.query(
@@ -727,6 +738,13 @@ export class ContractService {
         this.notifyKiriUserReactivation(contract).catch(err =>
           this.logger.warn(`Failed to notify Kiri for user reactivation: ${err.message}`)
         );
+      }
+
+      // InOut guarda los límites del plan 5 minutos: que el nuevo aplique ya.
+      if (contract.package?.targetApplication === 'Inout' && principalUserId) {
+        const inoutApiUrl = process.env.INOUT_API_URL || 'http://localhost:3001';
+        fetch(`${inoutApiUrl}/api/usage-status/invalidate-cache/${principalUserId}`, { method: 'POST' })
+          .catch(() => this.logger.warn('Could not invalidate InOut cache'));
       }
 
       this.logger.log(`Contract ${contract.code} auto-activated: both parties signed.`);

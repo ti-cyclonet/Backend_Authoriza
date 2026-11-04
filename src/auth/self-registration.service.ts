@@ -746,6 +746,88 @@ export class SelfRegistrationService {
     const isPasswordValid = await bcrypt.compare(password, user.strPassword);
     if (!isPasswordValid) throw new BadRequestException('Contraseña incorrecta');
 
+    return this.upgradePlanForUser(user, packageId, consents, meta, billingCycle, firstInvoiceDiscountPct);
+  }
+
+  /**
+   * Cambio de plan pedido desde dentro de una app (InOut) con la sesión vigente:
+   * sin contraseña, pero solo el administrador de la cuenta, a un plan que se
+   * ofrece en la landing de esa misma app y aceptando Términos + datos.
+   */
+  async upgradePlanFromApp(session: { id: string; rol?: string }, packageId: string, consents: ConsentInput, meta: RequestMeta, billingCycle: 'monthly' | 'annual' = 'monthly') {
+    const rol = String(session.rol || '');
+    if (!/^admin/i.test(rol) && rol !== 'accountOwner') {
+      throw new ForbiddenException('Solo el administrador de la cuenta puede cambiar el plan.');
+    }
+    const user = await this.userRepository.findOne({ where: { id: session.id } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+
+    const pkg = await this.packageRepository.findOne({ where: { id: packageId } });
+    if (!pkg || !pkg.showInLanding) throw new BadRequestException('Ese plan no está disponible.');
+    if (!this.consentsService.hasConsents(consents)) {
+      throw new BadRequestException('Debes aceptar los Términos del Servicio y autorizar el tratamiento de tus datos.');
+    }
+
+    const pending = await this.findPendingUpgrade(user.id, pkg.targetApplication);
+    if (pending && (pending.clientSignedAt || pending.adminSignedAt)) {
+      throw new BadRequestException(`Ya tienes un cambio al plan "${pending.package?.name}" en firma. Termina ese proceso antes de pedir otro.`);
+    }
+
+    return this.upgradePlanForUser(user, packageId, consents, meta, billingCycle);
+  }
+
+  /**
+   * Cambio de plan pendiente (contrato PENDING) del titular de la cuenta para
+   * una app: el que se está firmando mientras el plan actual sigue vigente.
+   */
+  async findPendingUpgrade(userId: string, application?: string | null): Promise<Contract | null> {
+    const ownerId = await this.accountOwnerId(userId);
+    const pendings = await this.contractRepository.find({
+      where: { user: { id: ownerId }, status: ContractStatus.PENDING },
+      relations: ['package'],
+      order: { createdAt: 'DESC' },
+    });
+    return pendings.find((c) => !application || c.package?.targetApplication?.toLowerCase() === application.toLowerCase()) ?? null;
+  }
+
+  /** Estado del cambio de plan pendiente, para mostrarlo en la app. */
+  async pendingUpgradeStatus(userId: string, application?: string) {
+    const c = await this.findPendingUpgrade(userId, application);
+    if (!c) return { pending: null };
+    return {
+      pending: {
+        contractCode: c.code,
+        packageName: c.package?.displayName || c.package?.name,
+        requestedAt: c.createdAt,
+        issued: !!c.pdfUrl && !!c.issuedAt,
+        adminSigned: !!c.adminSignedAt,
+        clientSigned: !!c.clientSignedAt,
+      },
+    };
+  }
+
+  /** Titular de la cuenta: el propio usuario o, si es dependiente, su principal. */
+  private async accountOwnerId(userId: string): Promise<string> {
+    const own = await this.contractRepository.count({ where: { user: { id: userId } } });
+    if (own) return userId;
+    const dependency = await this.userDependencyRepository.findOne({ where: { dependentUserId: userId, status: 'ACTIVE' } });
+    return dependency?.principalUserId || userId;
+  }
+
+  /** Un nuevo cambio de plan reemplaza al anterior que aún nadie había firmado. */
+  private async cancelUnsignedUpgrades(ownerId: string, application?: string | null) {
+    const pendings = await this.contractRepository.find({
+      where: { user: { id: ownerId }, status: ContractStatus.PENDING },
+      relations: ['package'],
+    });
+    const unsigned = pendings.filter((c) => !c.clientSignedAt && !c.adminSignedAt
+      && (!application || c.package?.targetApplication === application));
+    if (!unsigned.length) return;
+    await this.contractRepository.update(unsigned.map((c) => c.id), { status: ContractStatus.CANCELLED });
+    this.logger.log(`Cambio de plan reemplazado: ${unsigned.map((c) => c.code).join(', ')} cancelado(s)`);
+  }
+
+  private async upgradePlanForUser(user: User, packageId: string, consents: ConsentInput = {}, meta: RequestMeta = {}, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
     // 2. Validate package exists
     const pkg = await this.packageRepository.findOne({
       where: { id: packageId },
@@ -845,7 +927,7 @@ export class SelfRegistrationService {
    * This happens when the user registered directly in Kiri (without going through
    * the InOut/Authoriza self-registration flow that creates a contract automatically).
    */
-  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0, clientSignature: ClientSignature | null = null) {
+  private async createContractForUpgrade(user: User, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0, clientSignature: ClientSignature | null = null, previous: Contract | null = null) {
     const contractCode = await this.entityCodeService.generateCode('Contract');
     const today = new Date();
     const endDate = new Date(today);
@@ -855,7 +937,9 @@ export class SelfRegistrationService {
     const userName = user.basicData?.legalEntityData?.businessName
       || user.basicData?.naturalPersonData?.firstName
       || user.strUserName.split('@')[0];
-    const codePrefix = await this.generateUniqueCodePrefix(userName, this.contractRepository.manager);
+    // Cambio de plan de un contrato existente: conserva su prefijo (los códigos
+    // de los documentos de la cuenta no cambian) y su sector.
+    const codePrefix = previous?.codePrefix || await this.generateUniqueCodePrefix(userName, this.contractRepository.manager);
 
     // Paquete no facturable (DEV/FREE) -> valor 0; facturable -> valor del año.
     // Anual (si el paquete tiene precio anual): una sola factura por ese valor.
@@ -873,7 +957,7 @@ export class SelfRegistrationService {
       status: pkg.isBillable ? ContractStatus.PENDING : ContractStatus.ACTIVE,
       issuedAt: new Date(),
       codePrefix,
-      businessSector: 'personal',
+      businessSector: previous?.businessSector || 'personal',
       // Descuento del primer mes (Kiri, invitado por un amigo): solo en pago
       // mensual de un paquete facturable, y como mucho 50%
       firstInvoiceDiscountPct: !isNonBillablePkg && !anual && firstInvoiceDiscountPct > 0 ? Math.min(firstInvoiceDiscountPct, 50) : null,
@@ -919,7 +1003,7 @@ export class SelfRegistrationService {
     });
 
     this.logger.log(
-      `New contract ${contractCode} created for Kiri user ${user.strUserName} upgrading to "${pkg.name}"`,
+      `New contract ${contractCode} created for user ${user.strUserName} upgrading to "${pkg.name}"`,
     );
 
     // Now apply the same post-upgrade logic (roles, signer, notifications)
@@ -944,9 +1028,11 @@ export class SelfRegistrationService {
       ? `Plan cambiado a "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma del administrador de CycloNet en FactoNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto puedes seguir usando tu plan actual.`
       : isBillable && isKiriApp
       ? `Plan cambiado a "${pkg.name}". Se generó un contrato pendiente de firma. Primero lo firmará el administrador de CycloNet; cuando lo haga, recibirás un correo con el enlace para revisarlo y firmarlo tú en FactoNet (billing.cyclonet.com.co). Mientras tanto puedes seguir usando tu plan actual; al firmar ambas partes, tu nuevo plan se activará automáticamente.`
+      : isBillable && previous
+      ? `Solicitaste el cambio al plan "${pkg.name}". Se generó tu nuevo contrato: primero lo revisa y firma CycloNet; luego recibirás un correo para firmarlo tú en FactoNet (billing.cyclonet.com.co). Al firmar ambas partes, el nuevo plan se activa solo. Mientras tanto sigues usando tu plan actual.`
       : `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`;
 
-    return { success: true, message };
+    return { success: true, message, contractCode, pendingActivation: isBillable };
   }
 
   private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0, clientSignature: ClientSignature | null = null) {
@@ -959,6 +1045,16 @@ export class SelfRegistrationService {
       const user = contract.user;
       const result = await this.createContractForUpgrade(user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature);
       return result;
+    }
+
+    // Lo mismo en las demás apps (InOut): si el contrato actual está ACTIVE, se
+    // conserva hasta que el nuevo quede firmado por ambas partes. Cambiarlo en
+    // sitio a PENDING dejaba a la cuenta sin plan (InOut responde
+    // CONTRACT_INACTIVE) mientras se firmaba. Al activarse el nuevo,
+    // autoActivateIfBothSigned cancela el anterior y le pasa sus roles.
+    if (isBillable && contract.status === ContractStatus.ACTIVE) {
+      await this.cancelUnsignedUpgrades(contract.user.id, pkg.targetApplication);
+      return this.createContractForUpgrade(contract.user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, null, contract);
     }
 
     // For non-billable or non-Kiri: update the EXISTING contract in place.
