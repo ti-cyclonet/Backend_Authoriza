@@ -769,7 +769,9 @@ export class SelfRegistrationService {
     }
 
     const pending = await this.findPendingUpgrade(user.id, pkg.targetApplication);
-    if (pending && (pending.clientSignedAt || pending.adminSignedAt)) {
+    // La firma del cliente es su propia aceptación: puede cambiar de idea hasta
+    // que firme CycloNet.
+    if (pending?.adminSignedAt) {
       throw new BadRequestException(`Ya tienes un cambio al plan "${pending.package?.name}" en firma. Termina ese proceso antes de pedir otro.`);
     }
 
@@ -814,13 +816,13 @@ export class SelfRegistrationService {
     return dependency?.principalUserId || userId;
   }
 
-  /** Un nuevo cambio de plan reemplaza al anterior que aún nadie había firmado. */
+  /** Un nuevo cambio de plan reemplaza al anterior que CycloNet aún no había firmado. */
   private async cancelUnsignedUpgrades(ownerId: string, application?: string | null) {
     const pendings = await this.contractRepository.find({
       where: { user: { id: ownerId }, status: ContractStatus.PENDING },
       relations: ['package'],
     });
-    const unsigned = pendings.filter((c) => !c.clientSignedAt && !c.adminSignedAt
+    const unsigned = pendings.filter((c) => !c.adminSignedAt
       && (!application || c.package?.targetApplication === application));
     if (!unsigned.length) return;
     await this.contractRepository.update(unsigned.map((c) => c.id), { status: ContractStatus.CANCELLED });
@@ -963,10 +965,11 @@ export class SelfRegistrationService {
       firstInvoiceDiscountPct: !isNonBillablePkg && !anual && firstInvoiceDiscountPct > 0 ? Math.min(firstInvoiceDiscountPct, 50) : null,
     });
 
-    // Plan pago de Kiri contratado aceptando Términos + Habeas Data: esa
-    // aceptación queda como la firma del cliente; el contrato se activa solo
-    // cuando lo firme el administrador de FactoNet (autoActivateIfBothSigned).
-    const firmadoPorAceptacion = !!clientSignature && !isNonBillablePkg && (pkg as any).targetApplication === 'Kiri';
+    // Plan pago contratado aceptando Términos + Habeas Data (Kiri, o el cambio
+    // de plan de InOut): esa aceptación queda como la firma del cliente; el
+    // contrato se activa solo cuando lo firme el administrador de FactoNet
+    // (autoActivateIfBothSigned).
+    const firmadoPorAceptacion = !!clientSignature && !isNonBillablePkg;
     if (firmadoPorAceptacion) {
       contract.clientSignedAt = clientSignature!.at;
       contract.clientSignedBy = clientSignature!.by;
@@ -1028,6 +1031,8 @@ export class SelfRegistrationService {
       ? `Plan cambiado a "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma del administrador de CycloNet en FactoNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto puedes seguir usando tu plan actual.`
       : isBillable && isKiriApp
       ? `Plan cambiado a "${pkg.name}". Se generó un contrato pendiente de firma. Primero lo firmará el administrador de CycloNet; cuando lo haga, recibirás un correo con el enlace para revisarlo y firmarlo tú en FactoNet (billing.cyclonet.com.co). Mientras tanto puedes seguir usando tu plan actual; al firmar ambas partes, tu nuevo plan se activará automáticamente.`
+      : isBillable && firmadoPorAceptacion
+      ? `Solicitaste el cambio al plan "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma de CycloNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto sigues usando tu plan actual.`
       : isBillable && previous
       ? `Solicitaste el cambio al plan "${pkg.name}". Se generó tu nuevo contrato: primero lo revisa y firma CycloNet; luego recibirás un correo para firmarlo tú en FactoNet (billing.cyclonet.com.co). Al firmar ambas partes, el nuevo plan se activa solo. Mientras tanto sigues usando tu plan actual.`
       : `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`;
@@ -1054,7 +1059,7 @@ export class SelfRegistrationService {
     // autoActivateIfBothSigned cancela el anterior y le pasa sus roles.
     if (isBillable && contract.status === ContractStatus.ACTIVE) {
       await this.cancelUnsignedUpgrades(contract.user.id, pkg.targetApplication);
-      return this.createContractForUpgrade(contract.user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, null, contract);
+      return this.createContractForUpgrade(contract.user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature, contract);
     }
 
     // For non-billable or non-Kiri: update the EXISTING contract in place.

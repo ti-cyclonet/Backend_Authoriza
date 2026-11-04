@@ -59,17 +59,20 @@ describe('SelfRegistrationService.upgradePlanFromApp', () => {
     expect(res.pendingActivation).toBe(true);
     expect(saved).toHaveLength(1);
     expect(saved[0]).toMatchObject({ status: ContractStatus.PENDING, codePrefix: 'TIE', businessSector: 'restaurante', package: { id: PRO.id } });
+    // Aceptar los Términos al pedir el cambio ES la firma del cliente
+    expect(saved[0]).toMatchObject({ clientSignedBy: OWNER.strUserName, clientSignedByUserId: OWNER.id });
+    expect(saved[0].clientSignedAt).toBeInstanceOf(Date);
     // El contrato actual no se tocó
     expect(updated.find((u) => u.ids === 'c-free' || (Array.isArray(u.ids) && u.ids.includes('c-free')))).toBeUndefined();
   });
 
-  it('reemplaza un cambio anterior que nadie había firmado', async () => {
-    pendings = [{ id: 'c-old', code: 'CT-0', status: ContractStatus.PENDING, package: PRO }];
+  it('reemplaza un cambio anterior que CycloNet aún no había firmado', async () => {
+    pendings = [{ id: 'c-old', code: 'CT-0', status: ContractStatus.PENDING, clientSignedAt: new Date(), package: PRO }];
     await service.upgradePlanFromApp({ id: OWNER.id, rol: 'adminInout' }, PRO.id, consents, {});
     expect(updated).toContainEqual({ ids: ['c-old'], patch: { status: ContractStatus.CANCELLED } });
   });
 
-  it('no deja pedir otro cambio si el anterior ya está en firma', async () => {
+  it('no deja pedir otro cambio si CycloNet ya firmó el anterior', async () => {
     pendings = [{ id: 'c-old', code: 'CT-0', status: ContractStatus.PENDING, adminSignedAt: new Date(), package: PRO }];
     await expect(service.upgradePlanFromApp({ id: OWNER.id, rol: 'adminInout' }, PRO.id, consents, {}))
       .rejects.toThrow(/en firma/);
