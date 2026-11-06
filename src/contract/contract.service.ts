@@ -1420,12 +1420,20 @@ export class ContractService {
       limitType: v.limitType || 'quantity',
     }));
 
+    // ¿Hay un cambio de plan pedido (contrato PENDING de la app) aún sin activar?
+    // InOut deja seguir usando una prueba vencida mientras se activa el nuevo plan.
+    const app = (application || contract.package?.targetApplication || '').toLowerCase();
+    const pendingUpgrade = allContracts.some(
+      (c) => c.status === 'PENDING' && c.package?.targetApplication?.toLowerCase() === app,
+    );
+
     return {
       contractId: contract.id,
       packageName: contract.package?.name ?? '',
       isBillable: contract.package?.isBillable ?? true,
       startDate: contract.startDate ?? null,
       endDate: contract.endDate ?? null,
+      pendingUpgrade,
       limits,
     };
   }
