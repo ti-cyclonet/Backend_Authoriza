@@ -355,8 +355,14 @@ export class PackageService {
 
     return packages.map(pkg => {
       // Generar features automáticamente desde usageLimitVariables
+      // Orden en la tarjeta: funciones, cantidades y al final la duración
+      const rank = (v: { variableName: string; limitType: string }) =>
+        v.variableName === 'nDiasUso' ? 2 : v.limitType === 'feature' ? 0 : 1;
       const variables = (pkg.usageLimitVariables || [])
-        .filter(v => !application || v.targetApplication.toLowerCase() === application.toLowerCase());
+        .filter(v => !application || v.targetApplication.toLowerCase() === application.toLowerCase())
+        .map((v, i) => ({ v, i }))
+        .sort((a, b) => rank(a.v) - rank(b.v) || a.i - b.i)
+        .map(({ v }) => v);
 
       const features = variables
         .map(v => {
