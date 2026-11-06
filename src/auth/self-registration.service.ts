@@ -1027,6 +1027,14 @@ export class SelfRegistrationService {
       this.logger.warn(`Failed to notify adminFactonet: ${err.message}`)
     );
 
+    // InOut: con el cambio pedido, una prueba vencida vuelve a funcionar ya
+    // (sin esperar a que caduque su caché de límites)
+    if (String(pkg.targetApplication || '').toLowerCase() === 'inout') {
+      const inoutApiUrl = process.env.INOUT_API_URL || 'http://localhost:3001';
+      fetch(`${inoutApiUrl}/api/usage-status/invalidate-cache/${user.id}`, { method: 'POST' })
+        .catch(() => this.logger.warn('Could not invalidate InOut cache'));
+    }
+
     const message = isBillable && isKiriApp && firmadoPorAceptacion
       ? `Plan cambiado a "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma del administrador de CycloNet en FactoNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto puedes seguir usando tu plan actual.`
       : isBillable && isKiriApp
