@@ -2,13 +2,14 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailTemplate } from './entities/email-template.entity';
-import { MailService } from '../mail/mail.service';
+import { MailAttachment, MailService } from '../mail/mail.service';
 import {
   CreateEmailTemplateDto,
   UpdateEmailTemplateDto,
   SendEmailDto,
 } from './dto/notification.dto';
 import { PLANTILLAS_FACTURACION } from './plantillas-facturacion';
+import { PLANTILLA_TIQUETE_VENTA } from './plantilla-tiquete';
 import { JobApplicationDto, QuoteRequestDto } from './dto/notification.dto';
 
 /** Buzón comercial que recibe las solicitudes del cotizador (el de contacto general es otro). */
@@ -99,11 +100,23 @@ export class NotificationsService {
     const success = await this.mailService.send(dto.to, subject, html, {
       application: this.applicationOf(dto.templateCode),
       tenantId: dto.tenantId,
-    });
+    }, this.pdfAttachments(dto.attachments));
     return {
       success,
       message: success ? 'Email sent successfully' : 'Failed to send email',
     };
+  }
+
+  /** Adjuntos en base64 → Buffer; solo PDF real (cabecera %PDF-) de hasta 2 MB. */
+  private pdfAttachments(list?: { filename: string; contentBase64: string; contentType: string }[]): MailAttachment[] | undefined {
+    if (!list?.length) return undefined;
+    return list.map((a) => {
+      const content = Buffer.from(String(a.contentBase64 || ''), 'base64');
+      if (content.length > 2 * 1024 * 1024) throw new BadRequestException('El adjunto supera 2 MB.');
+      if (content.subarray(0, 5).toString('latin1') !== '%PDF-') throw new BadRequestException('El adjunto debe ser un PDF.');
+      const filename = String(a.filename || 'documento.pdf').replace(/[^\p{L}\p{N} .,()_-]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) || 'documento.pdf';
+      return { filename: /\.pdf$/i.test(filename) ? filename : `${filename}.pdf`, content, contentType: 'application/pdf' };
+    });
   }
 
   /** App que origina el correo según el prefijo de la plantilla. */
@@ -135,7 +148,7 @@ export class NotificationsService {
    * asunto con que se sembró).
    */
   async sembrarPlantillasFacturacion(): Promise<void> {
-    for (const p of PLANTILLAS_FACTURACION) {
+    for (const p of [...PLANTILLAS_FACTURACION, PLANTILLA_TIQUETE_VENTA]) {
       const actual = await this.templateRepo.findOne({ where: { code: p.code } });
       if (!actual) {
         await this.templateRepo.save(this.templateRepo.create({ code: p.code, subject: p.subject, htmlBody: p.htmlBody, isActive: true }));
