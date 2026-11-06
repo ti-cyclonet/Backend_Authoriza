@@ -1434,6 +1434,8 @@ export class ContractService {
       startDate: contract.startDate ?? null,
       endDate: contract.endDate ?? null,
       pendingUpgrade,
+      // Tipo de negocio (InOut activa sus módulos por sector)
+      businessSector: contract.businessSector || 'general',
       limits,
     };
   }
