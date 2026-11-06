@@ -22,6 +22,8 @@ export interface PlantillaFacturacion {
    * guardada conserva ese asunto: si un administrador la editó, se respeta.
    */
   reemplazaAsunto?: string;
+  /** Igual, por el cuerpo: se reemplaza la versión anterior solo si nadie la editó. */
+  reemplazaHtml?: string;
 }
 
 const AZUL = '#1a237e';

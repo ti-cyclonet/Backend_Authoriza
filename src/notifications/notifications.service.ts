@@ -93,7 +93,7 @@ export class NotificationsService {
   async sendEmail(dto: SendEmailDto): Promise<{ success: boolean; message: string }> {
     const template = await this.findTemplateByCode(dto.templateCode);
     // Variables opcionales de las plantillas: vacías si quien envía no las manda
-    const variables = { logoBlock: '', payButton: '', ...(dto.variables || {}) };
+    const variables = { logoBlock: '', payButton: '', receiptNote: '', ...(dto.variables || {}) };
     const html = this.replaceVariables(template.htmlBody, variables);
     const subject = this.replaceVariables(template.subject, variables);
 
@@ -153,6 +153,9 @@ export class NotificationsService {
       if (!actual) {
         await this.templateRepo.save(this.templateRepo.create({ code: p.code, subject: p.subject, htmlBody: p.htmlBody, isActive: true }));
         this.logger.log(`${p.code} template seeded`);
+      } else if (p.reemplazaHtml && actual.htmlBody === p.reemplazaHtml) {
+        await this.templateRepo.update(actual.id, { htmlBody: p.htmlBody });
+        this.logger.log(`${p.code} template updated`);
       } else if (p.reemplazaAsunto && actual.subject === p.reemplazaAsunto) {
         await this.templateRepo.update(actual.id, { subject: p.subject, htmlBody: p.htmlBody });
         this.logger.log(`${p.code} template updated to Spanish`);
