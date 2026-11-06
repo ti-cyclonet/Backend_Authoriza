@@ -1,4 +1,5 @@
-import { IsString, IsOptional, IsBoolean, MaxLength, IsEmail, Matches } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, MaxLength, IsEmail, Matches, IsArray, ArrayMaxSize, ValidateNested, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateEmailTemplateDto {
   @IsString()
@@ -29,6 +30,21 @@ export class UpdateEmailTemplateDto {
   isActive?: boolean;
 }
 
+/** Adjunto de un correo (por ahora solo PDF: el comprobante de una venta). */
+export class EmailAttachmentDto {
+  @IsString()
+  @MaxLength(120)
+  filename: string;
+
+  /** Contenido en base64 (hasta ~2 MB del archivo). */
+  @IsString()
+  @MaxLength(2_800_000)
+  contentBase64: string;
+
+  @IsIn(['application/pdf'])
+  contentType: 'application/pdf';
+}
+
 export class SendEmailDto {
   @IsString()
   to: string;
@@ -44,6 +60,13 @@ export class SendEmailDto {
   @IsString()
   @MaxLength(100)
   tenantId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => EmailAttachmentDto)
+  attachments?: EmailAttachmentDto[];
 }
 
 /** Solicitud del cotizador de la landing: el resumen va al cliente y a CycloNet. */
