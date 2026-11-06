@@ -209,6 +209,15 @@ export default class InitialApplicationsSeed {
             ],
           },
           {
+            // Cocina: solo la pantalla de preparación (InOut limita sus rutas en el backend)
+            strName: 'kitchenInout',
+            strDescription1: 'Cocina',
+            strDescription2: 'Solo ve la pantalla de preparación y avanza los pedidos que prepara.',
+            menuOptions: [
+              { strName: 'kitchenKitchenInout', strDescription: 'Cocina', strUrl: '/cocina', strIcon: 'fire', strType: 'main_menu', ingOrder: 1 },
+            ],
+          },
+          {
             strName: 'viewerInout',
             strDescription1: 'Visor',
             strDescription2: 'Acceso solo lectura al panel, inventario y reportes.',
