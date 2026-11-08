@@ -17,7 +17,7 @@ export interface PrincipalUserStats {
 
 export interface ApplicationStats {
   total: number;
-  byApplication: { name: string; userCount: number; roleCount: number }[];
+  byApplication: { name: string; userCount: number; clientCount: number; roleCount: number }[];
 }
 
 export interface PackageStats {

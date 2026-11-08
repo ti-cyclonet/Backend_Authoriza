@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 import { DashboardOverviewService } from './dashboard-overview.service';
+import { DashboardCustomersService } from './dashboard-customers.service';
 import { RolesGuard } from './guards/roles.guard';
 import { User } from '../users/entities/user.entity';
 import { Invoice } from '../invoices/entities/invoice.entity';
@@ -23,7 +24,7 @@ import { LogsModule } from '../logs/logs.module';
     LogsModule
   ],
   controllers: [DashboardController],
-  providers: [DashboardService, DashboardOverviewService, RolesGuard],
+  providers: [DashboardService, DashboardOverviewService, DashboardCustomersService, RolesGuard],
   exports: [DashboardService]
 })
 export class DashboardModule {}
