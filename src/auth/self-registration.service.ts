@@ -1186,28 +1186,8 @@ export class SelfRegistrationService {
   }
 
   private async notifyAdminFreeContractActivated(contract: Contract): Promise<void> {
-    // Find all adminFactonet users and their dependents
-    const principalAdmins = await this.userRepository
-      .createQueryBuilder('user')
-      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
-      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
-      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
-      .andWhere('ur.status = :status', { status: 'ACTIVE' })
-      .getMany();
-
-    const allRecipients: string[] = [];
-    for (const admin of principalAdmins) {
-      allRecipients.push(admin.strUserName);
-      const deps = await this.userRepository
-        .createQueryBuilder('user')
-        .innerJoin('user_dependencies', 'ud', 'ud."dependentUserId" = user.id')
-        .where('ud."principalUserId" = :principalId', { principalId: admin.id })
-        .andWhere('ud.status = :status', { status: 'ACTIVE' })
-        .getMany();
-      deps.forEach(d => allRecipients.push(d.strUserName));
-    }
-
-    const uniqueRecipients = [...new Set(allRecipients)];
+    // Solo quienes tienen el rol adminFactonet (antes también todos sus dependientes, con cualquier rol)
+    const uniqueRecipients = await this.adminFactonetEmails();
     if (uniqueRecipients.length === 0) return;
 
     const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
@@ -1242,28 +1222,8 @@ export class SelfRegistrationService {
   }
 
   private async notifyAdminFactonetUpgrade(contract: Contract, pkg: Package): Promise<void> {
-    // Find all adminFactonet users and their dependents
-    const principalAdmins = await this.userRepository
-      .createQueryBuilder('user')
-      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
-      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
-      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
-      .andWhere('ur.status = :status', { status: 'ACTIVE' })
-      .getMany();
-
-    const allRecipients: string[] = [];
-    for (const admin of principalAdmins) {
-      allRecipients.push(admin.strUserName);
-      const deps = await this.userRepository
-        .createQueryBuilder('user')
-        .innerJoin('user_dependencies', 'ud', 'ud."dependentUserId" = user.id')
-        .where('ud."principalUserId" = :principalId', { principalId: admin.id })
-        .andWhere('ud.status = :status', { status: 'ACTIVE' })
-        .getMany();
-      deps.forEach(d => allRecipients.push(d.strUserName));
-    }
-
-    const uniqueRecipients = [...new Set(allRecipients)];
+    // Solo quienes tienen el rol adminFactonet (antes también todos sus dependientes, con cualquier rol)
+    const uniqueRecipients = await this.adminFactonetEmails();
     if (uniqueRecipients.length === 0) return;
 
     const factonetUrl = process.env.FACTONET_LOGIN_URL || 'http://localhost:4202/login';
@@ -1299,6 +1259,18 @@ export class SelfRegistrationService {
       }
     }
     this.logger.log(`Notified ${uniqueRecipients.length} adminFactonet user(s) about contract upgrade ${contract.code}`);
+  }
+
+  /** Correos de los usuarios con el rol adminFactonet activo: los que gestionan contratos en FactoNet. */
+  private async adminFactonetEmails(): Promise<string[]> {
+    const admins = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('r."strName" = :roleName', { roleName: 'adminFactonet' })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .getMany();
+    return [...new Set(admins.map((a) => a.strUserName).filter(Boolean))];
   }
 
   private async notifyAdminFactonetUsers(contract: any, dto: SelfRegisterDto, pkg: Package): Promise<void> {
