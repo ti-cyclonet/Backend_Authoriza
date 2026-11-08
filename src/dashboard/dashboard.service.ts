@@ -101,7 +101,8 @@ export class DashboardService {
     const applications = await this.userRepository.manager.query(`
       SELECT 
         a."strName" as name,
-        COUNT(DISTINCT ur."userId") as "userCount",
+        COUNT(DISTINCT ur."userId") FILTER (WHERE r."strName" <> 'clienteInout') as "userCount",
+        COUNT(DISTINCT ur."userId") FILTER (WHERE r."strName" = 'clienteInout') as "clientCount",
         COUNT(DISTINCT r.id) as "roleCount"
       FROM application a
       LEFT JOIN rol r ON r."strApplicationId" = a.id
@@ -114,7 +115,9 @@ export class DashboardService {
       total: applications.length,
       byApplication: applications.map(app => ({
         name: app.name,
+        // userCount: equipo (sin los clientes de las tiendas online, que van en clientCount)
         userCount: parseInt(app.userCount),
+        clientCount: parseInt(app.clientCount),
         roleCount: parseInt(app.roleCount)
       }))
     };

@@ -6,6 +6,7 @@ import { Invoice, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { Contract } from '../contract/entities/contract.entity';
 import { ContractStatus } from '../contract/enums/contract-status.enum';
 import { LogsService } from '../logs/logs.service';
+import { CLIENT_ROLE, DashboardCustomersService } from './dashboard-customers.service';
 
 /** Colombia no tiene horario de verano: UTC-5 fijo. */
 const BOGOTA_OFFSET_MS = 5 * 60 * 60 * 1000;
@@ -43,6 +44,7 @@ export class DashboardOverviewService {
     @InjectRepository(Invoice) private invoiceRepository: Repository<Invoice>,
     @InjectRepository(Contract) private contractRepository: Repository<Contract>,
     private logsService: LogsService,
+    private customersService: DashboardCustomersService,
   ) {}
 
   async getOverview() {
@@ -71,7 +73,7 @@ export class DashboardOverviewService {
       receivables, overdue, paymentReported,
       contractsAgg, newContractsMonth, newContractsPrev, pendingSignature,
       expiringList, overdueList,
-      usersAgg, signupsRaw,
+      usersAgg, signupsRaw, customers,
       billedSeriesRaw, collectedSeriesRaw,
       recentLogs,
       newsContracts, newsInvoices, newsUsers, newsPayments,
@@ -115,8 +117,12 @@ export class DashboardOverviewService {
         .addSelect('COUNT(u.id) FILTER (WHERE u.dtmCreateDate >= :week)', 'week')
         .setParameters({ today: todayStart, week: weekStart })
         .where('u.deletedAt IS NULL').getRawOne(),
+      // Registros por tipo: clientes de las tiendas online (rol clienteInout) y negocios o sus equipos
       this.userRepository.createQueryBuilder('u')
-        .select('u.dtmCreateDate', 'd').where('u.deletedAt IS NULL AND u.dtmCreateDate >= :from', { from: signupsStart }).getRawMany(),
+        .select('u.dtmCreateDate', 'd')
+        .addSelect(`EXISTS (SELECT 1 FROM user_roles ur JOIN rol r ON r.id = ur."roleId" WHERE ur."userId" = u.id AND r."strName" = :clientRole)`, 'client')
+        .where('u.deletedAt IS NULL AND u.dtmCreateDate >= :from', { from: signupsStart, clientRole: CLIENT_ROLE }).getRawMany(),
+      this.customersService.getCustomerStats(now),
       inv().select('i.issueDate', 'd').addSelect('i.value', 'v').where('i.issueDate >= :from', { from: sixMonthsStart }).getRawMany(),
       inv().select('COALESCE(i.paymentDate, i.updatedAt)', 'd').addSelect('COALESCE(i.paidAmount, i.value)', 'v')
         .where('i.status = :paid', { paid: InvoiceStatus.PAID })
@@ -155,10 +161,16 @@ export class DashboardOverviewService {
     for (const r of billedSeriesRaw) { const m = byMonth.get(bogotaDateKey(r.d).slice(0, 7)); if (m) m.billed += num(r.v); }
     for (const r of collectedSeriesRaw) { const m = byMonth.get(bogotaDateKey(r.d).slice(0, 7)); if (m) m.collected += num(r.v); }
 
-    const days: { date: string; count: number }[] = [];
-    for (let k = 13; k >= 0; k--) days.push({ date: bogotaDateKey(bogotaDayStart(now, -k)), count: 0 });
+    const days: { date: string; count: number; clients: number; others: number }[] = [];
+    for (let k = 13; k >= 0; k--) days.push({ date: bogotaDateKey(bogotaDayStart(now, -k)), count: 0, clients: 0, others: 0 });
     const byDay = new Map(days.map((d) => [d.date, d]));
-    for (const r of signupsRaw) { const d = byDay.get(bogotaDateKey(r.d)); if (d) d.count++; }
+    for (const r of signupsRaw) {
+      const d = byDay.get(bogotaDateKey(r.d));
+      if (!d) continue;
+      d.count++;
+      if (r.client === true || r.client === 't') d.clients++;
+      else d.others++;
+    }
 
     // Accesos: el registro de actividad guarda los últimos ~100 eventos, así que
     // es una muestra reciente (suficiente para "quién está entrando ahora").
@@ -205,6 +217,7 @@ export class DashboardOverviewService {
         overdueInvoices: overdueList.map((i) => ({ ...i, value: num(i.value), daysOverdue: Math.floor((now.getTime() - new Date(i.expirationDate).getTime()) / DAY_MS) })),
       },
       series: { months, signups: days },
+      customers,
       activity: recentLogs.map((l) => ({ id: l.id, level: l.level, action: l.action, message: l.message, createdAt: l.createdAt })),
       news: {
         contracts: newsContracts.map((c) => ({ id: c.id, code: c.code, status: c.status, monthly: Math.round(num(c.value) / 12), client: c.client, package: c.package })),
