@@ -83,6 +83,10 @@ export class Invoice {
   @Column({ nullable: true })
   paymentVoucherUrl?: string;
 
+  // Referencia del soporte de pago, tal como la escribió quien pagó: un mismo soporte no se usa en dos facturas
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  paymentReference?: string | null;
+
   // Payment registration fields
   @Column({ type: 'decimal', precision: 12, scale: 2, nullable: true })
   paidAmount?: number;

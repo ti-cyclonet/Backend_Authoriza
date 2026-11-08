@@ -12,6 +12,7 @@ import { UserDependency } from '../user-dependencies/entities/user-dependency.en
 import { User } from '../users/entities/user.entity';
 import { GlobalParametersForInvoices } from '../global-parameters-invoices/entities/global-parameters-for-invoices.entity';
 import { notificarFacturaAKiri } from './kiri-invoice-notifier';
+import { duplicateMessage, normalizeReference } from './payment-reference';
 
 @Injectable()
 export class InvoicesService {
@@ -229,10 +230,41 @@ export class InvoicesService {
   }
 
   /**
+   * Otra factura cuyo pago se reportó con la misma referencia de soporte
+   * (escrita igual o distinto: "Ref. M-8721 4093" = "m87214093"). Los pagos
+   * rechazados no cuentan: al rechazar se borra la referencia.
+   */
+  async findReferenceUse(invoiceId: number, raw: unknown): Promise<{ invoiceId: number; message: string } | null> {
+    const ref = normalizeReference(raw);
+    if (!ref) return null;
+    // Candidatas por SQL (terminan igual) y comparación exacta aquí, con las mismas reglas
+    const rows: Array<{ id: number; code: string | null; paymentDate: Date | null; paymentReference: string }> =
+      await this.invoiceRepository
+        .createQueryBuilder('i')
+        .select(['i.id AS id', 'i.code AS code', 'i.paymentDate AS "paymentDate"', 'i.paymentReference AS "paymentReference"'])
+        .where('i.paymentReference IS NOT NULL')
+        .andWhere('i.id <> :invoiceId', { invoiceId })
+        .andWhere(`regexp_replace(upper(i.paymentReference), '[^A-Z0-9]', '', 'g') LIKE :tail`, { tail: `%${ref}` })
+        .getRawMany();
+    const hit = rows.find((r) => normalizeReference(r.paymentReference) === ref);
+    if (!hit) return null;
+    return { invoiceId: hit.id, message: duplicateMessage(ref, hit.code || `INV-${hit.id}`, hit.paymentDate) };
+  }
+
+  /** 409 REFERENCE_USED si el soporte ya se usó en el pago de otra factura. */
+  async assertReferenceUnused(invoiceId: number, raw: unknown): Promise<void> {
+    const use = await this.findReferenceUse(invoiceId, raw);
+    if (use) {
+      this.logger.warn(`Referencia de pago repetida en la factura ${invoiceId} (ya usada en la factura ${use.invoiceId})`);
+      throw new ConflictException({ error: 'REFERENCE_USED', reference: normalizeReference(raw), message: use.message });
+    }
+  }
+
+  /**
    * Register a payment for an invoice.
    * Freezes the late fee penalty at the moment of payment and marks invoice as Paid.
    */
-  async registerPayment(id: number, paymentDate: string, paidAmount: number, paymentVoucherUrl?: string): Promise<Invoice> {
+  async registerPayment(id: number, paymentDate: string, paidAmount: number, paymentVoucherUrl?: string, paymentReference?: string): Promise<Invoice> {
     const invoice = await this.invoiceRepository.findOne({
       where: { id },
       relations: ['user', 'contract'],
@@ -241,6 +273,8 @@ export class InvoicesService {
     if (!invoice) {
       throw new NotFoundException(`Invoice with ID ${id} not found`);
     }
+    // Un mismo soporte no se usa en dos facturas
+    await this.assertReferenceUnused(id, paymentReference);
 
     // Calculate and freeze the late fee at this moment
     const lateFeeConfig = await this.getLateFeeConfig();
@@ -295,6 +329,7 @@ export class InvoicesService {
       lateFeeDays: lateFeeDays || null,
       lateFeePercentage: lateFeePercentage || null,
       paymentVoucherUrl: paymentVoucherUrl || null,
+      paymentReference: paymentReference?.trim() || null,
       rejectionReason: null,
       globalParameters,
       operationTypes,
@@ -375,6 +410,8 @@ export class InvoicesService {
       lateFeeDays: null,
       lateFeePercentage: null,
       paymentVoucherUrl: null,
+      // El soporte rechazado queda libre para reportarlo de nuevo
+      paymentReference: null,
       rejectionReason: reason || 'Payment proof rejected by administrator',
       globalParameters: cleanedGlobalParams,
       operationTypes: cleanedOperationTypes,

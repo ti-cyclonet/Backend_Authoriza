@@ -74,13 +74,23 @@ export class InvoicesController {
   ) {
     let voucherUrl: string | undefined = dto.paymentVoucherUrl;
 
+    // Antes de subir la imagen: el soporte no puede estar ya usado en otra factura
+    await this.invoicesService.assertReferenceUnused(+id, dto.paymentReference);
+
     // If a file was uploaded, upload to Cloudinary
     if (file) {
       const uploadResult = await this.cloudinaryService.uploadImage(file, 'payment-vouchers');
       voucherUrl = uploadResult.secure_url;
     }
 
-    return this.invoicesService.registerPayment(+id, dto.paymentDate, dto.paidAmount, voucherUrl);
+    return this.invoicesService.registerPayment(+id, dto.paymentDate, dto.paidAmount, voucherUrl, dto.paymentReference);
+  }
+
+  /** ¿La referencia ya se usó en el pago de otra factura? Para avisar antes de enviar. */
+  @Get(':id/payment-reference/check')
+  async checkPaymentReference(@Param('id') id: string, @Query('ref') ref: string) {
+    const use = await this.invoicesService.findReferenceUse(+id, ref);
+    return { used: !!use, message: use?.message ?? null };
   }
 
   @Post(':id/confirm-payment')
