@@ -34,6 +34,12 @@ export class EinvoicingController {
     return einvoicingCatalog();
   }
 
+  /** Ingresos de CycloNet por el complemento (dashboard de Authoriza). */
+  @Get('income/summary')
+  income(@Query('month') month?: string) {
+    return this.service.incomeSummary(month);
+  }
+
   @Get('tenants/:tenantId/status')
   status(@Param('tenantId') tenantId: string) {
     return this.service.status(tenantId);

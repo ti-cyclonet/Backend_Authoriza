@@ -12,6 +12,7 @@ import { NOT_AVAILABLE_MESSAGE, resolveProvider } from './providers/registry';
 import { einvoicingCatalog } from './addon-plans';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NoticeContext, noticeVariables } from './einvoicing-notices';
+import { einvoicingIncome, lastMonths } from './einvoicing-income';
 import { ContractService } from '../contract/contract.service';
 import { Invoice, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { buyerFromUser, linesFromInvoice } from './cyclonet-invoices';
@@ -425,6 +426,54 @@ export class EinvoicingService {
   /** Complemento vigente (SOLICITADO o ACTIVO) del negocio. */
   currentAddon(tenantId: string) {
     return this.addons.findOne({ where: { tenantId, code: 'EINVOICING', status: In(['SOLICITADO', 'ACTIVO']) }, order: { createdAt: 'DESC' } });
+  }
+
+  // ═══════════════════════ Ingresos de CycloNet (dashboard)
+
+  /**
+   * Ingresos por el complemento: facturado y pagado por mes (sin IVA), planes
+   * activos y su valor mensual recurrente, documentos emitidos por los
+   * negocios y, si se configura EINVOICING_PROVIDER_UNIT_COST, el costo
+   * estimado del proveedor y el margen.
+   */
+  async incomeSummary(month?: string) {
+    const m = /^\d{4}-\d{2}$/.test(String(month || '')) ? String(month) : yyyymm(new Date());
+    const from = `${lastMonths(m, 6)[0]}-01`;
+    const yearFrom = `${m.slice(0, 4)}-01-01`;
+    const rows = await this.dataSource.query(
+      `SELECT i."issueDate", i.status, i."addonCharges",
+              COALESCE(le."businessName", NULLIF(TRIM(CONCAT(np."firstName", ' ', np."firstSurname")), ''), u."strUserName") AS client
+         FROM invoices i
+         LEFT JOIN "user" u ON u.id = i."userId"
+         LEFT JOIN basic_data bd ON bd.id = u."basicDataId"
+         LEFT JOIN legal_entity_data le ON le."basicDataId" = bd.id
+         LEFT JOIN natural_person_data np ON np."basicDataId" = bd.id
+        WHERE i."addonCharges" IS NOT NULL AND i."issueDate" >= LEAST($1::date, $2::date)`,
+      [from, yearFrom],
+    ).catch(() => []);
+    const income = einvoicingIncome(rows, m);
+    const [plans] = await this.dataSource.query(
+      `SELECT COUNT(*) FILTER (WHERE status = 'ACTIVO') AS active,
+              COUNT(*) FILTER (WHERE status = 'SOLICITADO') AS requested,
+              COALESCE(SUM("monthlyValue") FILTER (WHERE status = 'ACTIVO'), 0) AS mrr
+         FROM contract_addons WHERE code = 'EINVOICING'`,
+    ).catch(() => [{}]);
+    const docs = await this.documents.createQueryBuilder('d')
+      .where("d.sourceApp <> 'AUTHORIZA' AND d.status <> 'RECHAZADO' AND to_char(d.createdAt AT TIME ZONE 'America/Bogota', 'YYYY-MM') = :m", { m })
+      .getCount().catch(() => 0);
+    const unitCost = Number(process.env.EINVOICING_PROVIDER_UNIT_COST) || 0;
+    const providerCost = unitCost > 0 ? Math.round(docs * unitCost) : null;
+    return {
+      available: !!this.provider(),
+      ...income,
+      activePlans: Number(plans?.active) || 0,
+      requested: Number(plans?.requested) || 0,
+      mrr: Number(plans?.mrr) || 0,
+      documents: docs,
+      providerUnitCost: unitCost || null,
+      providerCost,
+      margin: providerCost != null ? income.billed - providerCost : null,
+    };
   }
 
   // ═══════════════════════ Avisos por correo
