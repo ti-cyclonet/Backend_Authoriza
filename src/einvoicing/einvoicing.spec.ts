@@ -184,3 +184,49 @@ describe('Facturación electrónica · servicio', () => {
       .rejects.toMatchObject({ response: { error: 'EINVOICING_NOT_ACTIVE' } });
   });
 });
+
+describe('Facturación electrónica · avisos por correo', () => {
+  const { esc, noticeVariables, priceText } = require('./einvoicing-notices');
+  it('variables escapadas, precio "por confirmar" y texto según disponibilidad', () => {
+    expect(esc('<b>Arepas & Co</b>')).toBe('&lt;b&gt;Arepas &amp; Co&lt;/b&gt;');
+    expect(priceText(null)).toMatch(/por confirmar/);
+    expect(priceText(89900)).toBe('$89.900 al mes');
+    const ctx = { businessName: 'Arepas <SAS>', tenantEmail: 'a@b.co', requestedBy: 'dueno@b.co', tier: 'MEDIO', includedUnits: 150, monthly: null, requestedAt: new Date('2026-11-09T21:33:56Z'), available: false, settingsUrl: 'https://app/setting', adminUrl: 'https://auth/home' };
+    const v = noticeVariables(ctx);
+    expect(v).toEqual(expect.objectContaining({ businessName: 'Arepas &lt;SAS&gt;', plan: 'Medio', includedUnits: '150' }));
+    expect(v.availabilityText).toMatch(/te avisaremos/);
+    expect(noticeVariables(ctx, true).availabilityText).toMatch(/en espera/);
+  });
+
+  it('al solicitar avisa a CycloNet (adminFactonet) y confirma al negocio, sin repetir correos', async () => {
+    delete process.env.EINVOICING_PROVIDER;
+    const sent: any[] = [];
+    const rows: any[] = [];
+    const repo = { findOne: jest.fn(async () => null), find: jest.fn(async () => []), create: (x: any) => x, save: jest.fn(async (x: any) => { rows.push(x); return x; }), count: jest.fn(async () => 0), createQueryBuilder: () => ({ where: () => ({ getCount: async () => 0 }) }) };
+    const dataSource = { query: jest.fn(async (sql: string) => (sql.includes('adminFactonet') ? [{ email: 'admin@cyclonet.co' }, { email: 'ADMIN@cyclonet.co' }] : [{ email: 'ti.cyclonet.sas@gmail.com', business: 'Cyclonet S. A. S.' }])) };
+    const notifications = { sendByTemplate: jest.fn(async (code: string, to: string) => { sent.push([code, to]); }) };
+    const service = new EinvoicingService(repo as any, repo as any, repo as any, repo as any, dataSource as any, { findTenantLimits: async () => ({ contractId: 'c1' }) } as any, notifications as any);
+    await service.requestAddon('t1', { tier: 'MEDIO', acceptTerms: true, requestedBy: 'ti.cyclonet.sas@gmail.com' });
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sent).toEqual([['EINVOICING_REQUEST_ADMIN', 'admin@cyclonet.co'], ['EINVOICING_REQUEST_RECEIVED', 'ti.cyclonet.sas@gmail.com']]);
+  });
+
+  it('al activarse avisa al negocio una sola vez', async () => {
+    process.env.EINVOICING_PROVIDER = 'simulado';
+    const sent: string[] = [];
+    const addon: any = { tenantId: 't1', code: 'EINVOICING', tier: 'MEDIO', includedUnits: 150, status: 'SOLICITADO', monthlyValue: 89900, extraUnitValue: 350, requestedBy: 'dueno@tienda.co', requestedAt: new Date(), notifiedAt: null };
+    const issuer: any = { tenantId: 't1', idType: '31', idNumber: '901565464', status: 'LISTO' };
+    const addons = { findOne: jest.fn(async () => (addon.status === 'CANCELADO' ? null : addon)), save: jest.fn(async (x: any) => x) };
+    const issuers = { findOne: jest.fn(async () => issuer), save: jest.fn(async (x: any) => x) };
+    const dataSource = { query: jest.fn(async () => [{ email: 'dueno@tienda.co', business: 'Tienda' }]) };
+    const notifications = { sendByTemplate: jest.fn(async (code: string, to: string) => { sent.push(`${code}:${to}`); }) };
+    const service = new EinvoicingService(issuers as any, {} as any, {} as any, addons as any, dataSource as any, {} as any, notifications as any);
+    expect(await service.maybeActivate('t1')).toBe(true);
+    expect(sent).toEqual(['EINVOICING_ACTIVATED:dueno@tienda.co']);
+    expect(addon.notifiedAt).toBeInstanceOf(Date);
+    addon.status = 'SOLICITADO';
+    await service.maybeActivate('t1');
+    expect(sent).toHaveLength(1);
+  });
+});

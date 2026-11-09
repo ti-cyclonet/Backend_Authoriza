@@ -14,6 +14,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PLANTILLAS_FACTURACION, pesos, totalFactura } from '../notifications/plantillas-facturacion';
 import { PLANTILLA_TIQUETE_VENTA } from '../notifications/plantilla-tiquete';
 import { PLANTILLA_PAGOS_EN_LINEA } from '../notifications/plantilla-pagos-en-linea';
+import { PLANTILLAS_FACTURACION_ELECTRONICA } from '../notifications/plantillas-facturacion-electronica';
 
 /**
  * Avisos de cobro: además del recordatorio del día de pago, ahora se avisa
@@ -109,7 +110,7 @@ describe('Plantillas del ciclo de cobro', () => {
     const { service, guardadas } = armar([]);
     await service.sembrarPlantillasFacturacion();
     // Las de facturación, el tiquete de venta y el aviso de pagos en línea de InOut
-    expect(guardadas.map(g => g.code)).toEqual([...PLANTILLAS_FACTURACION, PLANTILLA_TIQUETE_VENTA, PLANTILLA_PAGOS_EN_LINEA].map(p => p.code));
+    expect(guardadas.map(g => g.code)).toEqual([...PLANTILLAS_FACTURACION, PLANTILLA_TIQUETE_VENTA, PLANTILLA_PAGOS_EN_LINEA, ...PLANTILLAS_FACTURACION_ELECTRONICA].map(p => p.code));
     expect(guardadas.every(g => g.isActive)).toBe(true);
   });
 
