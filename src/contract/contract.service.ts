@@ -1437,6 +1437,10 @@ export class ContractService {
       // Tipo de negocio (InOut activa sus módulos por sector)
       businessSector: contract.businessSector || 'general',
       limits,
+      // Complementos del contrato (p. ej. facturación electrónica) y su estado
+      addons: await this.contractRepository.manager
+        .query(`SELECT code, tier, status, "includedUnits" FROM contract_addons WHERE "tenantId" = $1 AND status IN ('SOLICITADO','ACTIVO')`, [tenantId])
+        .catch(() => []),
     };
   }
 

@@ -19,6 +19,7 @@ import { DocumentTypesModule } from './document-types/document-types.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PackageModule } from './package/package.module';
 import { ContractModule } from './contract/contract.module';
+import { EinvoicingModule } from './einvoicing/einvoicing.module';
 import { PeriodModule } from './period/period.module';
 import { GlobalParametersForInvoicesModule } from './global-parameters-invoices/global-parameters-for-invoices.module';
 import { GlobalParametersPeriodsModule } from './global-parameters-periods/global-parameters-periods.module';
@@ -75,6 +76,7 @@ import { UsageLimitVariablesModule } from './usage-limit-variables/usage-limit-v
     DashboardModule,
     PackageModule,
     ContractModule,
+    EinvoicingModule,
     EntityCodesModule,
     GlobalParametersModule,
     PeriodModule,

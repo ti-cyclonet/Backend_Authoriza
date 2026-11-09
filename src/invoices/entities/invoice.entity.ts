@@ -83,6 +83,10 @@ export class Invoice {
   @Column({ nullable: true })
   paymentVoucherUrl?: string;
 
+  // Complementos del contrato cobrados en esta factura (incluidos en value): [{ code, label, amount }]
+  @Column({ type: 'jsonb', nullable: true })
+  addonCharges?: { code: string; label: string; amount: number }[] | null;
+
   // Referencia del soporte de pago, tal como la escribió quien pagó: un mismo soporte no se usa en dos facturas
   @Column({ type: 'varchar', length: 100, nullable: true })
   paymentReference?: string | null;
