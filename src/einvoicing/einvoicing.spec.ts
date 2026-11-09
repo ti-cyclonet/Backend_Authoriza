@@ -230,3 +230,21 @@ describe('Facturación electrónica · avisos por correo', () => {
     expect(sent).toHaveLength(1);
   });
 });
+
+describe('Facturación electrónica · ingresos de CycloNet', () => {
+  const { einvoicingIncome, lastMonths } = require('./einvoicing-income');
+  it('suma por mes lo facturado y lo pagado del complemento, sin otros conceptos', () => {
+    expect(lastMonths('2026-02', 3)).toEqual(['2025-12', '2026-01', '2026-02']);
+    const plan = (amount: number) => ({ code: 'complemento_facturacion_electronica', label: '', amount });
+    const extra = (amount: number) => ({ code: 'documentos_electronicos_adicionales', label: '', amount });
+    const r = einvoicingIncome([
+      { issueDate: '2026-11-03', status: 'Paid', addonCharges: [plan(89900), extra(4200)], client: 'Arepas' },
+      { issueDate: '2026-11-05', status: 'Issued', addonCharges: [plan(39900), { code: 'otro', amount: 999 }], client: 'Panadería' },
+      { issueDate: '2026-10-03', status: 'Paid', addonCharges: [plan(89900)], client: 'Arepas' },
+      { issueDate: '2026-11-07', status: 'Paid', addonCharges: null, client: 'Sin complemento' },
+    ], '2026-11');
+    expect(r).toEqual(expect.objectContaining({ billed: 134000, collected: 94100, plans: 129800, extraDocs: 4200, prevBilled: 89900, yearBilled: 223900 }));
+    expect(r.byMonth.map((x: any) => x.month)).toEqual(['2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']);
+    expect(r.byClient[0]).toEqual({ client: 'Arepas', billed: 94100 });
+  });
+});
