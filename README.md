@@ -102,3 +102,24 @@ El proyecto está organizado en módulos específicos según la funcionalidad:
 ## Licencia
 
 Privada - Derechos reservados
+## 🧾 Facturación electrónica DIAN (pendiente: definir el proveedor tecnológico)
+
+Núcleo en `src/einvoicing/`. Emite factura, nota crédito y POS electrónico a través de un **proveedor tecnológico (PT) autorizado por la DIAN**. Lo usan InOut (las ventas de cada negocio, como complemento de su contrato) y las facturas de CycloNet a sus clientes. Mientras no haya un PT configurado, todo responde **«en configuración»** y no se emite nada.
+
+**Qué falta para encenderlo**
+1. Elegir el PT y escribir su adaptador en `src/einvoicing/providers/` (interfaz `EinvoiceProvider`: `registerIssuer`, `issue`, `getStatus`, `parseWebhook`) y registrarlo en `providers/registry.ts`.
+2. Variables en el `.env` del servidor (no se sincroniza con el repo):
+
+| Variable | Para qué |
+|---|---|
+| `EINVOICING_PROVIDER` | Nombre del adaptador (vacío = en configuración). `simulado` solo sirve fuera de producción. |
+| `EINVOICING_<PT>_*` | Credenciales del PT (las define su adaptador). |
+| `EINVOICING_PRICES` | JSON con los precios del complemento: `{"BASICO":{"monthly":…},"MEDIO":{"monthly":…},"ALTO":{"monthly":…},"extraUnit":…}`. Sin él, el precio se muestra como «por definir» y no se cobra nada. |
+| `EINVOICING_CYCLONET_TENANT_ID` | Usuario de CycloNet como emisor de sus propias facturas. |
+| `EINVOICING_CYCLONET_FROM` | `YYYY-MM-DD`: facturas de CycloNet a emitir desde esa fecha (no reprocesa las anteriores). |
+
+3. Registrar el webhook del PT: `POST /api/einvoicing/webhook`.
+
+**Flujo.** El negocio pide el complemento aceptando los términos (`contract_addons`, estado SOLICITADO) y carga sus datos fiscales y su resolución de numeración. Cuando hay PT, se le da de alta y el complemento pasa a ACTIVO, con el precio vigente. Cada venta reserva su número con bloqueo y crea el documento PENDIENTE, sin duplicar por origen. Se envía en segundo plano: la cola corre cada minuto y reintenta lo que esté en contingencia. Si la venta se anula, sale una nota crédito. La factura mensual del contrato suma el valor del complemento y los documentos por encima de los incluidos el mes anterior (`invoices.addonCharges`).
+
+**Rutas** (clave interna `x-internal-key` o administrador de Authoriza): `GET einvoicing/catalog`, `GET|PUT|POST einvoicing/tenants/:tenantId/{status,issuer,resolutions,addon,addon/cancel,documents}`, `POST einvoicing/documents`, `POST einvoicing/credit-notes`, `GET einvoicing/addons`.
