@@ -7,6 +7,7 @@ import { jwtConstants } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
 import { InternalOrAdminGuard } from '../notifications/guards/internal-or-admin.guard';
 import { ContractModule } from '../contract/contract.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { EinvoiceIssuer } from './entities/einvoice-issuer.entity';
 import { EinvoiceResolution } from './entities/einvoice-resolution.entity';
 import { EinvoiceDocument } from './entities/einvoice-document.entity';
@@ -99,6 +100,7 @@ export class EinvoicingWebhookController {
   imports: [
     TypeOrmModule.forFeature([EinvoiceIssuer, EinvoiceResolution, EinvoiceDocument, ContractAddon]),
     ContractModule,
+    NotificationsModule,
     JwtModule.register({ secret: jwtConstants.secret }),
   ],
   controllers: [EinvoicingController, EinvoicingWebhookController],

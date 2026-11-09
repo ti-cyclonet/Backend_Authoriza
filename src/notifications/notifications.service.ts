@@ -11,6 +11,7 @@ import {
 import { PLANTILLAS_FACTURACION } from './plantillas-facturacion';
 import { PLANTILLA_TIQUETE_VENTA } from './plantilla-tiquete';
 import { PLANTILLA_PAGOS_EN_LINEA } from './plantilla-pagos-en-linea';
+import { PLANTILLAS_FACTURACION_ELECTRONICA } from './plantillas-facturacion-electronica';
 import { JobApplicationDto, QuoteRequestDto } from './dto/notification.dto';
 
 /** Buzón comercial que recibe las solicitudes del cotizador (el de contacto general es otro). */
@@ -149,7 +150,7 @@ export class NotificationsService {
    * asunto con que se sembró).
    */
   async sembrarPlantillasFacturacion(): Promise<void> {
-    for (const p of [...PLANTILLAS_FACTURACION, PLANTILLA_TIQUETE_VENTA, PLANTILLA_PAGOS_EN_LINEA]) {
+    for (const p of [...PLANTILLAS_FACTURACION, PLANTILLA_TIQUETE_VENTA, PLANTILLA_PAGOS_EN_LINEA, ...PLANTILLAS_FACTURACION_ELECTRONICA]) {
       const actual = await this.templateRepo.findOne({ where: { code: p.code } });
       if (!actual) {
         await this.templateRepo.save(this.templateRepo.create({ code: p.code, subject: p.subject, htmlBody: p.htmlBody, isActive: true }));

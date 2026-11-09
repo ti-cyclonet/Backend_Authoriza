@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Optional, BadRequestException, ConflictException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, LessThanOrEqual, Not, Repository } from 'typeorm';
@@ -10,6 +10,8 @@ import { BuyerData, EinvoiceDocType, IssuerData, LineInput, computeTotals, nextN
 import { EinvoiceProvider, ProviderUnavailableError } from './providers/einvoice-provider';
 import { NOT_AVAILABLE_MESSAGE, resolveProvider } from './providers/registry';
 import { einvoicingCatalog } from './addon-plans';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NoticeContext, noticeVariables } from './einvoicing-notices';
 import { ContractService } from '../contract/contract.service';
 import { Invoice, InvoiceStatus } from '../invoices/entities/invoice.entity';
 import { buyerFromUser, linesFromInvoice } from './cyclonet-invoices';
@@ -60,6 +62,7 @@ export class EinvoicingService {
     @InjectRepository(ContractAddon) private readonly addons: Repository<ContractAddon>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly contracts: ContractService,
+    @Optional() private readonly notifications?: NotificationsService,
   ) {}
 
   /** Se resuelve en cada uso: encenderlo solo exige cambiar el .env y reiniciar. */
@@ -126,6 +129,10 @@ export class EinvoicingService {
       requestIp: input.ip?.slice(0, 64) || null,
     }));
     this.logger.log(`Facturación electrónica solicitada por ${tenantId} (plan ${tier.code})`);
+    // Avisos: a CycloNet (adminFactonet) y la confirmación al negocio. No bloquean la solicitud.
+    this.noticeContext(tenantId, { requestedBy: input.requestedBy, tier: tier.code, includedUnits: tier.includedUnits, monthly: tier.monthly, requestedAt: new Date() })
+      .then((ctx) => this.sendRequestNotices(ctx))
+      .catch((e) => this.logger.warn(`Avisos de la solicitud de facturación electrónica (${tenantId}): ${e.message}`));
     await this.maybeActivate(tenantId);
     return this.status(tenantId);
   }
@@ -165,6 +172,17 @@ export class EinvoicingService {
     addon.activatedAt = new Date();
     await this.addons.save(addon);
     this.logger.log(`Facturación electrónica ACTIVA para ${tenantId}`);
+    // "Te avisaremos": correo al negocio, una sola vez
+    if (!addon.notifiedAt) {
+      try {
+        const ctx = await this.noticeContext(tenantId, { requestedBy: addon.requestedBy, tier: addon.tier, includedUnits: addon.includedUnits, monthly: addon.monthlyValue, requestedAt: addon.requestedAt });
+        await this.mail('EINVOICING_ACTIVATED', [ctx.requestedBy, ctx.tenantEmail], noticeVariables(ctx));
+        addon.notifiedAt = new Date();
+        await this.addons.save(addon);
+      } catch (e) {
+        this.logger.warn(`Aviso de activación de facturación electrónica (${tenantId}): ${(e as Error).message}`);
+      }
+    }
     return true;
   }
 
@@ -407,6 +425,55 @@ export class EinvoicingService {
   /** Complemento vigente (SOLICITADO o ACTIVO) del negocio. */
   currentAddon(tenantId: string) {
     return this.addons.findOne({ where: { tenantId, code: 'EINVOICING', status: In(['SOLICITADO', 'ACTIVO']) }, order: { createdAt: 'DESC' } });
+  }
+
+  // ═══════════════════════ Avisos por correo
+
+  /** Datos del negocio para los correos (nombre y correo del dueño del contrato). */
+  private async noticeContext(tenantId: string, a: { requestedBy: string; tier: string; includedUnits: number; monthly: number | null; requestedAt: Date }): Promise<NoticeContext> {
+    const rows = await this.dataSource.query(
+      `SELECT u."strUserName" AS email, le."businessName" AS business, np."firstName" AS first, np."firstSurname" AS last
+         FROM "user" u
+         LEFT JOIN basic_data bd ON bd.id = u."basicDataId"
+         LEFT JOIN legal_entity_data le ON le."basicDataId" = bd.id
+         LEFT JOIN natural_person_data np ON np."basicDataId" = bd.id
+        WHERE u.id = $1 LIMIT 1`,
+      [tenantId],
+    ).catch(() => []);
+    const r = rows[0] || {};
+    const inout = (process.env.INOUT_LOGIN_URL || 'https://app.cyclonet.com.co/login').replace(/\/login\/?$/, '');
+    const authoriza = (process.env.AUTHORIZA_LOGIN_URL || 'https://auth.cyclonet.com.co/login').replace(/\/login\/?$/, '');
+    return {
+      businessName: r.business || [r.first, r.last].filter(Boolean).join(' ') || r.email || 'Negocio',
+      tenantEmail: r.email || '',
+      requestedBy: a.requestedBy || r.email || '',
+      tier: a.tier,
+      includedUnits: a.includedUnits,
+      monthly: a.monthly != null ? Number(a.monthly) : null,
+      requestedAt: new Date(a.requestedAt),
+      available: !!this.provider(),
+      settingsUrl: `${inout}/setting`,
+      adminUrl: `${authoriza}/home`,
+    };
+  }
+
+  private async sendRequestNotices(ctx: NoticeContext): Promise<void> {
+    const admins: { email: string }[] = await this.dataSource.query(
+      `SELECT DISTINCT u."strUserName" AS email FROM "user" u
+         JOIN user_roles ur ON ur."userId" = u.id AND ur.status = 'ACTIVE'
+         JOIN rol r ON r.id = ur."roleId" AND r."strName" = 'adminFactonet'`,
+    ).catch(() => []);
+    await this.mail('EINVOICING_REQUEST_ADMIN', admins.map((a) => a.email), noticeVariables(ctx, true));
+    await this.mail('EINVOICING_REQUEST_RECEIVED', [ctx.requestedBy, ctx.tenantEmail], noticeVariables(ctx));
+  }
+
+  /** Envía la plantilla a cada correo distinto (sin repetir); un fallo no detiene a los demás. */
+  private async mail(template: string, to: string[], vars: Record<string, string>): Promise<void> {
+    if (!this.notifications) return;
+    const unique = [...new Set(to.map((e) => String(e || '').trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
+    for (const email of unique) {
+      await this.notifications.sendByTemplate(template, email, vars).catch((e) => this.logger.warn(`${template} a ${email}: ${e.message}`));
+    }
   }
 
   // ═══════════════════════ Internos

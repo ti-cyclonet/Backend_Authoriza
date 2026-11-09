@@ -75,7 +75,7 @@ export class DashboardOverviewService {
       expiringList, overdueList,
       usersAgg, signupsRaw, customers,
       billedSeriesRaw, collectedSeriesRaw,
-      recentLogs,
+      recentLogs, einvoicingRaw,
       newsContracts, newsInvoices, newsUsers, newsPayments,
     ] = await Promise.all([
       collected(monthStart, now),
@@ -128,6 +128,21 @@ export class DashboardOverviewService {
         .where('i.status = :paid', { paid: InvoiceStatus.PAID })
         .andWhere('COALESCE(i.paymentDate, i.updatedAt) >= :from', { from: sixMonthsStart }).getRawMany(),
       this.logsService.getRecentLogs(12),
+      // Solicitudes de facturación electrónica pendientes de activar y su avance
+      this.userRepository.manager.query(
+        `SELECT a.id, a.tier, a."requestedAt", a."requestedBy", u."strUserName" AS email,
+                COALESCE(le."businessName", NULLIF(TRIM(CONCAT(np."firstName", ' ', np."firstSurname")), ''), u."strUserName") AS client,
+                i.status AS "issuerStatus",
+                EXISTS (SELECT 1 FROM einvoice_resolutions r WHERE r."issuerId" = i.id AND r.active AND r."docType" IN ('FACTURA','POS')) AS numbering
+           FROM contract_addons a
+           JOIN "user" u ON u.id::text = a."tenantId"
+           LEFT JOIN basic_data bd ON bd.id = u."basicDataId"
+           LEFT JOIN legal_entity_data le ON le."basicDataId" = bd.id
+           LEFT JOIN natural_person_data np ON np."basicDataId" = bd.id
+           LEFT JOIN einvoice_issuers i ON i."tenantId" = a."tenantId"
+          WHERE a.code = 'EINVOICING' AND a.status = 'SOLICITADO'
+          ORDER BY a."requestedAt" ASC LIMIT 20`,
+      ).catch(() => []),
       // Novedades: lo último de cada tipo. El panel compara con la consulta
       // anterior y avisa con una burbuja sonora de lo que llegó.
       this.contractRepository.createQueryBuilder('c')
@@ -215,6 +230,17 @@ export class DashboardOverviewService {
       alerts: {
         expiringContracts: expiringList.map((c) => ({ ...c, daysLeft: Math.ceil((new Date(c.endDate).getTime() - now.getTime()) / DAY_MS) })),
         overdueInvoices: overdueList.map((i) => ({ ...i, value: num(i.value), daysOverdue: Math.floor((now.getTime() - new Date(i.expirationDate).getTime()) / DAY_MS) })),
+        // Negocios que pidieron la facturación electrónica: datos fiscales y numeración listos o pendientes
+        einvoicingRequests: einvoicingRaw.map((r: any) => ({
+          id: r.id,
+          client: r.client,
+          email: r.email,
+          tier: r.tier,
+          requestedAt: r.requestedAt,
+          daysWaiting: Math.max(0, Math.floor((now.getTime() - new Date(r.requestedAt).getTime()) / DAY_MS)),
+          dataReady: !!r.issuerStatus && r.issuerStatus !== 'DATOS_INCOMPLETOS',
+          numberingReady: r.numbering === true || r.numbering === 't',
+        })),
       },
       series: { months, signups: days },
       customers,
