@@ -272,7 +272,7 @@ export class AuthController {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'} - InOut</title>
+  <title>${isSuccess ? '¡Cuenta verificada!' : 'Verificación'} - ${result.appName || 'InOut'}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
@@ -295,20 +295,21 @@ export class AuthController {
     <div class="icon">${isSuccess ? '✅' : isPending ? '📧' : '⚠️'}</div>
     <h1>${isSuccess ? '¡Cuenta activada!' : isPending ? '¡Email verificado!' : (result.message || 'Error')}</h1>
     ${isSuccess ? `
-    <p>Tu contrato ha sido activado exitosamente. Ya puedes iniciar sesión en InOut.</p>
+    <p>Tu contrato ha sido activado exitosamente. Ya puedes iniciar sesión en ${result.appName || 'InOut'}.</p>
     <div class="info-box">
       <p><strong>Plan:</strong> ${result.data?.packageName || ''}</p>
       <p><strong>Contrato:</strong> ${result.data?.contractCode || ''}</p>
       ${result.data?.endDate ? `<p><strong>Válido hasta:</strong> ${new Date(result.data.endDate).toLocaleDateString('es-CO')}</p>` : ''}
       <p><strong>Contraseña temporal:</strong> <code>1234567890</code></p>
     </div>
-    <a href="${result.loginUrl || 'https://inout.cyclonet.com.co'}" class="btn">Ir a InOut →</a>
+    <a href="${result.loginUrl || 'https://inout.cyclonet.com.co'}" class="btn">Ir a ${result.appName || 'InOut'} →</a>
     ` : isPending ? `
     <p>${result.message}</p>
     <div class="info-box">
       <p><strong>Plan:</strong> ${result.data?.packageName || ''}</p>
       <p><strong>Contrato:</strong> ${result.data?.contractCode || ''}</p>
     </div>
+    ${result.loginUrl ? `<a href="${result.loginUrl}" class="btn">Ir a ${result.appName || 'InOut'} →</a>` : ''}
     ` : `
     <p>Verifica que el enlace sea correcto o solicita uno nuevo.</p>
     `}

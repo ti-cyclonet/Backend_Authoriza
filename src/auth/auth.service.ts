@@ -122,7 +122,7 @@ export class AuthService {
     // Si además tiene un rol de staff, el panel solo considera los de staff; así
     // ser cliente de otro negocio no le obliga a elegir empresa al entrar.
     const staffRoles = userActiveRoles.filter(ur => !AuthService.CUSTOMER_ROLES.includes(ur.role?.strName || ''));
-    const panelRoles = staffRoles.length > 0 ? staffRoles : userActiveRoles;
+    const panelRoles = AuthService.preferFactonetCompany(staffRoles.length > 0 ? staffRoles : userActiveRoles);
 
     // Detectar múltiples contratos (para esta app) y forzar selección cuando hay
     // ambigüedad. Cada contrato representa un "tenant"/plan distinto; el usuario
@@ -577,6 +577,18 @@ export class AuthService {
    * de staff, y el del MarketPlace pide el de cliente explícitamente.
    */
   static readonly CUSTOMER_ROLES = ['clienteInout'];
+
+  /**
+   * FactoNet: la empresa (empresaFactonet) ya ve y paga sus facturas con CycloNet,
+   * así que el rol de cliente (adminInvoices, p. ej. por su contrato de InOut) del
+   * mismo titular sobra. Sin esto, quien usa InOut y además contrató la
+   * contabilidad tendría que elegir contrato al entrar a FactoNet.
+   */
+  static preferFactonetCompany<T extends { role?: { strName?: string }; contract?: { user?: { id?: string } } | null }>(roles: T[]): T[] {
+    const owners = new Set(roles.filter((ur) => ur.role?.strName === 'empresaFactonet').map((ur) => ur.contract?.user?.id).filter(Boolean));
+    if (!owners.size) return roles;
+    return roles.filter((ur) => !(ur.role?.strName === 'adminInvoices' && owners.has(ur.contract?.user?.id)));
+  }
 
   /** De varios user_roles, el primero que NO sea de cliente (o el primero si todos lo son). */
   static preferStaffRole<T extends { role?: { strName?: string } }>(roles: T[]): T | undefined {
