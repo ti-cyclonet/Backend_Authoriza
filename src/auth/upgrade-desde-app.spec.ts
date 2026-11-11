@@ -77,4 +77,13 @@ describe('SelfRegistrationService.upgradePlanFromApp', () => {
     await expect(service.upgradePlanFromApp({ id: OWNER.id, rol: 'adminInout' }, PRO.id, consents, {}))
       .rejects.toThrow(/en firma/);
   });
+
+  it('con la aceptación de los Términos el nuevo plan queda activo de inmediato (autoservicio)', async () => {
+    const activate = jest.fn(async (c: any) => ({ ...c, status: ContractStatus.ACTIVE }));
+    (service as any).contractService = { findOne: jest.fn(async (id: string) => ({ id, clientSignedAt: new Date() })), activateIfClientSigned: activate };
+    const res: any = await service.upgradePlanFromApp({ id: OWNER.id, rol: 'adminInout' }, PRO.id, consents, {});
+    expect(activate).toHaveBeenCalledWith(expect.objectContaining({ id: 'c-new' }));
+    expect(res.pendingActivation).toBe(false);
+    expect(res.message).toMatch(/ya está activo/);
+  });
 });

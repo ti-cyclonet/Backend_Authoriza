@@ -33,10 +33,11 @@ export class ContractController {
   @Post(':id/pdf')
   async uploadPDF(
     @Param('id') contractId: string,
-    @Body() body: { pdfBuffer: string }
+    @Body() body: { pdfBuffer: string },
+    @Req() req: any,
   ) {
     const pdfBuffer = Buffer.from(body.pdfBuffer, 'base64');
-    const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer);
+    const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer, req.user?.id ?? null);
     return { pdfUrl };
   }
 

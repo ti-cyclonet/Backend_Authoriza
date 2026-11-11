@@ -394,7 +394,7 @@ export class ContractService {
     return this.contractRepository.save(contract);
   }
 
-  async uploadContractPDF(contractId: string, pdfBuffer: Buffer): Promise<string> {
+  async uploadContractPDF(contractId: string, pdfBuffer: Buffer, uploaderId?: string | null): Promise<string> {
     const contract = await this.findOne(contractId);
 
     if (contract.pdfUrl) {
@@ -413,7 +413,10 @@ export class ContractService {
     // EXCEPCIÓN: en el flujo "admin firma primero" (Kiri/Shotra), NO se envía
     // aquí; el correo al cliente se dispara cuando el admin firma (signAsAdmin),
     // para no invitar al cliente antes de tiempo.
-    if (contract.user?.isVerified && !this.isAdminFirstSigningFlow(contract)) {
+    // Si quien sube el PDF es el propio cliente (lo genera al firmar), no se le
+    // manda la invitación: ya está firmando.
+    const uploadedByOwner = !!uploaderId && uploaderId === contract.user?.id;
+    if (contract.user?.isVerified && !this.isAdminFirstSigningFlow(contract) && !uploadedByOwner) {
       this.sendContractEmail(contract, uploadResult.secure_url).catch((err) =>
         this.logger.error(`Error sending contract email: ${err.message}`),
       );
@@ -524,17 +527,14 @@ export class ContractService {
 
     const saved = await this.contractRepository.save(contract);
 
-    // If admin already signed, activate automatically
-    if (saved.adminSignedAt) {
-      return this.autoActivateIfBothSigned(saved);
+    // Autoservicio: la firma del cliente activa el contrato. La de CycloNet es
+    // una contrafirma posterior que no condiciona el servicio.
+    if (!saved.adminSignedAt) {
+      this.notifyAuthorizedAdminSigner(saved).catch(err =>
+        this.logger.warn(`Failed to notify admin signer: ${err.message}`),
+      );
     }
-
-    // Notify authorized admin signer that client has signed
-    this.notifyAuthorizedAdminSigner(saved).catch(err =>
-      this.logger.warn(`Failed to notify admin signer: ${err.message}`),
-    );
-
-    return saved;
+    return this.activateIfClientSigned(saved);
   }
 
   /**
@@ -584,9 +584,10 @@ export class ContractService {
 
     const saved = await this.contractRepository.save(contract);
 
-    // If client already signed, activate automatically
+    // Contrafirma: si el cliente ya firmó, el contrato ya está activo (o se
+    // activa ahora, para contratos firmados antes de este cambio).
     if (saved.clientSignedAt) {
-      return this.autoActivateIfBothSigned(saved);
+      return this.activateIfClientSigned(saved);
     }
 
     // El admin firmó primero: recién ahora se invita al CLIENTE a firmar.
@@ -626,10 +627,13 @@ export class ContractService {
   }
 
   /**
-   * Auto-activate contract when both parties have signed.
+   * Activa el contrato en cuanto el cliente lo firma (autoservicio, sin esperar
+   * a CycloNet). La firma del administrador queda como contrafirma posterior.
+   * Requisito de la exclusión de IVA para computación en la nube (art. 476
+   * num. 21 E.T.): el servicio se aprovisiona sin intervención del proveedor.
    */
-  private async autoActivateIfBothSigned(contract: Contract): Promise<Contract> {
-    if (contract.clientSignedAt && contract.adminSignedAt && contract.status !== ContractStatus.ACTIVE) {
+  async activateIfClientSigned(contract: Contract): Promise<Contract> {
+    if (contract.clientSignedAt && contract.status !== ContractStatus.ACTIVE) {
       contract.status = ContractStatus.ACTIVE;
       contract.startDate = new Date();
 
@@ -747,7 +751,7 @@ export class ContractService {
           .catch(() => this.logger.warn('Could not invalidate InOut cache'));
       }
 
-      this.logger.log(`Contract ${contract.code} auto-activated: both parties signed.`);
+      this.logger.log(`Contract ${contract.code} auto-activated: client signed.`);
       return saved;
     }
     return contract;
@@ -1255,13 +1259,11 @@ export class ContractService {
       ],
     });
 
-    if (!contract?.pdfUrl) return; // No hay contrato o no tiene PDF aún
+    // Solo contratos por firmar: el cliente firma primero en FactoNet (el PDF
+    // se genera ahí si aún no existe) y con su firma se activa el plan.
+    if (!contract || contract.clientSignedAt || contract.status !== ContractStatus.PENDING) return;
 
-    // En flujo admin-primero (Kiri/Shotra) el correo se envía tras la firma del
-    // admin, no al verificar el correo del usuario.
-    if (this.isAdminFirstSigningFlow(contract)) return;
-
-    await this.sendContractEmail(contract, contract.pdfUrl);
+    await this.sendContractEmail(contract, contract.pdfUrl || '');
   }
 
   private async validateCodePrefix(codePrefix: string, userId: string): Promise<void> {
