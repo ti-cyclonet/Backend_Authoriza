@@ -30,7 +30,7 @@ describe('ContractService · activación con la firma del cliente', () => {
       findOne: jest.fn(async () => ({ ...OWNER, isAuthorizedSigner: true })),
       update: jest.fn(),
       createQueryBuilder: jest.fn(() => {
-        const qb: any = { update: () => qb, set: () => qb, where: () => qb, execute: async () => undefined, innerJoin: () => qb, andWhere: () => qb, getMany: async () => [] };
+        const qb: any = { update: () => qb, set: () => qb, where: () => qb, execute: async () => undefined, innerJoin: () => qb, andWhere: () => qb, getMany: async () => [], getCount: async () => 1 };
         return qb;
       }),
     };
