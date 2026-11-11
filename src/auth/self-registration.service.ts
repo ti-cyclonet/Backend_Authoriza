@@ -41,6 +41,13 @@ interface ClientSignature {
   ip: string;
 }
 
+/** App y login a los que se envía al usuario tras verificar su correo, según su plan. */
+export function appTarget(contract: { package?: { targetApplication?: string | null } | null } | null): { name: string; loginUrl: string } {
+  const app = String(contract?.package?.targetApplication || '').toLowerCase();
+  if (app === 'factonet') return { name: 'FactoNet', loginUrl: process.env.FACTONET_LOGIN_URL || 'https://billing.cyclonet.com.co/login' };
+  return { name: 'InOut', loginUrl: process.env.INOUT_LOGIN_URL || 'http://localhost:4201/login' };
+}
+
 @Injectable()
 export class SelfRegistrationService {
   private readonly logger = new Logger(SelfRegistrationService.name);
@@ -283,6 +290,8 @@ export class SelfRegistrationService {
         issuedAt: new Date(),
         codePrefix,
         businessSector: dto.businessSector || 'general',
+        // Planes de FactoNet: el primer mes es gratis (lo descuenta el generador de facturas)
+        freeMonthsCredit: pkg.isBillable && String(pkg.targetApplication || '').toLowerCase() === 'factonet' ? 1 : 0,
       });
       const savedContract = await manager.save(contract);
 
@@ -482,8 +491,25 @@ export class SelfRegistrationService {
         // registro es de una sola cuenta (nueva politica: el principal queda
         // con accountOwner + adminInout + adminInvoices + userShotra).
         const operationalUserId = dependency ? dependency.dependentUserId : principalUserId;
+        const isFactonetPlan = String(contract.package?.targetApplication || '').toLowerCase() === 'factonet';
 
-        const adminInoutRole = await manager.findOne(Rol, {
+        // Planes de FactoNet: el rol de la empresa (contabilidad + sus facturas
+        // con CycloNet). No recibe roles de InOut.
+        if (isFactonetPlan) {
+          const empresaRole = await manager.findOne(Rol, { where: { strName: 'empresaFactonet' } });
+          if (empresaRole) {
+            const existingEmpresa = await manager.findOne(UserRole, {
+              where: { userId: operationalUserId, roleId: empresaRole.id, contractId: contract.id },
+            });
+            if (!existingEmpresa) {
+              await manager.save(manager.create(UserRole, {
+                userId: operationalUserId, roleId: empresaRole.id, contractId: contract.id, status: 'ACTIVE',
+              }));
+            }
+          }
+        }
+
+        const adminInoutRole = isFactonetPlan ? null : await manager.findOne(Rol, {
           where: { strName: 'adminInout' },
         });
         if (adminInoutRole) {
@@ -506,8 +532,9 @@ export class SelfRegistrationService {
           }
         }
 
-        // Also assign adminInvoices role from Factonet
-        const adminInvoicesRole = await manager.findOne(Rol, {
+        // Also assign adminInvoices role from Factonet (en planes de FactoNet ya
+        // lo cubre empresaFactonet)
+        const adminInvoicesRole = isFactonetPlan ? null : await manager.findOne(Rol, {
           where: { strName: 'adminInvoices' },
         });
         if (adminInvoicesRole) {
@@ -600,7 +627,8 @@ export class SelfRegistrationService {
         success: true,
         message: '¡Registro completado! Ya puedes iniciar sesión.',
         contractActivated: true,
-        loginUrl: process.env.INOUT_LOGIN_URL || 'http://localhost:4201/login',
+        appName: appTarget(result.contract).name,
+        loginUrl: appTarget(result.contract).loginUrl,
         data: {
           contractCode: result.contract.code,
           packageName: result.contract.package?.name || '',
@@ -612,11 +640,14 @@ export class SelfRegistrationService {
 
     return {
       success: true,
-      message: result.bothVerified
-        ? 'Email verificado. Tu contrato será activado por un administrador.'
-        : 'Email verificado. Falta que el otro usuario confirme su correo para activar el contrato.',
+      message: !result.bothVerified
+        ? 'Email verificado. Falta que el otro usuario confirme su correo para activar el contrato.'
+        : appTarget(result.contract).name === 'FactoNet'
+          ? 'Email verificado. Ingresa a FactoNet y firma tu contrato: tu plan se activa en cuanto lo firmes, y el primer mes es gratis.'
+          : 'Email verificado. Ingresa y firma tu contrato: tu plan se activa en cuanto lo firmes.',
       contractActivated: false,
-      loginUrl: process.env.INOUT_LOGIN_URL || 'http://localhost:4201/login',
+      appName: appTarget(result.contract).name,
+      loginUrl: appTarget(result.contract).loginUrl,
       data: {
         contractCode: result.contract.code,
         packageName: result.contract.package?.name || '',
