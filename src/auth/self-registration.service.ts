@@ -1,5 +1,7 @@
+import { ContractService } from '../contract/contract.service';
 import {
   Injectable,
+  Optional,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -57,6 +59,7 @@ export class SelfRegistrationService {
     private notificationsService: NotificationsService,
     private logsService: LogsService,
     private consentsService: ConsentsService,
+    @Optional() private contractService?: ContractService,
   ) {}
 
   async register(dto: SelfRegisterDto, meta: RequestMeta = {}) {
@@ -966,9 +969,9 @@ export class SelfRegistrationService {
     });
 
     // Plan pago contratado aceptando Términos + Habeas Data (Kiri, o el cambio
-    // de plan de InOut): esa aceptación queda como la firma del cliente; el
-    // contrato se activa solo cuando lo firme el administrador de FactoNet
-    // (autoActivateIfBothSigned).
+    // de plan de InOut): esa aceptación queda como la firma del cliente y el
+    // contrato se activa de inmediato (activateIfClientSigned). La firma del
+    // administrador de FactoNet es una contrafirma posterior.
     const firmadoPorAceptacion = !!clientSignature && !isNonBillablePkg;
     if (firmadoPorAceptacion) {
       contract.clientSignedAt = clientSignature!.at;
@@ -1000,10 +1003,24 @@ export class SelfRegistrationService {
     }
 
     // Reload contract with user relation for downstream logic
-    const fullContract = await this.contractRepository.findOne({
+    let fullContract = await this.contractRepository.findOne({
       where: { id: savedContract.id },
       relations: ['package', 'user'],
     });
+
+    // Autoservicio: firmado por aceptación → el nuevo plan queda activo ya
+    // (cancela el anterior y le pasa sus roles).
+    let activated = false;
+    if (firmadoPorAceptacion && this.contractService) {
+      try {
+        const full = await this.contractService.findOne(savedContract.id);
+        const result = await this.contractService.activateIfClientSigned(full);
+        activated = result.status === ContractStatus.ACTIVE;
+        if (activated) fullContract = await this.contractRepository.findOne({ where: { id: savedContract.id }, relations: ['package', 'user'] });
+      } catch (err) {
+        this.logger.warn(`No se pudo activar el contrato ${contractCode}: ${err.message}`);
+      }
+    }
 
     this.logger.log(
       `New contract ${contractCode} created for user ${user.strUserName} upgrading to "${pkg.name}"`,
@@ -1035,17 +1052,13 @@ export class SelfRegistrationService {
         .catch(() => this.logger.warn('Could not invalidate InOut cache'));
     }
 
-    const message = isBillable && isKiriApp && firmadoPorAceptacion
-      ? `Plan cambiado a "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma del administrador de CycloNet en FactoNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto puedes seguir usando tu plan actual.`
-      : isBillable && isKiriApp
-      ? `Plan cambiado a "${pkg.name}". Se generó un contrato pendiente de firma. Primero lo firmará el administrador de CycloNet; cuando lo haga, recibirás un correo con el enlace para revisarlo y firmarlo tú en FactoNet (billing.cyclonet.com.co). Mientras tanto puedes seguir usando tu plan actual; al firmar ambas partes, tu nuevo plan se activará automáticamente.`
-      : isBillable && firmadoPorAceptacion
-      ? `Solicitaste el cambio al plan "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato. Solo falta la firma de CycloNet; cuando firme, tu nuevo plan se activará automáticamente. Mientras tanto sigues usando tu plan actual.`
-      : isBillable && previous
-      ? `Solicitaste el cambio al plan "${pkg.name}". Se generó tu nuevo contrato: primero lo revisa y firma CycloNet; luego recibirás un correo para firmarlo tú en FactoNet (billing.cyclonet.com.co). Al firmar ambas partes, el nuevo plan se activa solo. Mientras tanto sigues usando tu plan actual.`
-      : `Plan cambiado a "${pkg.name}". Tu contrato será activado por un administrador.`;
+    const message = activated
+      ? `Plan cambiado a "${pkg.name}". Al aceptar los Términos y Condiciones y la autorización de tratamiento de datos firmaste el nuevo contrato, y tu nuevo plan ya está activo.`
+      : isBillable
+      ? `Solicitaste el cambio al plan "${pkg.name}". Se generó tu nuevo contrato: fírmalo en FactoNet (billing.cyclonet.com.co) y el nuevo plan se activa de inmediato. Mientras tanto sigues usando tu plan actual.`
+      : `Plan cambiado a "${pkg.name}".`;
 
-    return { success: true, message, contractCode, pendingActivation: isBillable };
+    return { success: true, message, contractCode, pendingActivation: isBillable && !activated };
   }
 
   private async executeUpgrade(contract: Contract, pkg: Package, packageId: string, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0, clientSignature: ClientSignature | null = null) {
@@ -1061,10 +1074,10 @@ export class SelfRegistrationService {
     }
 
     // Lo mismo en las demás apps (InOut): si el contrato actual está ACTIVE, se
-    // conserva hasta que el nuevo quede firmado por ambas partes. Cambiarlo en
+    // conserva hasta que el nuevo quede firmado por el cliente. Cambiarlo en
     // sitio a PENDING dejaba a la cuenta sin plan (InOut responde
     // CONTRACT_INACTIVE) mientras se firmaba. Al activarse el nuevo,
-    // autoActivateIfBothSigned cancela el anterior y le pasa sus roles.
+    // activateIfClientSigned cancela el anterior y le pasa sus roles.
     if (isBillable && contract.status === ContractStatus.ACTIVE) {
       await this.cancelUnsignedUpgrades(contract.user.id, pkg.targetApplication);
       return this.createContractForUpgrade(contract.user, pkg, packageId, billingCycle, firstInvoiceDiscountPct, clientSignature, contract);
