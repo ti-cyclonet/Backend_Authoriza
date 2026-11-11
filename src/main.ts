@@ -17,6 +17,7 @@ import InoutProPackageSeed from './seeds/inout-pro-package.seed';
 import InoutEnterprisePackageSeed from './seeds/inout-enterprise-package.seed';
 import KiriPackagesSeed from './seeds/kiri-packages.seed';
 import CyclonPlusPackageSeed from './seeds/cyclon-plus-package.seed';
+import FactonetPackagesSeed from './seeds/factonet-packages.seed';
 import ShotraPackagesSeed from './seeds/shotra-packages.seed';
 import { seedCustomerParameters } from './seeds/customer-parameters.seed';
 import InoutParametersSeed from './seeds/inout-parameters.seed';
@@ -107,6 +108,9 @@ async function bootstrap() {
 
   const shotraPackagesSeed = new ShotraPackagesSeed();
   await shotraPackagesSeed.run(dataSource);
+
+  const factonetPackagesSeed = new FactonetPackagesSeed();
+  await factonetPackagesSeed.run(dataSource);
 
   // Seed de plantillas de email
   const notificationsService = app.get(NotificationsService);

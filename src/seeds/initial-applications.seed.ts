@@ -327,6 +327,58 @@ export default class InitialApplicationsSeed {
               },
             ],
           },
+          {
+            // Empresa que contrata FactoNet (planes FN): lleva su contabilidad y,
+            // como cliente de CycloNet, ve y paga sus facturas.
+            strName: 'empresaFactonet',
+            strDescription1: 'Empresa',
+            strDescription2: 'Contabilidad de su empresa y sus facturas con CycloNet',
+            menuOptions: [
+              {
+                strName: 'homeFactonetInvoices',
+                strDescription: 'Home',
+                strUrl: '/home',
+                strIcon: 'house',
+                strType: 'main_menu',
+                ingOrder: 0,
+              },
+              {
+                strName: 'contabilidadFactonet',
+                strDescription: 'Contabilidad',
+                strUrl: '/contabilidad',
+                strIcon: 'journal-bookmark',
+                strType: 'main_menu',
+                ingOrder: 1,
+                strSubmenus: [],
+              },
+              {
+                strName: 'facturasFactonetInvoices',
+                strDescription: 'Invoices',
+                strUrl: '/invoices',
+                strIcon: 'file-earmark-text',
+                strType: 'main_menu',
+                ingOrder: 2,
+                strSubmenus: [],
+              },
+            ],
+          },
+          {
+            // Contador o auxiliar invitado por la empresa: solo su contabilidad.
+            strName: 'contadorFactonet',
+            strDescription1: 'Contador',
+            strDescription2: 'Solo la contabilidad de la empresa que lo invitó',
+            menuOptions: [
+              {
+                strName: 'contabilidadFactonet',
+                strDescription: 'Contabilidad',
+                strUrl: '/contabilidad',
+                strIcon: 'journal-bookmark',
+                strType: 'main_menu',
+                ingOrder: 1,
+                strSubmenus: [],
+              },
+            ],
+          },
         ],
       },
       // Kiri Finance
