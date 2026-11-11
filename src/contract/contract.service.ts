@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Not, In } from 'typeorm';
@@ -394,8 +395,18 @@ export class ContractService {
     return this.contractRepository.save(contract);
   }
 
-  async uploadContractPDF(contractId: string, pdfBuffer: Buffer, uploaderId?: string | null): Promise<string> {
+  /**
+   * Sube (o reemplaza) el PDF del contrato. Solo el dueño del contrato, un
+   * dependiente firmante autorizado del dueño o un adminFactonet.
+   */
+  async uploadContractPDF(contractId: string, pdfBuffer: Buffer, uploaderId: string | null | undefined): Promise<string> {
+    const requesterId = this.requireUserId(uploaderId);
     const contract = await this.findOne(contractId);
+
+    const isAdmin = await this.hasActiveRole(requesterId, ContractService.ADMIN_ROLE);
+    if (!isAdmin) {
+      await this.assertClientSigner(contract, requesterId);
+    }
 
     if (contract.pdfUrl) {
       await this.cloudinaryService.deletePDFByUrl(contract.pdfUrl);
@@ -436,7 +447,12 @@ export class ContractService {
     return app === 'Kiri' || app === 'Shotra';
   }
 
-  async issueContract(contractId: string): Promise<Contract> {
+  /** Emite el contrato. Solo adminFactonet. */
+  async issueContract(contractId: string, requesterId: string | null | undefined): Promise<Contract> {
+    const userId = this.requireUserId(requesterId);
+    if (!(await this.hasActiveRole(userId, ContractService.ADMIN_ROLE))) {
+      throw new ForbiddenException('Solo un administrador de FactoNet puede emitir contratos.');
+    }
     const contract = await this.findOne(contractId);
 
     if (!contract.pdfUrl || contract.pdfUrl.trim() === '') {
@@ -476,7 +492,8 @@ export class ContractService {
    * Client signs the contract.
    * Contract must be ISSUED (have a PDF) to be signed by the client.
    */
-  async signAsClient(contractId: string, signedBy: string, ip: string, userId?: string): Promise<Contract> {
+  async signAsClient(contractId: string, signedBy: string, ip: string, signerId: string | null | undefined): Promise<Contract> {
+    const userId = this.requireUserId(signerId);
     const contract = await this.findOne(contractId);
 
     if (!contract.pdfUrl || !contract.issuedAt) {
@@ -489,40 +506,12 @@ export class ContractService {
       throw new BadRequestException('El cliente ya ha firmado este contrato.');
     }
 
-    // Validate signer authorization
-    if (userId) {
-      const contractOwnerId = contract.user?.id;
-
-      // Case 1: The signer IS the contract owner (KIRI user signing their own contract)
-      if (userId === contractOwnerId) {
-        // Owner can always sign their own contract — no extra validation needed
-      } else {
-        // Case 2: The signer is a dependent — check UserDependency.isAuthorizedSigner
-        const dependency = await this.userDependencyRepository.findOne({
-          where: {
-            principalUserId: contractOwnerId,
-            dependentUserId: userId,
-            status: 'ACTIVE',
-          },
-        });
-
-        if (!dependency) {
-          throw new BadRequestException(
-            'No tienes relación de dependencia con el dueño del contrato.',
-          );
-        }
-
-        if (!dependency.isAuthorizedSigner) {
-          throw new BadRequestException(
-            'No tienes autorización para firmar. El administrador debe designarte como firmante autorizado en la gestión de dependencias.',
-          );
-        }
-      }
-    }
+    // El firmante es el usuario autenticado: el dueño o un dependiente firmante autorizado.
+    await this.assertClientSigner(contract, userId);
 
     contract.clientSignedAt = new Date();
     contract.clientSignedBy = signedBy;
-    contract.clientSignedByUserId = userId || null;
+    contract.clientSignedByUserId = userId;
     contract.clientSignedIp = ip;
 
     const saved = await this.contractRepository.save(contract);
@@ -541,7 +530,8 @@ export class ContractService {
    * Admin signs the contract.
    * Requires that the contract is ISSUED.
    */
-  async signAsAdmin(contractId: string, signedBy: string, ip: string, userId?: string): Promise<Contract> {
+  async signAsAdmin(contractId: string, signedBy: string, ip: string, signerId: string | null | undefined): Promise<Contract> {
+    const userId = this.requireUserId(signerId);
     const contract = await this.findOne(contractId);
 
     if (!contract.pdfUrl || !contract.issuedAt) {
@@ -554,28 +544,8 @@ export class ContractService {
       throw new BadRequestException('El administrador ya ha firmado este contrato.');
     }
 
-    // Validate authorized admin signer
-    if (userId) {
-      // Check if user is an authorized signer via User entity or UserDependency
-      const signerUser = await this.userRepository.findOne({ where: { id: userId } });
-      const isSignerViaUser = signerUser?.isAuthorizedSigner === true;
-
-      if (!isSignerViaUser) {
-        const signerDependency = await this.userDependencyRepository.findOne({
-          where: {
-            dependentUserId: userId,
-            status: 'ACTIVE',
-            isAuthorizedSigner: true,
-          },
-        });
-
-        if (!signerDependency) {
-          throw new BadRequestException(
-            'No tienes autorización para firmar contratos. Debes ser designado como firmante autorizado.',
-          );
-        }
-      }
-    }
+    // Solo un adminFactonet designado como firmante autorizado.
+    await this.assertAdminSigner(userId);
 
     contract.adminSignedAt = new Date();
     contract.adminSignedBy = signedBy;
@@ -600,6 +570,89 @@ export class ContractService {
     }
 
     return saved;
+  }
+
+  private static readonly ADMIN_ROLE = 'adminFactonet';
+
+  /** El id del usuario autenticado (JWT); sin él no se firma ni se modifica. */
+  private requireUserId(userId: string | null | undefined): string {
+    if (!userId) {
+      throw new UnauthorizedException('Se requiere un usuario autenticado.');
+    }
+    return userId;
+  }
+
+  /** ¿Tiene el usuario el rol indicado activo? */
+  private async hasActiveRole(userId: string, roleName: string): Promise<boolean> {
+    const count = await this.userRepository
+      .createQueryBuilder('user')
+      .innerJoin('user_roles', 'ur', 'ur."userId" = user.id')
+      .innerJoin('rol', 'r', 'r.id = ur."roleId"')
+      .where('user.id = :userId', { userId })
+      .andWhere('r."strName" = :roleName', { roleName })
+      .andWhere('ur.status = :status', { status: 'ACTIVE' })
+      .getCount();
+    return count > 0;
+  }
+
+  /**
+   * Quien actúa como cliente debe ser el dueño del contrato o un dependiente
+   * activo del dueño designado como firmante autorizado.
+   */
+  private async assertClientSigner(contract: Contract, userId: string): Promise<void> {
+    const contractOwnerId = contract.user?.id;
+    if (contractOwnerId && userId === contractOwnerId) return;
+
+    const dependency = contractOwnerId
+      ? await this.userDependencyRepository.findOne({
+          where: {
+            principalUserId: contractOwnerId,
+            dependentUserId: userId,
+            status: 'ACTIVE',
+          },
+        })
+      : null;
+
+    if (!dependency) {
+      throw new ForbiddenException(
+        'No tienes relación de dependencia con el dueño del contrato.',
+      );
+    }
+
+    if (!dependency.isAuthorizedSigner) {
+      throw new ForbiddenException(
+        'No tienes autorización para firmar. El administrador debe designarte como firmante autorizado en la gestión de dependencias.',
+      );
+    }
+  }
+
+  /**
+   * La contrafirma de CycloNet: un adminFactonet que además sea firmante
+   * autorizado (en su usuario o en su dependencia activa).
+   */
+  private async assertAdminSigner(userId: string): Promise<void> {
+    const notAuthorized = () =>
+      new ForbiddenException(
+        'No tienes autorización para firmar contratos. Debes ser designado como firmante autorizado.',
+      );
+
+    if (!(await this.hasActiveRole(userId, ContractService.ADMIN_ROLE))) {
+      throw notAuthorized();
+    }
+
+    const signerUser = await this.userRepository.findOne({ where: { id: userId } });
+    if (signerUser?.isAuthorizedSigner === true) return;
+
+    const signerDependency = await this.userDependencyRepository.findOne({
+      where: {
+        dependentUserId: userId,
+        status: 'ACTIVE',
+        isAuthorizedSigner: true,
+      },
+    });
+    if (!signerDependency) {
+      throw notAuthorized();
+    }
   }
 
   /**

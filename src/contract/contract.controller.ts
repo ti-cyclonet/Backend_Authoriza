@@ -37,7 +37,7 @@ export class ContractController {
     @Req() req: any,
   ) {
     const pdfBuffer = Buffer.from(body.pdfBuffer, 'base64');
-    const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer, req.user?.id ?? null);
+    const pdfUrl = await this.contractService.uploadContractPDF(contractId, pdfBuffer, req.user?.id);
     return { pdfUrl };
   }
 
@@ -79,23 +79,23 @@ export class ContractController {
   @Post(':id/sign-client')
   async signAsClient(
     @Param('id') contractId: string,
-    @Body() body: { signedBy: string; userId?: string },
+    @Body() body: { signedBy: string },
     @Req() req: any,
   ) {
     const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
-    const userId = body.userId || req.user?.id || null;
-    return this.contractService.signAsClient(contractId, body.signedBy, ip, userId);
+    // El firmante es SIEMPRE el usuario del JWT; un userId en el body se ignora.
+    return this.contractService.signAsClient(contractId, body.signedBy, ip, req.user?.id);
   }
 
   @Post(':id/sign-admin')
   async signAsAdmin(
     @Param('id') contractId: string,
-    @Body() body: { signedBy: string; userId?: string },
+    @Body() body: { signedBy: string },
     @Req() req: any,
   ) {
     const ip = req.headers['x-forwarded-for'] || req.connection?.remoteAddress || req.ip || 'unknown';
-    const userId = body.userId || req.user?.id || null;
-    return this.contractService.signAsAdmin(contractId, body.signedBy, ip, userId);
+    // El firmante es SIEMPRE el usuario del JWT; un userId en el body se ignora.
+    return this.contractService.signAsAdmin(contractId, body.signedBy, ip, req.user?.id);
   }
 
   @Get(':id/signatures')
@@ -104,8 +104,8 @@ export class ContractController {
   }
 
   @Patch(':id/issue')
-  async issueContract(@Param('id') contractId: string) {
-    return this.contractService.issueContract(contractId);
+  async issueContract(@Param('id') contractId: string, @Req() req: any) {
+    return this.contractService.issueContract(contractId, req.user?.id);
   }
 
   @Get('active')
