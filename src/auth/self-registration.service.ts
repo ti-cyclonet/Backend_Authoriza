@@ -784,6 +784,25 @@ export class SelfRegistrationService {
   }
 
   /**
+   * Cambio de plan pedido por el backend de Kiri (clave interna) con la sesión
+   * de Kiri: sin contraseña. La aceptación de Términos + tratamiento de datos es
+   * la firma del cliente (obligatoria aquí) y el plan queda activo de inmediato.
+   * Solo planes de Kiri que se ofrecen en la landing.
+   */
+  async upgradePlanInternal(email: string, packageId: string, consents: ConsentInput, meta: RequestMeta, billingCycle: 'monthly' | 'annual' = 'monthly', firstInvoiceDiscountPct = 0) {
+    const user = await this.userRepository.findOne({ where: { strUserName: email } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    const pkg = await this.packageRepository.findOne({ where: { id: packageId } });
+    if (!pkg || !pkg.showInLanding || String((pkg as any).targetApplication || '').toLowerCase() !== 'kiri') {
+      throw new BadRequestException('Ese plan no está disponible.');
+    }
+    if (!this.consentsService.hasConsents(consents)) {
+      throw new BadRequestException('Debes aceptar los Términos del Servicio y autorizar el tratamiento de tus datos.');
+    }
+    return this.upgradePlanForUser(user, packageId, consents, meta, billingCycle, firstInvoiceDiscountPct);
+  }
+
+  /**
    * Cambio de plan pedido desde dentro de una app (InOut) con la sesión vigente:
    * sin contraseña, pero solo el administrador de la cuenta, a un plan que se
    * ofrece en la landing de esa misma app y aceptando Términos + datos.

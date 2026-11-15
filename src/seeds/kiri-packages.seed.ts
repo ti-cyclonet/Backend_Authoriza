@@ -39,8 +39,9 @@ const PAQUETES: DefPaquete[] = [
   {
     plan: 'FREE',
     name: 'KIRI FREE',
-    description: 'Empieza a ordenar tu plata: registra tus gastos e ingresos sin límite, controla tus deudas y gastos fijos, ahorra en bolsillos y haz crecer tu Árbol Kiri.',
-    descripcionesViejas: ['Gestión básica de tus finanzas personales. Controla ingresos, deudas y gastos fijos con distribución inteligente de presupuesto.'],
+    // 2026-11: cada plan con su promesa (FREE para empezar, PLUS para ti, PRO para los dos)
+    description: 'Para empezar: organiza tu quincena gratis. Gastos, ingresos, deudas y gastos fijos sin límite, cuánto puedes gastar cada semana, tu Árbol Kiri y su tienda. Al registrarte pruebas KIRI PLUS 14 días.',
+    descripcionesViejas: ['Gestión básica de tus finanzas personales. Controla ingresos, deudas y gastos fijos con distribución inteligente de presupuesto.', 'Empieza a ordenar tu plata: registra tus gastos e ingresos sin límite, controla tus deudas y gastos fijos, ahorra en bolsillos y haz crecer tu Árbol Kiri.'],
     preciosViejos: [],
     displayOrder: 1,
     isHighlighted: false,
@@ -51,8 +52,8 @@ const PAQUETES: DefPaquete[] = [
   {
     plan: 'PLUS',
     name: 'KIRI PLUS',
-    description: 'Todo Kiri para ti: Kiri Coach con IA, dictado y escáner de recibos, proyecciones a 24 meses, reportes en PDF, Social con préstamos y ahorros compartidos, y sin límites en tus registros.',
-    descripcionesViejas: ['Todas las funcionalidades de Kiri Finance. Asistente IA, reportes avanzados, estrategias de deuda, funciones sociales y sin límites en registros.'],
+    description: 'Para ti: planea tu futuro. Proyecciones a 24 meses y el día en que quedas libre de deudas, historial de 2 años y reportes en PDF, Kiri Coach con 150 mensajes, y Social con préstamos y ahorros compartidos.',
+    descripcionesViejas: ['Todas las funcionalidades de Kiri Finance. Asistente IA, reportes avanzados, estrategias de deuda, funciones sociales y sin límites en registros.', 'Todo Kiri para ti: Kiri Coach con IA, dictado y escáner de recibos, proyecciones a 24 meses, reportes en PDF, Social con préstamos y ahorros compartidos, y sin límites en tus registros.'],
     // 16.000 → 12.900 → 14.900 (anual 119.000 → 139.000)
     preciosViejos: [16000, 12900],
     preciosAnualesViejos: [119000],
@@ -65,9 +66,10 @@ const PAQUETES: DefPaquete[] = [
   {
     plan: 'PRO',
     name: 'KIRI PRO',
-    description: 'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, más IA, escáner que separa por productos, escenarios guardados, historial ilimitado y soporte prioritario. Conexión con tu banco, próximamente.',
+    description: 'Para los dos: la plata del hogar. Presupuesto del hogar en pareja (basta con que uno tenga PRO), Kiri Coach con 500 mensajes, escáner que separa por productos, escenarios guardados, todo tu historial y soporte prioritario. Conexión con tu banco, próximamente.',
     // Ya no hay PLUS gratis para la pareja de un PRO; la conexión con el banco aún no está disponible
     descripcionesViejas: [
+      'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, más IA, escáner que separa por productos, escenarios guardados, historial ilimitado y soporte prioritario. Conexión con tu banco, próximamente.',
       'Para el hogar y quien quiere todo: presupuesto del hogar en pareja (tu pareja recibe PLUS gratis), conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
       'Para el hogar y quien quiere todo: presupuesto del hogar en pareja, conexión con tu banco, más IA, escenarios guardados, historial ilimitado y soporte prioritario.',
     ],
