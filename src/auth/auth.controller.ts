@@ -207,6 +207,17 @@ export class AuthController {
     return this.selfRegistrationService.recordAppConsents(body, this.consentMeta(req, body));
   }
 
+  @ApiOperation({ summary: 'Interno: cambio de plan pedido desde Kiri con la sesión de Kiri (sin contraseña)' })
+  @Public()
+  @UseGuards(InternalKeyGuard)
+  @Post('internal/upgrade-plan')
+  async upgradePlanInternal(@Body() body: { email: string; packageId: string; billingCycle?: 'monthly' | 'annual'; firstInvoiceDiscountPct?: number } & ConsentInput, @Req() req: ExpressRequest) {
+    // Kiri ya autenticó a la persona (su sesión): la firma es la aceptación de
+    // Términos + datos, con la IP y el navegador del usuario (consentMeta).
+    const billingCycle = body.billingCycle === 'annual' ? 'annual' : 'monthly';
+    return this.selfRegistrationService.upgradePlanInternal(body.email, body.packageId, body, this.consentMeta(req, body), billingCycle, Number(body.firstInvoiceDiscountPct) || 0);
+  }
+
   @ApiOperation({ summary: 'Interno: avatar vigente de un usuario por id o email (Shotra, Kiri)' })
   @Public()
   @UseGuards(InternalKeyGuard)

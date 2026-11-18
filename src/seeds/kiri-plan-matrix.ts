@@ -40,6 +40,8 @@ export const KIRI_PLAN_VARIABLES: VarDef[] = [
   { variableName: 'aiCoach', displayName: 'Kiri Coach con IA', limitType: 'feature', valores: { FREE: 1, PLUS: 1, PRO: 1 } },
   { variableName: 'socialConnections', displayName: 'Conexiones sociales', limitType: 'feature', valores: { FREE: 1, PLUS: 1, PRO: 1 } },
   { variableName: 'advancedReports', displayName: 'Reportes en PDF', limitType: 'feature', valores: { FREE: 0, PLUS: 1, PRO: 1 } },
+  // Colores exclusivos del árbol: Aurora con PLUS, también Diamante con PRO
+  { variableName: 'jardinExclusivo', displayName: 'Color exclusivo para tu Árbol Kiri', limitType: 'feature', valores: { FREE: 0, PLUS: 1, PRO: 1 } },
   { variableName: 'debtStrategies', displayName: 'Estrategias de deuda (Bola de nieve / Avalancha)', limitType: 'feature', valores: { FREE: 0, PLUS: 1, PRO: 1 } },
   { variableName: 'p2pLoans', displayName: 'Préstamos entre usuarios', limitType: 'feature', valores: { FREE: 0, PLUS: 1, PRO: 1 } },
   { variableName: 'sharedDebts', displayName: 'Deudas compartidas', limitType: 'feature', valores: { FREE: 0, PLUS: 1, PRO: 1 } },
@@ -52,8 +54,10 @@ export const KIRI_PLAN_VARIABLES: VarDef[] = [
   { variableName: 'prioritySupport', displayName: 'Soporte prioritario', limitType: 'feature', valores: { FREE: 0, PLUS: 0, PRO: 1 } },
   // ── Cantidades ──
   { variableName: 'nCategorias', displayName: 'categorías de presupuesto', limitType: 'quantity', valores: { FREE: 3, PLUS: 20, PRO: U } },
-  { variableName: 'nDeudas', displayName: 'deudas', limitType: 'quantity', valores: { FREE: 3, PLUS: U, PRO: U } },
-  { variableName: 'nGastosFijos', displayName: 'gastos fijos', limitType: 'quantity', valores: { FREE: 4, PLUS: U, PRO: U } },
+  // Desde 2026-11: en FREE no se limita lo que debes pagar (deudas y gastos fijos), así el
+  // "si pagas tus obligaciones te quedan" y el plan semanal salen bien desde el primer día.
+  { variableName: 'nDeudas', displayName: 'deudas', limitType: 'quantity', valores: { FREE: U, PLUS: U, PRO: U } },
+  { variableName: 'nGastosFijos', displayName: 'gastos fijos', limitType: 'quantity', valores: { FREE: U, PLUS: U, PRO: U } },
   { variableName: 'nBolsillos', displayName: 'bolsillos de ahorro', limitType: 'quantity', valores: { FREE: 2, PLUS: 10, PRO: U } },
   { variableName: 'nMeDeben', displayName: 'registros de "Me deben"', limitType: 'quantity', valores: { FREE: 1, PLUS: U, PRO: U } },
   { variableName: 'nIngresosExtra', displayName: 'ingresos extra', limitType: 'quantity', valores: { FREE: 2, PLUS: U, PRO: U } },
